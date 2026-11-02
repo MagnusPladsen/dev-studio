@@ -370,7 +370,7 @@ export default function PalettesPage() {
             </div>
 
             {/* Color grid */}
-            <div className="grid grid-cols-4 sm:grid-cols-8 gap-2 mb-6">
+            <div className="grid grid-cols-4 sm:grid-cols-8 md:max-lg:grid-cols-4 gap-2 mb-6">
               {selected.colors.map((color, i) => (
                 <div key={i} className="group relative">
                   <button

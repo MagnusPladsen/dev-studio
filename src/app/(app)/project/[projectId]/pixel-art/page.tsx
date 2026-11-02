@@ -251,6 +251,11 @@ export default function PixelArtPage() {
   const [onionSkin, setOnionSkin] = useState(true);
   const [onionOpacity, setOnionOpacity] = useState(0.3);
   const [sizeMenu, setSizeMenu] = useState(false);
+  // Below 1280px the toolbar scrolls sideways, so the canvas menu is placed with fixed coordinates inside the screen.
+  const [sizeMenuPlacement, setSizeMenuPlacement] = useState<React.CSSProperties | undefined>();
+  // Phones show the colour panel or the frames, one at a time, so the canvas keeps room.
+  const [showColourPanel, setShowColourPanel] = useState(false);
+  const [showFrames, setShowFrames] = useState(false);
   const [scaleMethod, setScaleMethod] = useState<ScaleMethod>("sharp");
   const [scaleCopy, setScaleCopy] = useState(false);
   const [scaling, setScaling] = useState(false);
@@ -1007,6 +1012,22 @@ export default function PixelArtPage() {
 
   const smallBtn: React.CSSProperties = { ...btnStyle(), padding: 3 };
 
+  const placeSizeMenu = (anchor: HTMLElement): React.CSSProperties | undefined => {
+    if (window.innerWidth >= 1280) return undefined;
+    const MARGIN = 8;
+    const rect = anchor.getBoundingClientRect();
+    const width = Math.min(288, window.innerWidth - MARGIN * 2);
+    const top = rect.bottom + 4;
+    return {
+      position: "fixed",
+      top,
+      left: Math.max(MARGIN, Math.min(rect.left, window.innerWidth - width - MARGIN)),
+      width,
+      maxHeight: window.innerHeight - top - MARGIN,
+      overflowY: "auto",
+    };
+  };
+
   // Sprite list + new-sprite form + links. Shown in the left column on desktop, in a drawer on phones.
   const spritesPanel = (
     <div style={panelStyle}>
@@ -1137,198 +1158,201 @@ export default function PixelArtPage() {
     <div className="flex flex-col h-full overflow-hidden" style={{ background: "var(--bg-primary)" }}>
       {/* Top bar */}
       <div
-        className="flex items-center justify-between px-4 h-12 shrink-0 border-b max-md:h-auto max-md:flex-wrap max-md:gap-2 max-md:py-2 max-md:px-3"
+        className="flex items-center gap-1.5 px-4 h-12 shrink-0 border-b max-md:px-3"
         style={{ background: "var(--bg-secondary)", borderColor: "var(--border)" }}
       >
-        <div className="flex items-center gap-3 max-md:gap-2 max-md:flex-wrap">
-          <label className="flex items-center gap-1.5">
-            <span className="text-[10px] uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Name</span>
-            <input
-              type="text"
-              value={newName}
-              onChange={(e) => { setNewName(e.target.value); setTouched(true); }}
-              placeholder={DEFAULT_NAME}
-              className="bg-transparent text-sm font-medium outline-none w-36 max-md:w-28 px-1.5 py-0.5 rounded"
-              style={{ color: "var(--text-primary)", border: "1px solid var(--border)" }}
-            />
-          </label>
-          <div className="relative">
-            <button
-              onClick={() => {
-                setPickW(String(canvasW));
-                setPickH(String(canvasH));
-                setSizeMenu((v) => !v);
-              }}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium"
-              style={{ background: "var(--bg-card)", color: "var(--text-primary)", border: "1px solid var(--border)" }}
-              title="Change canvas size"
-            >
-              <Maximize2 className="w-3.5 h-3.5" style={{ color: "var(--accent)" }} />
-              Canvas {canvasW}×{canvasH}
-              <ChevronDown className="w-3 h-3" style={{ color: "var(--text-muted)" }} />
-            </button>
-            {sizeMenu && (
-              <div
-                className="absolute z-50 top-full left-0 mt-1 w-72 max-w-[calc(100vw-24px)] p-3 rounded-lg shadow-xl"
-                style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)" }}
+        <div className="flex-1 min-w-0 h-full flex items-center justify-between max-xl:gap-3 max-xl:overflow-x-auto">
+          <div className="flex items-center gap-3 max-md:gap-2 max-xl:shrink-0">
+            <label className="flex items-center gap-1.5">
+              <span className="text-[10px] uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Name</span>
+              <input
+                type="text"
+                value={newName}
+                onChange={(e) => { setNewName(e.target.value); setTouched(true); }}
+                placeholder={DEFAULT_NAME}
+                className="bg-transparent text-sm font-medium outline-none field-sizing-content min-w-36 max-w-80 max-md:min-w-28 max-md:max-w-[60vw] px-1.5 py-0.5 rounded"
+                style={{ color: "var(--text-primary)", border: "1px solid var(--border)" }}
+              />
+            </label>
+            <div className="relative">
+              <button
+                onClick={(e) => {
+                  setPickW(String(canvasW));
+                  setPickH(String(canvasH));
+                  setSizeMenuPlacement(placeSizeMenu(e.currentTarget));
+                  setSizeMenu((v) => !v);
+                }}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium max-xl:whitespace-nowrap"
+                style={{ background: "var(--bg-card)", color: "var(--text-primary)", border: "1px solid var(--border)" }}
+                title="Change canvas size"
               >
-                <div className="text-xs font-medium mb-2" style={{ color: "var(--text-primary)" }}>Canvas size (pixels)</div>
-                <div className="grid grid-cols-4 gap-1 mb-2">
-                  {SIZES.map((sz) => {
-                    const on = String(sz.w) === pickW && String(sz.h) === pickH;
-                    return (
-                      <button
-                        key={sz.label}
-                        onClick={() => {
-                          setPickW(String(sz.w));
-                          setPickH(String(sz.h));
-                        }}
-                        className="text-xs py-1 rounded"
-                        style={{
-                          background: on ? "var(--accent)" : "var(--bg-hover)",
-                          color: on ? "var(--on-accent, #fff)" : "var(--text-primary)",
-                          border: "1px solid var(--border)",
-                        }}
-                      >
-                        {sz.label}
-                      </button>
-                    );
-                  })}
-                </div>
-                <div className="flex items-center gap-1.5 mb-3 text-xs" style={{ color: "var(--text-muted)" }}>
-                  Custom
-                  <input type="number" min={1} max={MAX_SIZE} value={pickW} onChange={(e) => setPickW(e.target.value)} className="w-14 px-1.5 py-0.5 rounded outline-none" style={{ background: "var(--bg-primary)", color: "var(--text-primary)", border: "1px solid var(--border)" }} aria-label="Width" />
-                  ×
-                  <input type="number" min={1} max={MAX_SIZE} value={pickH} onChange={(e) => setPickH(e.target.value)} className="w-14 px-1.5 py-0.5 rounded outline-none" style={{ background: "var(--bg-primary)", color: "var(--text-primary)", border: "1px solid var(--border)" }} aria-label="Height" />
-                </div>
-                <div className="flex gap-1.5">
-                  <button
-                    onClick={async () => {
-                      const [w, h] = pickedSize();
-                      await resizeCanvas(w, h);
-                      setSizeMenu(false);
-                    }}
-                    className="flex-1 text-xs py-1.5 rounded font-medium"
-                    style={{ background: "var(--accent)", color: "var(--on-accent, #fff)" }}
-                    title="Keep your drawing, centred; larger adds empty space, smaller crops the edges"
-                  >
-                    Resize this sprite
-                  </button>
-                  <button
-                    onClick={() => {
-                      const [w, h] = pickedSize();
-                      createNewSprite(w, h);
-                      setSizeMenu(false);
-                    }}
-                    className="flex-1 text-xs py-1.5 rounded"
-                    style={{ background: "var(--bg-hover)", color: "var(--text-primary)", border: "1px solid var(--border)" }}
-                  >
-                    New sprite
-                  </button>
-                </div>
-                <p className="text-[11px] mt-2 leading-snug" style={{ color: "var(--text-muted)" }}>
-                  Resizing keeps your drawing centred. Making it smaller crops the edges.
-                </p>
-
-                <div className="mt-3 pt-3 border-t" style={{ borderColor: "var(--border)" }}>
-                  <div className="text-xs font-medium mb-0.5" style={{ color: "var(--text-primary)" }}>Scale up the drawing</div>
-                  <p className="text-[11px] mb-2 leading-snug" style={{ color: "var(--text-muted)" }}>
-                    Turn an {canvasW}×{canvasH} sprite into a bigger one, every frame and layer.
-                  </p>
-                  <div className="grid grid-cols-2 gap-1 mb-2" role="radiogroup" aria-label="Scaling method">
-                    {([
-                      ["sharp", "Sharp", "Each pixel becomes a block. Exact."],
-                      ["smooth", "Smooth", "Rounds diagonal edges, keeps the pixel look."],
-                    ] as const).map(([value, label, hint]) => (
-                      <button
-                        key={value}
-                        role="radio"
-                        aria-checked={scaleMethod === value}
-                        onClick={() => setScaleMethod(value)}
-                        className="text-left px-2 py-1.5 rounded"
-                        style={{
-                          background: scaleMethod === value ? "var(--accent-glow)" : "var(--bg-hover)",
-                          border: `1px solid ${scaleMethod === value ? "var(--accent)" : "var(--border)"}`,
-                        }}
-                        title={hint}
-                      >
-                        <span className="block text-xs font-medium" style={{ color: "var(--text-primary)" }}>{label}</span>
-                        <span className="block text-[10px] leading-snug" style={{ color: "var(--text-muted)" }}>{hint}</span>
-                      </button>
-                    ))}
-                  </div>
-                  <div className="grid grid-cols-3 gap-1 mb-2">
-                    {([2, 3, 4] as const).map((f) => {
-                      const tooBig = canvasW * f > MAX_SIZE || canvasH * f > MAX_SIZE;
+                <Maximize2 className="w-3.5 h-3.5" style={{ color: "var(--accent)" }} />
+                Canvas {canvasW}×{canvasH}
+                <ChevronDown className="w-3 h-3" style={{ color: "var(--text-muted)" }} />
+              </button>
+              {sizeMenu && (
+                <div
+                  className="absolute z-50 top-full left-0 mt-1 w-72 max-w-[calc(100vw-24px)] p-3 rounded-lg shadow-xl"
+                  style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)", ...sizeMenuPlacement }}
+                >
+                  <div className="text-xs font-medium mb-2" style={{ color: "var(--text-primary)" }}>Canvas size (pixels)</div>
+                  <div className="grid grid-cols-4 gap-1 mb-2">
+                    {SIZES.map((sz) => {
+                      const on = String(sz.w) === pickW && String(sz.h) === pickH;
                       return (
                         <button
-                          key={f}
-                          disabled={tooBig || scaling}
-                          onClick={async () => {
-                            setScaling(true);
-                            try {
-                              await scaleSprite(f, scaleMethod, scaleCopy);
-                              setSizeMenu(false);
-                            } finally {
-                              setScaling(false);
-                            }
+                          key={sz.label}
+                          onClick={() => {
+                            setPickW(String(sz.w));
+                            setPickH(String(sz.h));
                           }}
-                          className="py-1.5 rounded text-xs disabled:opacity-40"
-                          style={{ background: "var(--bg-hover)", color: "var(--text-primary)", border: "1px solid var(--border)" }}
-                          title={tooBig ? `Bigger than ${MAX_SIZE}×${MAX_SIZE}` : `Scale to ${canvasW * f}×${canvasH * f}`}
+                          className="text-xs py-1 rounded"
+                          style={{
+                            background: on ? "var(--accent)" : "var(--bg-hover)",
+                            color: on ? "var(--on-accent, #fff)" : "var(--text-primary)",
+                            border: "1px solid var(--border)",
+                          }}
                         >
-                          <span className="font-semibold">×{f}</span>
-                          <span className="block text-[10px] tabular-nums" style={{ color: "var(--text-muted)" }}>
-                            {canvasW * f}×{canvasH * f}
-                          </span>
+                          {sz.label}
                         </button>
                       );
                     })}
                   </div>
-                  <label className="flex items-center gap-1.5 text-[11px]" style={{ color: "var(--text-secondary)" }}>
-                    <input type="checkbox" checked={scaleCopy} onChange={(e) => setScaleCopy(e.target.checked)} className="accent-[var(--accent)]" />
-                    Keep the original and make a scaled copy
-                  </label>
+                  <div className="flex items-center gap-1.5 mb-3 text-xs" style={{ color: "var(--text-muted)" }}>
+                    Custom
+                    <input type="number" min={1} max={MAX_SIZE} value={pickW} onChange={(e) => setPickW(e.target.value)} className="w-14 px-1.5 py-0.5 rounded outline-none" style={{ background: "var(--bg-primary)", color: "var(--text-primary)", border: "1px solid var(--border)" }} aria-label="Width" />
+                    ×
+                    <input type="number" min={1} max={MAX_SIZE} value={pickH} onChange={(e) => setPickH(e.target.value)} className="w-14 px-1.5 py-0.5 rounded outline-none" style={{ background: "var(--bg-primary)", color: "var(--text-primary)", border: "1px solid var(--border)" }} aria-label="Height" />
+                  </div>
+                  <div className="flex gap-1.5">
+                    <button
+                      onClick={async () => {
+                        const [w, h] = pickedSize();
+                        await resizeCanvas(w, h);
+                        setSizeMenu(false);
+                      }}
+                      className="flex-1 text-xs py-1.5 rounded font-medium"
+                      style={{ background: "var(--accent)", color: "var(--on-accent, #fff)" }}
+                      title="Keep your drawing, centred; larger adds empty space, smaller crops the edges"
+                    >
+                      Resize this sprite
+                    </button>
+                    <button
+                      onClick={() => {
+                        const [w, h] = pickedSize();
+                        createNewSprite(w, h);
+                        setSizeMenu(false);
+                      }}
+                      className="flex-1 text-xs py-1.5 rounded"
+                      style={{ background: "var(--bg-hover)", color: "var(--text-primary)", border: "1px solid var(--border)" }}
+                    >
+                      New sprite
+                    </button>
+                  </div>
+                  <p className="text-[11px] mt-2 leading-snug" style={{ color: "var(--text-muted)" }}>
+                    Resizing keeps your drawing centred. Making it smaller crops the edges.
+                  </p>
+
+                  <div className="mt-3 pt-3 border-t" style={{ borderColor: "var(--border)" }}>
+                    <div className="text-xs font-medium mb-0.5" style={{ color: "var(--text-primary)" }}>Scale up the drawing</div>
+                    <p className="text-[11px] mb-2 leading-snug" style={{ color: "var(--text-muted)" }}>
+                      Turn an {canvasW}×{canvasH} sprite into a bigger one, every frame and layer.
+                    </p>
+                    <div className="grid grid-cols-2 gap-1 mb-2" role="radiogroup" aria-label="Scaling method">
+                      {([
+                        ["sharp", "Sharp", "Each pixel becomes a block. Exact."],
+                        ["smooth", "Smooth", "Rounds diagonal edges, keeps the pixel look."],
+                      ] as const).map(([value, label, hint]) => (
+                        <button
+                          key={value}
+                          role="radio"
+                          aria-checked={scaleMethod === value}
+                          onClick={() => setScaleMethod(value)}
+                          className="text-left px-2 py-1.5 rounded"
+                          style={{
+                            background: scaleMethod === value ? "var(--accent-glow)" : "var(--bg-hover)",
+                            border: `1px solid ${scaleMethod === value ? "var(--accent)" : "var(--border)"}`,
+                          }}
+                          title={hint}
+                        >
+                          <span className="block text-xs font-medium" style={{ color: "var(--text-primary)" }}>{label}</span>
+                          <span className="block text-[10px] leading-snug" style={{ color: "var(--text-muted)" }}>{hint}</span>
+                        </button>
+                      ))}
+                    </div>
+                    <div className="grid grid-cols-3 gap-1 mb-2">
+                      {([2, 3, 4] as const).map((f) => {
+                        const tooBig = canvasW * f > MAX_SIZE || canvasH * f > MAX_SIZE;
+                        return (
+                          <button
+                            key={f}
+                            disabled={tooBig || scaling}
+                            onClick={async () => {
+                              setScaling(true);
+                              try {
+                                await scaleSprite(f, scaleMethod, scaleCopy);
+                                setSizeMenu(false);
+                              } finally {
+                                setScaling(false);
+                              }
+                            }}
+                            className="py-1.5 rounded text-xs disabled:opacity-40"
+                            style={{ background: "var(--bg-hover)", color: "var(--text-primary)", border: "1px solid var(--border)" }}
+                            title={tooBig ? `Bigger than ${MAX_SIZE}×${MAX_SIZE}` : `Scale to ${canvasW * f}×${canvasH * f}`}
+                          >
+                            <span className="font-semibold">×{f}</span>
+                            <span className="block text-[10px] tabular-nums" style={{ color: "var(--text-muted)" }}>
+                              {canvasW * f}×{canvasH * f}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <label className="flex items-center gap-1.5 text-[11px]" style={{ color: "var(--text-secondary)" }}>
+                      <input type="checkbox" checked={scaleCopy} onChange={(e) => setScaleCopy(e.target.checked)} className="accent-[var(--accent)]" />
+                      Keep the original and make a scaled copy
+                    </label>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
+            <button
+              onClick={() => { setShowNewDialog(true); setMobilePanel(true); }}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-md text-xs max-xl:whitespace-nowrap"
+              style={{ color: "var(--text-primary)", border: "1px solid var(--border)" }}
+              title="Start a new sprite"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              New sprite
+            </button>
+            <button
+              onClick={() => setMobilePanel((v) => !v)}
+              className="md:hidden flex items-center gap-1 px-2.5 py-1 rounded-md text-xs whitespace-nowrap"
+              style={{ color: "var(--text-primary)", border: "1px solid var(--border)", background: mobilePanel ? "var(--bg-hover)" : undefined }}
+              aria-expanded={mobilePanel}
+              title="Sprites, layers and links"
+            >
+              <PanelTopOpen className="w-3.5 h-3.5" />
+              Sprites &amp; layers
+            </button>
           </div>
-          <button
-            onClick={() => { setShowNewDialog(true); setMobilePanel(true); }}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-md text-xs"
-            style={{ color: "var(--text-primary)", border: "1px solid var(--border)" }}
-            title="Start a new sprite"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            New sprite
-          </button>
-          <button
-            onClick={() => setMobilePanel((v) => !v)}
-            className="md:hidden flex items-center gap-1 px-2.5 py-1 rounded-md text-xs"
-            style={{ color: "var(--text-primary)", border: "1px solid var(--border)", background: mobilePanel ? "var(--bg-hover)" : undefined }}
-            aria-expanded={mobilePanel}
-            title="Sprites, layers and links"
-          >
-            <PanelTopOpen className="w-3.5 h-3.5" />
-            Sprites &amp; layers
-          </button>
+          <div className="flex items-center gap-1.5 max-xl:shrink-0">
+            <UndoRedoButtons
+              history={{ undo, redo, ...historyState }}
+            />
+            <div style={{ width: 1, height: 20, background: "var(--border)", margin: "0 4px" }} />
+            <SaveIndicator state={touched ? saveState : "saved"} />
+            <HelpButton topic="pixel-art" />
+          </div>
         </div>
-        <div className="flex items-center gap-1.5">
-          <UndoRedoButtons
-            history={{ undo, redo, ...historyState }}
-          />
-          <div style={{ width: 1, height: 20, background: "var(--border)", margin: "0 4px" }} />
-          <SaveIndicator state={touched ? saveState : "saved"} />
-          <HelpButton topic="pixel-art" />
-          <ExportMenu
-            items={[
-              { label: "PNG (current frame)", description: `Frame ${activeFrame + 1} at ${canvasW}×${canvasH}`, onClick: exportPNG },
-              { label: "Sprite sheet PNG (all frames)", description: `${frames.length} frame${frames.length === 1 ? "" : "s"} in a grid`, onClick: exportSpriteSheet },
-              { label: "Animated GIF", description: "All frames, loops, 4× size", onClick: () => exportGif(4) },
-              { label: "Animated GIF (1× size)", description: `All frames, loops, ${canvasW}×${canvasH}`, onClick: () => exportGif(1) },
-            ]}
-          />
-        </div>
+        <ExportMenu
+          items={[
+            { label: "PNG (current frame)", description: `Frame ${activeFrame + 1} at ${canvasW}×${canvasH}`, onClick: exportPNG },
+            { label: "Sprite sheet PNG (all frames)", description: `${frames.length} frame${frames.length === 1 ? "" : "s"} in a grid`, onClick: exportSpriteSheet },
+            { label: "Animated GIF", description: "All frames, loops, 4× size", onClick: () => exportGif(4) },
+            { label: "Animated GIF (1× size)", description: `All frames, loops, ${canvasW}×${canvasH}`, onClick: () => exportGif(1) },
+          ]}
+        />
       </div>
 
       {/* Phones: sprites, layers and links in a drawer under the toolbar */}
@@ -1340,14 +1364,25 @@ export default function PixelArtPage() {
       )}
 
       <div className="flex flex-1 overflow-hidden max-md:flex-col">
-        {/* Left panel: sprites + tools + palette (phones: a scrollable strip of tools and colours) */}
-        <div className="w-52 shrink-0 flex flex-col gap-2 p-2 overflow-y-auto border-r max-md:w-full max-md:flex-row max-md:overflow-x-auto max-md:overflow-y-hidden max-md:border-r-0 max-md:border-b" style={{ borderColor: "var(--border)" }}>
+        {/* Left panel: sprites + tools + palette (phones: one scrolling row of tools, the colour panel opens below it) */}
+        <div className="w-52 shrink-0 flex flex-col gap-2 p-2 overflow-y-auto border-r max-md:w-full max-md:gap-1.5 max-md:p-1.5 max-md:max-h-[45dvh] max-md:border-r-0 max-md:border-b" style={{ borderColor: "var(--border)" }}>
           <div className="max-md:hidden">{spritesPanel}</div>
 
           {/* Tools */}
-          <div style={panelStyle} className="max-md:shrink-0">
-            <div className="text-xs font-medium mb-2" style={{ color: "var(--text-secondary)" }}>Tools</div>
-            <div className="grid grid-cols-4 gap-1">
+          <div style={panelStyle} className="max-md:shrink-0 max-md:flex max-md:items-center max-md:gap-1 max-md:overflow-x-auto max-md:p-1!">
+            <div className="text-xs font-medium mb-2 max-md:hidden" style={{ color: "var(--text-secondary)" }}>Tools</div>
+            <button
+              onClick={() => { setShowColourPanel(!showColourPanel); setShowFrames(false); }}
+              className="md:hidden! shrink-0 flex items-center gap-1"
+              style={btnStyle(showColourPanel)}
+              title={showColourPanel ? "Hide colours" : "Show colours"}
+              aria-label={showColourPanel ? "Hide colours" : "Show colours"}
+              aria-expanded={showColourPanel}
+            >
+              <span className="w-4 h-4 rounded-sm border" style={{ background: color, borderColor: "var(--border)" }} />
+              {showColourPanel ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+            </button>
+            <div className="grid grid-cols-4 gap-1 max-md:flex max-md:shrink-0">
               {(Object.keys(TOOL_META) as Tool[]).map((t) => {
                 const { icon: Icon, label, key } = TOOL_META[t];
                 return (
@@ -1357,7 +1392,7 @@ export default function PixelArtPage() {
                 );
               })}
             </div>
-            <div className="flex items-center gap-2 mt-2">
+            <div className="flex items-center gap-2 mt-2 max-md:mt-0 max-md:gap-1 max-md:shrink-0">
               <button onClick={() => setShowGrid(!showGrid)} style={btnStyle(showGrid)} title="Show grid" aria-label="Show grid" aria-pressed={showGrid}>
                 <Grid3X3 className="w-4 h-4" />
               </button>
@@ -1374,7 +1409,7 @@ export default function PixelArtPage() {
           </div>
 
           {/* Color */}
-          <div style={panelStyle} className="max-md:shrink-0 max-md:w-60">
+          <div style={panelStyle} className={`max-md:shrink-0 ${showColourPanel ? "" : "max-md:hidden"}`}>
             <div className="text-xs font-medium mb-2" style={{ color: "var(--text-secondary)" }}>Colour</div>
             <div className="flex items-center gap-2 mb-2">
               <div className="w-8 h-8 shrink-0 rounded border" style={{ background: color, borderColor: "var(--border)" }} />
@@ -1442,6 +1477,9 @@ export default function PixelArtPage() {
               </button>
             </div>
           </div>
+
+          {/* Tablets: layers move here from the right column so the canvas gets the width */}
+          <div className="hidden md:max-xl:block">{layersPanel}</div>
         </div>
 
         {/* Center: canvas */}
@@ -1460,7 +1498,7 @@ export default function PixelArtPage() {
         </div>
 
         {/* Right panel: layers */}
-        <div className="w-48 shrink-0 flex flex-col gap-2 p-2 overflow-y-auto border-l max-md:hidden" style={{ borderColor: "var(--border)" }}>
+        <div className="w-48 shrink-0 flex flex-col gap-2 p-2 overflow-y-auto border-l max-xl:hidden" style={{ borderColor: "var(--border)" }}>
           {layersPanel}
         </div>
       </div>
@@ -1470,7 +1508,7 @@ export default function PixelArtPage() {
         className="shrink-0 border-t px-4 pt-2 pb-2.5 max-md:px-3"
         style={{ background: "var(--bg-secondary)", borderColor: "var(--border)" }}
       >
-        <div className="flex items-center gap-3 mb-1.5 flex-wrap">
+        <div className={`flex items-center gap-3 mb-1.5 flex-wrap ${showFrames ? "" : "max-md:mb-0"}`}>
           <div className="flex items-center gap-1.5">
             <Film className="w-4 h-4" style={{ color: "var(--accent)" }} />
             <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>Animation</span>
@@ -1481,7 +1519,7 @@ export default function PixelArtPage() {
           <span className="text-xs hidden lg:inline" style={{ color: "var(--text-muted)" }}>
             Each box is one frame. Draw a frame, add the next one, then press Preview to play them in order.
           </span>
-          <div className="ml-auto flex items-center gap-3">
+          <div className={`ml-auto flex items-center gap-3 ${showFrames ? "" : "max-md:hidden"}`}>
             <label className="flex items-center gap-1.5 text-xs cursor-pointer select-none" style={{ color: "var(--text-secondary)" }} title="Shows the previous frame faded behind the current one, so the next frame is easy to line up">
               <input type="checkbox" checked={onionSkin} onChange={(e) => setOnionSkin(e.target.checked)} className="accent-[var(--accent)]" />
               Show previous frame
@@ -1499,9 +1537,18 @@ export default function PixelArtPage() {
               />
             )}
           </div>
+          <button
+            onClick={() => { setShowFrames(!showFrames); setShowColourPanel(false); }}
+            className={`md:hidden flex items-center gap-1 px-2.5 py-1 rounded-md text-xs ${showFrames ? "" : "ml-auto"}`}
+            style={{ color: "var(--text-primary)", border: "1px solid var(--border)" }}
+            aria-expanded={showFrames}
+          >
+            {showFrames ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
+            {showFrames ? "Hide frames" : "Show frames"}
+          </button>
         </div>
 
-        <div className="flex items-center gap-3 max-md:flex-wrap max-md:gap-2">
+        <div className={`flex items-center gap-3 max-md:flex-wrap max-md:gap-2 ${showFrames ? "" : "max-md:hidden"}`}>
           <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={() => setPlaying(!playing)}
@@ -1556,14 +1603,14 @@ export default function PixelArtPage() {
           </div>
 
           <div className="flex items-center gap-1 shrink-0">
-            <button onClick={addFrame} className="flex items-center gap-1 px-2 py-1.5 rounded-md text-xs" style={{ color: "var(--text-primary)", border: "1px solid var(--border)" }} title="Add an empty frame at the end">
-              <FilePlus className="w-3.5 h-3.5" /> New frame
+            <button onClick={addFrame} className="flex items-center gap-1 px-2 py-1.5 rounded-md text-xs" style={{ color: "var(--text-primary)", border: "1px solid var(--border)" }} title="Add an empty frame at the end" aria-label="New frame">
+              <FilePlus className="w-3.5 h-3.5" /> <span className="md:max-xl:hidden">New frame</span>
             </button>
-            <button onClick={() => duplicateFrame()} className="flex items-center gap-1 px-2 py-1.5 rounded-md text-xs" style={{ color: "var(--text-primary)", border: "1px solid var(--border)" }} title="Copy the selected frame, a quick way to make the next pose">
-              <Copy className="w-3.5 h-3.5" /> Duplicate
+            <button onClick={() => duplicateFrame()} className="flex items-center gap-1 px-2 py-1.5 rounded-md text-xs" style={{ color: "var(--text-primary)", border: "1px solid var(--border)" }} title="Copy the selected frame, a quick way to make the next pose" aria-label="Duplicate frame">
+              <Copy className="w-3.5 h-3.5" /> <span className="md:max-xl:hidden">Duplicate</span>
             </button>
-            <button onClick={() => deleteFrame()} disabled={frames.length <= 1} className="flex items-center gap-1 px-2 py-1.5 rounded-md text-xs disabled:opacity-40" style={{ color: "var(--red)", border: "1px solid var(--border)" }} title="Delete the selected frame">
-              <Trash2 className="w-3.5 h-3.5" /> Delete
+            <button onClick={() => deleteFrame()} disabled={frames.length <= 1} className="flex items-center gap-1 px-2 py-1.5 rounded-md text-xs disabled:opacity-40" style={{ color: "var(--red)", border: "1px solid var(--border)" }} title="Delete the selected frame" aria-label="Delete frame">
+              <Trash2 className="w-3.5 h-3.5" /> <span className="md:max-xl:hidden">Delete</span>
             </button>
           </div>
         </div>
