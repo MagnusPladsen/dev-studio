@@ -41,6 +41,17 @@ export function markTutorialSeen(projectId: string, topic: HelpTopic, store: See
   }
 }
 
+/** Forgets which tours were seen in a project, so turning tutorials back on shows each one again. */
+export function clearSeenTutorials(projectId: string, store: SeenStore | null = browserStore()): void {
+  const all = readAll(store);
+  delete all[projectId];
+  try {
+    store?.setItem(TUTORIALS_SEEN_KEY, JSON.stringify(all));
+  } catch {
+    // Storage full or blocked: tours already seen just stay hidden.
+  }
+}
+
 /** The help topic for a project page such as `/project/abc/pixel-art`, or null outside a tool. */
 export function tutorialTopicForPath(pathname: string, projectId: string): HelpTopic | null {
   const prefix = `/project/${projectId}/`;

@@ -5,6 +5,7 @@ import { HELP } from "./help-content";
 import {
   TUTORIALS_SEEN_KEY,
   areTutorialsOn,
+  clearSeenTutorials,
   getSeenTutorials,
   markTutorialSeen,
   setProjectTutorials,
@@ -79,6 +80,20 @@ describe("seen tutorials", () => {
 
   it("should not throw when there is no storage", () => {
     expect(() => markTutorialSeen("p1", "music", null)).not.toThrow();
+  });
+
+  it("should forget a project's tools when they are cleared", () => {
+    const store = memoryStore();
+    markTutorialSeen("p1", "music", store);
+    clearSeenTutorials("p1", store);
+    expect(getSeenTutorials("p1", store)).toEqual([]);
+  });
+
+  it("should keep other projects when one project's tools are cleared", () => {
+    const store = memoryStore();
+    markTutorialSeen("p2", "music", store);
+    clearSeenTutorials("p1", store);
+    expect(getSeenTutorials("p2", store)).toEqual(["music"]);
   });
 });
 

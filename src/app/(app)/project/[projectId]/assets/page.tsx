@@ -16,6 +16,7 @@ import { ASSET_ICONS } from "@/components/asset-icons";
 import { ExamplesBar } from "@/components/ExamplesBar";
 import { NewBadge, isNewTool } from "@/components/NewBadge";
 import { HelpButton } from "@/components/HelpButton";
+import { TutorialsToggle } from "@/components/TutorialsToggle";
 import { ASSET_KINDS, ASSET_TYPES, assetHref, listAssets } from "@/lib/assets";
 import { getRelated } from "@/lib/links";
 import { getAssetName, getStoredAsset } from "@/lib/asset-actions";
@@ -132,6 +133,7 @@ export default function AssetsPage() {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <HelpButton topic="assets" />
+          <TutorialsToggle projectId={projectId} />
           <button
             onClick={exportProject}
             className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm shrink-0 max-md:flex-1"
