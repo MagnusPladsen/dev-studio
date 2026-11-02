@@ -51,13 +51,25 @@ export const DEFAULT_COLUMNS: BoardColumn[] = [
 
 export const DAY = 86_400_000;
 
-export function today(): string {
-  return new Date().toISOString().slice(0, 10);
+/** The local calendar date as YYYY-MM-DD (not UTC, so it matches the user's own day). */
+export function today(now = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 }
 
 export function isOverdue(issue: Pick<Issue, "dueDate" | "resolvedAt">): boolean {
   return !!issue.dueDate && !issue.resolvedAt && issue.dueDate < today();
 }
+
+/** Quotes a CSV cell and defuses leading = + - @ so spreadsheets don't run it as a formula. */
+export function csvCell(value: unknown): string {
+  const text = String(value ?? "");
+  const safe = /^[=+\-@]/.test(text) ? "'" + text : text;
+  return `"${safe.replace(/"/g, '""')}"`;
+}
+
+/** Byte order mark so Excel reads the CSV as UTF-8. */
+export const CSV_BOM = "\uFEFF";
 
 export function daysLeft(end?: string): number | null {
   if (!end) return null;
