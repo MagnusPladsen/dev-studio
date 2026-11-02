@@ -213,7 +213,7 @@ export function AccountPanel() {
           <button
             onClick={() => setDialog("signin")}
             className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg font-medium"
-            style={{ background: "var(--accent-glow)", color: "var(--accent)", border: "1px solid rgba(124,92,252,0.25)" }}
+            style={{ background: "var(--accent-glow)", color: "var(--accent)", border: "1px solid color-mix(in srgb, var(--accent) 25%, transparent)" }}
           >
             <CloudOff className="w-3.5 h-3.5" />
             Sign in to sync

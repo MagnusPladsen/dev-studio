@@ -16,10 +16,11 @@ owner through Vercel from `main`.
 ## Two apps
 
 The same code builds **GameDev Studio** (all tools) and **Dev Studio** (Task Board, Canvas, Wiki, Notebook), picked at
-build time by `NEXT_PUBLIC_APP` (`dev-studio` or unset). `src/lib/app-config.ts` holds each app's name, initials, URL
-and `assetTypes`; `ASSET_TYPES` and the sidebar only show those, and `src/proxy.ts` redirects other tool routes to the
+build time by `NEXT_PUBLIC_APP` (`dev-studio` or unset). `src/lib/app-config.ts` holds each app's name, initials, URL,
+brand `accent` (purple / teal: root layout sets `--accent`, `src/app/icon.tsx` + `apple-icon.tsx` draw the favicon) and
+`assetTypes`; `ASSET_TYPES` and the sidebar only show those, and `src/proxy.ts` redirects other tool routes to the
 dashboard. In Dev Studio, Story is labelled **Wiki** (entry types Person/System/Component/Event/Reference/Goal).
-Projects carry `app` (missing = GameDev Studio); the projects list shows the other app's projects behind a toggle
+Both landing pages end with `<OtherAppPromo>` linking to the other app. Projects carry `app` (missing = GameDev Studio); the projects list shows the other app's projects behind a toggle
 and opens them on the other site. Examples: `src/lib/examples/dev-studio.ts` (Tidepool, a habit app). Write new UI
 text so it fits both apps, or switch on `isDevStudio` / `APP.subject`.
 

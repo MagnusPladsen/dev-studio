@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { LogIn } from "lucide-react";
+import { ArrowUpRight, LogIn } from "lucide-react";
 import { BetaBadge } from "@/components/BetaBadge";
-import { APP } from "@/lib/app-config";
+import { APP, OTHER_APP, isDevStudio } from "@/lib/app-config";
 import { supabaseEnabled } from "@/lib/supabase";
 import { ASSET_ICONS } from "@/components/asset-icons";
 import { ASSET_KINDS } from "@/lib/assets";
@@ -89,6 +89,48 @@ export function LandingNav({ sections }: { sections: { href: string; label: stri
         </div>
       </div>
     </nav>
+  );
+}
+
+const OTHER_APP_PITCH = isDevStudio
+  ? {
+      question: "Making a game?",
+      pitch: "GameDev Studio has these planning tools plus pixel art, 3D pixel art, music, sound effects, tilemaps and dialogue trees, all linked together.",
+    }
+  : {
+      question: "Planning something that isn't a game?",
+      pitch: "Dev Studio is the Task Board, Canvas, Wiki and Notebook on their own, made for any software project. Same account, same free tools.",
+    };
+
+/** "Have you tried the other studio?" card, in the other app's own colour. */
+export function OtherAppPromo() {
+  return (
+    <section className="py-12 px-4 sm:px-6">
+      <a
+        href={OTHER_APP.url}
+        className="group max-w-4xl mx-auto flex flex-col sm:flex-row items-start sm:items-center gap-5 rounded-2xl border p-6 sm:p-8 transition-colors hover:bg-[var(--bg-hover)]"
+        style={{ background: "var(--bg-secondary)", borderColor: `color-mix(in srgb, ${OTHER_APP.accent} 40%, var(--border))` }}
+      >
+        <div className="w-12 h-12 rounded-xl flex items-center justify-center font-bold shrink-0" style={{ background: OTHER_APP.accent, color: "white" }}>
+          {OTHER_APP.initials}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium mb-1" style={{ color: OTHER_APP.accent }}>
+            {OTHER_APP_PITCH.question} Have you tried {OTHER_APP.name}?
+          </p>
+          <p className="leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+            {OTHER_APP_PITCH.pitch}
+          </p>
+        </div>
+        <span
+          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap shrink-0"
+          style={{ background: OTHER_APP.accent, color: "white" }}
+        >
+          Open {OTHER_APP.name}
+          <ArrowUpRight className="w-4 h-4" />
+        </span>
+      </a>
+    </section>
   );
 }
 
