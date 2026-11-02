@@ -1,5 +1,22 @@
 import { describe, expect, it } from "vitest";
-import { imageSrc, itemsFromLines, linkPreview, linkUrl } from "./cards";
+import { imageSrc, itemsFromLines, linkCardSize, linkLook, linkPreview, linkUrl } from "./cards";
+
+describe("linkCardSize", () => {
+  it("should start a compact card when the link is a plain page", () => {
+    expect(linkCardSize("https://lospec.com/palette-list")).toEqual({ width: 280, height: 64 });
+  });
+
+  it("should start a song-shaped card when the link is a track", () => {
+    expect(linkCardSize("https://tidal.com/browse/track/77646169")).toEqual({ width: 320, height: 112 });
+  });
+});
+
+describe("linkLook", () => {
+  it("should fall back to the domain when there is no title or label", () => {
+    const look = linkLook({ id: "n", type: "link", x: 0, y: 0, width: 280, height: 64, label: "", data: { url: "https://www.lospec.com/x" } });
+    expect(look.title).toBe("lospec.com");
+  });
+});
 
 describe("itemsFromLines", () => {
   let next = 0;

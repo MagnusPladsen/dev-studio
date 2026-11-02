@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { CheckSquare, ExternalLink, ImagePlus, Link2, Play, Square } from "lucide-react";
+import { CheckSquare, ExternalLink, Globe, ImagePlus, Link2, Music, Play, Square } from "lucide-react";
 import type { DiagramNode } from "@/types";
 import { ASSET_KINDS, assetHref, getAsset } from "@/lib/assets";
 import { ASSET_ICONS } from "@/components/asset-icons";
@@ -13,11 +13,26 @@ import {
   hostname,
   imageSrc,
   itemsFromLines,
-  linkPreview,
+  LINK_THUMB,
+  linkLook,
   linkUrl,
   nodeAsset,
+  SONG_COVER,
+  type LinkLook,
 } from "@/lib/diagrams/cards";
-import { embedFor, normalizeUrl, PROVIDER_NAMES } from "@/lib/diagrams/embeds";
+import {
+  embedFor,
+  imageUrlFor,
+  normalizeUrl,
+  playerSrc,
+  PROVIDER_COLORS,
+  PROVIDER_NAMES,
+  type AudioEmbed,
+  type Embed,
+  type EmbedProvider,
+  type Player,
+  type VideoEmbed,
+} from "@/lib/diagrams/embeds";
 import { GROUP_HEADER } from "@/lib/diagrams/geometry";
 import { DRAWING_STROKE, drawingStroke, smoothPath } from "@/lib/diagrams/freehand";
 import { polygonPoints, shapeOutline } from "@/lib/diagrams/shapes";
@@ -345,79 +360,194 @@ function LinkForm({ node, onCommit, onCancel }: BodyProps) {
   );
 }
 
-function LinkMedia({ url, image, title }: { url: string; image?: string; title: string }) {
-  const [isPlaying, setIsPlaying] = useState(false);
-  const embed = embedFor(url);
-  const thumbnail = image ?? embed?.thumbnail;
-  if (embed && isPlaying) {
-    return (
-      <iframe
-        src={embed.src}
-        title={title}
-        className="block w-full"
-        style={embed.height ? { height: embed.height } : { aspectRatio: embed.aspect }}
-        allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-        allowFullScreen
-        referrerPolicy="strict-origin-when-cross-origin"
-      />
-    );
-  }
-  if (!thumbnail && !embed) return null;
+function OpenLinkButton({ url, title }: { url: string; title: string }) {
   return (
-    <div className="relative w-full" style={{ aspectRatio: 16 / 9, background: "var(--bg-primary)" }}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      {thumbnail && <img src={thumbnail} alt="" draggable={false} className="absolute inset-0 w-full h-full object-cover" />}
-      {embed && (
-        <button
-          {...CONTROL}
-          onClick={() => setIsPlaying(true)}
-          className="absolute inset-0 m-auto w-12 h-12 rounded-full flex items-center justify-center shadow-lg"
-          style={{ background: "rgba(0,0,0,0.7)", color: "white" }}
-          title={`Play on ${PROVIDER_NAMES[embed.provider]}`}
-          aria-label={`Play ${title} here`}
-        >
-          <Play className="w-5 h-5 ml-0.5" fill="currentColor" />
-        </button>
+    <a
+      {...CONTROL}
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="p-1 rounded shrink-0"
+      style={{ color: "var(--text-secondary)" }}
+      title="Open link in a new tab"
+      aria-label={`Open ${title} in a new tab`}
+    >
+      <ExternalLink className="w-3.5 h-3.5" />
+    </a>
+  );
+}
+
+function ProviderBadge({ provider, className = "" }: { provider: EmbedProvider; className?: string }) {
+  return (
+    <span className={`inline-flex items-center gap-1.5 text-[11px] font-medium truncate ${className}`} style={{ color: "var(--text-secondary)" }}>
+      <span className="w-2 h-2 rounded-full shrink-0" style={{ background: PROVIDER_COLORS[provider] }} />
+      {PROVIDER_NAMES[provider]}
+    </span>
+  );
+}
+
+function PlayerFrame({ embed, player, title }: { embed: Embed; player: Player; title: string }) {
+  return (
+    <iframe
+      src={playerSrc(embed, player, window.location.hostname)}
+      title={title}
+      className="block w-full"
+      style={"height" in player ? { height: player.height } : { aspectRatio: player.aspect }}
+      allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+      allowFullScreen
+      referrerPolicy="strict-origin-when-cross-origin"
+    />
+  );
+}
+
+interface LinkView extends LinkLook {
+  isLoading: boolean;
+}
+
+function LinkTitle({ view, lines = "line-clamp-2" }: { view: LinkView; lines?: string }) {
+  return (
+    <p className={`text-[13px] font-semibold leading-5 break-words ${lines}`} style={{ color: "var(--text-primary)" }}>
+      {view.isLoading && !view.preview.title ? "Loading preview…" : view.title}
+    </p>
+  );
+}
+
+function VideoLink({ embed, view }: { embed: VideoEmbed; view: LinkView }) {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const thumbnail = view.preview.image ?? embed.thumbnail;
+  const name = PROVIDER_NAMES[embed.provider];
+  return (
+    <>
+      {isPlaying ? (
+        <PlayerFrame embed={embed} player={embed.player} title={view.title} />
+      ) : (
+        <div className="relative w-full" style={{ aspectRatio: embed.player.aspect, background: "var(--bg-primary)" }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          {thumbnail && <img src={thumbnail} alt="" draggable={false} className="absolute inset-0 w-full h-full object-cover" />}
+          <span className="absolute top-2 left-2 px-2 py-0.5 rounded-full text-[11px] font-semibold" style={{ background: PROVIDER_COLORS[embed.provider], color: "var(--bg-primary)" }}>
+            {name}
+          </span>
+          <button
+            {...CONTROL}
+            onClick={() => setIsPlaying(true)}
+            className="absolute inset-0 m-auto w-12 h-12 rounded-full flex items-center justify-center shadow-lg"
+            style={{ background: "rgba(0,0,0,0.7)", color: "white" }}
+            title={`Play on ${name}`}
+            aria-label={`Play ${view.title} here`}
+          >
+            <Play className="w-5 h-5 ml-0.5" fill="currentColor" />
+          </button>
+        </div>
       )}
+      <div className="px-3.5 py-2.5">
+        <LinkTitle view={view} />
+        {view.preview.description && (
+          <p className="text-xs leading-4 mt-0.5 line-clamp-1 break-words" style={{ color: "var(--text-secondary)" }}>{view.preview.description}</p>
+        )}
+        <div className="flex items-center justify-between gap-2 mt-1.5">
+          <ProviderBadge provider={embed.provider} />
+          <OpenLinkButton url={view.url} title={view.title} />
+        </div>
+      </div>
+    </>
+  );
+}
+
+function SongLink({ embed, view }: { embed: AudioEmbed; view: LinkView }) {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const cover = view.preview.image ?? embed.thumbnail;
+  const accent = PROVIDER_COLORS[embed.provider];
+  const { player } = embed;
+  return (
+    <div className="relative">
+      <span className="absolute left-0 inset-y-0 w-1" style={{ background: accent }} />
+      {isPlaying && player ? (
+        <div className="pl-1">
+          <PlayerFrame embed={embed} player={player} title={view.title} />
+        </div>
+      ) : (
+        <div className="flex items-center gap-3 pl-4 pr-3 pt-3">
+          <div className="shrink-0 rounded-md overflow-hidden flex items-center justify-center" style={{ width: SONG_COVER, height: SONG_COVER, background: "var(--bg-primary)" }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            {cover ? <img src={cover} alt="" draggable={false} className="w-full h-full object-cover" /> : <Music className="w-6 h-6" style={{ color: accent }} />}
+          </div>
+          <div className="min-w-0 flex-1">
+            <LinkTitle view={view} />
+            {view.preview.description && (
+              <p className="text-xs leading-4 mt-0.5 line-clamp-2 break-words" style={{ color: "var(--text-secondary)" }}>{view.preview.description}</p>
+            )}
+          </div>
+          {player && (
+            <button
+              {...CONTROL}
+              onClick={() => setIsPlaying(true)}
+              className="w-9 h-9 rounded-full shrink-0 flex items-center justify-center shadow"
+              style={{ background: accent, color: "var(--bg-primary)" }}
+              title={`Play on ${PROVIDER_NAMES[embed.provider]}`}
+              aria-label={`Play ${view.title} here`}
+            >
+              <Play className="w-4 h-4 ml-0.5" fill="currentColor" />
+            </button>
+          )}
+        </div>
+      )}
+      <div className="flex items-center justify-between gap-2 pl-4 pr-2.5 py-1.5">
+        <ProviderBadge provider={embed.provider} />
+        <OpenLinkButton url={view.url} title={view.title} />
+      </div>
     </div>
   );
+}
+
+function ImageLink({ src, view }: { src: string; view: LinkView }) {
+  return (
+    <>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={src} alt={view.title} draggable={false} className="block w-full" />
+      <div className="flex items-center justify-between gap-2 px-3.5 py-1.5">
+        <span className="text-[11px] truncate" style={{ color: "var(--text-muted)" }}>{hostname(view.url)}</span>
+        <OpenLinkButton url={view.url} title={view.title} />
+      </div>
+    </>
+  );
+}
+
+function PlainLink({ view }: { view: LinkView }) {
+  const thumbnail = view.preview.image;
+  return (
+    <div className="flex items-center gap-3 px-3 py-2.5">
+      <div className="shrink-0 rounded-md overflow-hidden flex items-center justify-center" style={{ width: LINK_THUMB, height: LINK_THUMB, background: "var(--bg-primary)" }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        {thumbnail ? <img src={thumbnail} alt="" draggable={false} className="w-full h-full object-cover" /> : <Globe className="w-4 h-4" style={{ color: "var(--text-secondary)" }} />}
+      </div>
+      <div className="min-w-0 flex-1">
+        <LinkTitle view={view} />
+        <p className="text-[11px] truncate" style={{ color: "var(--text-muted)" }}>
+          {view.preview.siteName ? `${view.preview.siteName} · ${hostname(view.url)}` : hostname(view.url)}
+        </p>
+      </div>
+      <OpenLinkButton url={view.url} title={view.title} />
+    </div>
+  );
+}
+
+function LinkContent({ view }: { view: LinkView }) {
+  const image = imageUrlFor(view.url);
+  if (image) return <ImageLink src={image} view={view} />;
+  const embed = embedFor(view.url);
+  if (embed?.kind === "video") return <VideoLink embed={embed} view={view} />;
+  if (embed?.kind === "audio") return <SongLink embed={embed} view={view} />;
+  return <PlainLink view={view} />;
 }
 
 export function LinkBody(props: BodyProps) {
   const { node, isEditing, isLoading } = props;
   const url = linkUrl(node);
   if (isEditing || !url) return <div className="rounded-xl shadow-sm" style={cardSurface(node)}><LinkForm {...props} /></div>;
-  const preview = linkPreview(node);
-  const embed = embedFor(url);
-  const title = preview.title || node.label || hostname(url);
+  const view = { ...linkLook(node), isLoading };
   return (
     <div className="rounded-xl overflow-hidden shadow-sm" style={cardSurface(node)}>
-      <LinkMedia url={url} image={preview.image} title={title} />
-      <div className="px-3.5 py-2.5">
-        <p className="text-[13px] font-semibold leading-5 line-clamp-2 break-words" style={{ color: "var(--text-primary)" }}>
-          {isLoading && !preview.title ? "Loading preview…" : title}
-        </p>
-        {preview.description && (
-          <p className="text-xs leading-4 mt-0.5 line-clamp-2 break-words" style={{ color: "var(--text-secondary)" }}>{preview.description}</p>
-        )}
-        <div className="flex items-center justify-between gap-2 mt-1.5">
-          <span className="text-[11px] truncate" style={{ color: "var(--text-muted)" }}>
-            {embed ? PROVIDER_NAMES[embed.provider] : preview.siteName || hostname(url)}
-          </span>
-          <a
-            {...CONTROL}
-            href={url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="p-1 rounded shrink-0"
-            style={{ color: "var(--text-secondary)" }}
-            title="Open link in a new tab"
-            aria-label={`Open ${title} in a new tab`}
-          >
-            <ExternalLink className="w-3.5 h-3.5" />
-          </a>
-        </div>
-      </div>
+      <LinkContent key={url} view={view} />
     </div>
   );
 }

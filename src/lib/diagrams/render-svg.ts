@@ -1,7 +1,7 @@
 import type { DiagramEdge, DiagramNode } from "@/types";
-import { borderColor, checklistItems, hasShapeBody, hostname, imageSrc, isBasicShape, linkPreview, linkUrl } from "./cards";
-import { embedFor } from "./embeds";
-import { BOARD_BG, CARD_BG, CARD_BORDER, DONE, FONT, LABEL_BG, LABEL_TEXT, LINE, MUTED, PAD, TEXT } from "./export-style";
+import { borderColor, checklistItems, hasShapeBody, hostname, imageSrc, isBasicShape, LINK_THUMB, linkLook, SONG_COVER, type LinkLook } from "./cards";
+import { embedFor, imageUrlFor, PROVIDER_COLORS, PROVIDER_NAMES, type AudioEmbed, type EmbedProvider, type VideoEmbed } from "./embeds";
+import { BOARD_BG, CARD_BG, CARD_BORDER, DONE, FONT, LABEL_BG, LABEL_TEXT, LINE, MUTED, PAD, PLAY_BG, PLAY_ICON, TEXT } from "./export-style";
 import { DRAWING_STROKE, placedPoints, smoothPath } from "./freehand";
 import { boundsOf, edgeEndpoints, edgeLabelPos, GROUP_HEADER, type Rect } from "./geometry";
 import type { AssetLook, RenderInput } from "./render-png";
@@ -119,22 +119,79 @@ function imageSvg(node: DiagramNode, r: Rect): string {
   return cardBox(node, r, 8) + (src ? picture(src, media) : "") + caption;
 }
 
-function linkSvg(node: DiagramNode, r: Rect): string {
-  const url = linkUrl(node) ?? "";
-  const preview = linkPreview(node);
-  const embed = url ? embedFor(url) : null;
-  const thumb = preview.image ?? embed?.thumbnail;
-  let svg = cardBox(node, r);
-  let y = r.y + 12;
-  if (thumb || embed) {
-    const media = { x: r.x, y: r.y, width: r.width, height: Math.min(r.width / (16 / 9), r.height - 60) };
-    svg += `<rect x="${media.x}" y="${media.y}" width="${media.width}" height="${media.height}" rx="10" fill="${BOARD_BG}"/>`;
-    if (thumb) svg += picture(thumb, media);
-    y = r.y + media.height + 10;
-  }
-  const title = wrapByWidth(preview.title || node.label || url, r.width - 28, 13).slice(0, 2);
+function providerBadge(provider: EmbedProvider, x: number, y: number): string {
+  return `<circle cx="${x + 4}" cy="${y + 7}" r="4" fill="${PROVIDER_COLORS[provider]}"/>` +
+    textBlock([PROVIDER_NAMES[provider]], x + 14, y, { size: 11, lineHeight: 14, color: MUTED });
+}
+
+function playButton(cx: number, cy: number, radius: number, fill: string, arrow: string): string {
+  const s = radius * 0.42;
+  return `<circle cx="${cx}" cy="${cy}" r="${radius}" fill="${fill}"/><path d="M${cx - s * 0.7} ${cy - s} L${cx + s} ${cy} L${cx - s * 0.7} ${cy + s} Z" fill="${arrow}"/>`;
+}
+
+function videoLinkSvg(link: LinkLook, embed: VideoEmbed, r: Rect): string {
+  const thumb = link.preview.image ?? embed.thumbnail;
+  const media = { x: r.x, y: r.y, width: r.width, height: Math.max(0, Math.min(r.width / embed.player.aspect, r.height - 64)) };
+  let svg = `<rect x="${media.x}" y="${media.y}" width="${media.width}" height="${media.height}" rx="10" fill="${BOARD_BG}"/>`;
+  if (thumb) svg += picture(thumb, media);
+  const name = PROVIDER_NAMES[embed.provider];
+  svg += `<rect x="${r.x + 8}" y="${r.y + 8}" width="${name.length * 6.6 + 16}" height="18" rx="9" fill="${PROVIDER_COLORS[embed.provider]}"/>`;
+  svg += textBlock([name], r.x + 16, r.y + 11, { size: 11, lineHeight: 14, color: BOARD_BG, weight: 600 });
+  svg += playButton(media.x + media.width / 2, media.y + media.height / 2, 24, PLAY_BG, PLAY_ICON);
+  const y = media.y + media.height + 10;
+  const title = wrapByWidth(link.title, r.width - 28, 13).slice(0, 2);
   svg += textBlock(title, r.x + 14, y, { size: 13, lineHeight: 18, color: TEXT, weight: 600 });
-  return svg + textBlock([preview.siteName || hostname(url)], r.x + 14, y + title.length * 18 + 2, { size: 12, lineHeight: 16, color: MUTED });
+  return svg + providerBadge(embed.provider, r.x + 14, y + title.length * 18 + 4);
+}
+
+function songLinkSvg(link: LinkLook, embed: AudioEmbed, r: Rect): string {
+  const accent = PROVIDER_COLORS[embed.provider];
+  const cover = { x: r.x + 16, y: r.y + 12, width: SONG_COVER, height: SONG_COVER };
+  const art = link.preview.image ?? embed.thumbnail;
+  let svg = `<rect x="${r.x}" y="${r.y}" width="4" height="${r.height}" fill="${accent}"/>`;
+  svg += `<rect x="${cover.x}" y="${cover.y}" width="${cover.width}" height="${cover.height}" rx="6" fill="${BOARD_BG}"/>`;
+  if (art) svg += picture(art, cover);
+  const textX = cover.x + SONG_COVER + 12;
+  const textWidth = r.x + r.width - textX - (embed.player ? 48 : 12);
+  const title = wrapByWidth(link.title, textWidth, 13).slice(0, 2);
+  svg += textBlock(title, textX, cover.y + 4, { size: 13, lineHeight: 18, color: TEXT, weight: 600 });
+  const subtitle = wrapByWidth(link.preview.description ?? "", textWidth, 12).slice(0, 4 - title.length);
+  svg += textBlock(subtitle.filter(Boolean), textX, cover.y + 6 + title.length * 18, { size: 12, lineHeight: 16, color: MUTED });
+  if (embed.player) svg += playButton(r.x + r.width - 30, cover.y + SONG_COVER / 2, 18, accent, BOARD_BG);
+  return svg + providerBadge(embed.provider, r.x + 16, cover.y + SONG_COVER + 10);
+}
+
+function imageLinkSvg(link: LinkLook, src: string, r: Rect): string {
+  const media = { x: r.x, y: r.y, width: r.width, height: Math.max(0, r.height - 28) };
+  return picture(src, media) + textBlock([hostname(link.url)], r.x + 14, media.y + media.height + 7, { size: 11, lineHeight: 14, color: MUTED });
+}
+
+function plainLinkSvg(link: LinkLook, r: Rect): string {
+  const thumb = { x: r.x + 12, y: r.y + 12, width: LINK_THUMB, height: LINK_THUMB };
+  let svg = `<rect x="${thumb.x}" y="${thumb.y}" width="${LINK_THUMB}" height="${LINK_THUMB}" rx="6" fill="${BOARD_BG}"/>`;
+  if (link.preview.image) svg += picture(link.preview.image, thumb);
+  const textX = thumb.x + LINK_THUMB + 12;
+  const title = wrapByWidth(link.title, r.x + r.width - textX - 12, 13).slice(0, 2);
+  svg += textBlock(title, textX, r.y + 12, { size: 13, lineHeight: 18, color: TEXT, weight: 600 });
+  const site = link.preview.siteName ? `${link.preview.siteName} · ${hostname(link.url)}` : hostname(link.url);
+  return svg + textBlock([site], textX, r.y + 14 + title.length * 18, { size: 11, lineHeight: 14, color: MUTED });
+}
+
+/** Videos as a video frame, music as a song, pictures as themselves, and anything else as a compact link. */
+function linkSvg(node: DiagramNode, r: Rect): string {
+  const link = linkLook(node);
+  const image = link.url ? imageUrlFor(link.url) : null;
+  const embed = link.url ? embedFor(link.url) : null;
+  const body = image
+    ? imageLinkSvg(link, image, r)
+    : embed?.kind === "video"
+      ? videoLinkSvg(link, embed, r)
+      : embed?.kind === "audio"
+        ? songLinkSvg(link, embed, r)
+        : plainLinkSvg(link, r);
+  const clipId = `link-${node.id.replace(/[^\w-]/g, "_")}`;
+  const clip = `<clipPath id="${clipId}"><rect x="${r.x}" y="${r.y}" width="${r.width}" height="${r.height}" rx="10"/></clipPath>`;
+  return cardBox(node, r) + `${clip}<g clip-path="url(#${clipId})">${body}</g>`;
 }
 
 function assetSvg(node: DiagramNode, r: Rect, look: AssetLook | null): string {

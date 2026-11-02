@@ -3,7 +3,7 @@ import http, { type IncomingMessage } from "node:http";
 import https from "node:https";
 import type { LookupFunction } from "node:net";
 import type { LinkPreview } from "@/lib/diagrams/cards";
-import { embedFor, isImageUrl, PROVIDER_NAMES, type EmbedProvider } from "@/lib/diagrams/embeds";
+import { embedFor, imageUrlFor, PROVIDER_NAMES, type EmbedProvider } from "@/lib/diagrams/embeds";
 import { parsePageMeta } from "./meta";
 import { isPrivateAddress, isPrivateHostname } from "./safe-host";
 
@@ -12,8 +12,10 @@ const MAX_BYTES = 512 * 1024;
 const MAX_REDIRECTS = 4;
 const USER_AGENT = "GameDevStudioLinkPreview/1.0 (+https://gamedev-studio.pladsen.dev)";
 
-const OEMBED: Record<EmbedProvider, string> = {
+// Only these fixed oEmbed endpoints are asked directly; every other service's page goes through `fetchPublic`.
+const OEMBED: Partial<Record<EmbedProvider, string>> = {
   youtube: "https://www.youtube.com/oembed?format=json&url=",
+  youtubeMusic: "https://www.youtube.com/oembed?format=json&url=",
   spotify: "https://open.spotify.com/oembed?url=",
   vimeo: "https://vimeo.com/api/oembed.json?url=",
   soundcloud: "https://soundcloud.com/oembed?format=json&url=",
@@ -85,8 +87,10 @@ async function readCapped(response: IncomingMessage): Promise<string> {
   return Buffer.concat(chunks).subarray(0, MAX_BYTES).toString("utf8");
 }
 
-async function oembedPreview(provider: EmbedProvider, link: string, signal: AbortSignal): Promise<LinkPreview> {
-  const response = await fetch(OEMBED[provider] + encodeURIComponent(link), {
+async function oembedPreview(provider: EmbedProvider, endpoint: string, link: string, signal: AbortSignal): Promise<LinkPreview> {
+  // YouTube's oEmbed answers for www.youtube.com addresses, so YouTube Music links are asked that way.
+  const target = provider === "youtubeMusic" ? link.replace("//music.youtube.com/", "//www.youtube.com/") : link;
+  const response = await fetch(endpoint + encodeURIComponent(target), {
     signal,
     headers: { "user-agent": USER_AGENT, accept: "application/json" },
   });
@@ -114,7 +118,10 @@ async function pagePreview(link: string, signal: AbortSignal): Promise<LinkPrevi
 export async function fetchLinkPreview(link: string): Promise<LinkPreview> {
   const signal = AbortSignal.timeout(DEADLINE_MS);
   const embed = embedFor(link);
-  if (embed) return oembedPreview(embed.provider, link, signal);
-  if (isImageUrl(link)) return { image: link };
-  return pagePreview(link, signal);
+  const endpoint = embed && OEMBED[embed.provider];
+  if (embed && endpoint) return oembedPreview(embed.provider, endpoint, link, signal);
+  const image = imageUrlFor(link);
+  if (image) return { image };
+  const preview = await pagePreview(link, signal);
+  return embed ? { ...preview, siteName: PROVIDER_NAMES[embed.provider] } : preview;
 }

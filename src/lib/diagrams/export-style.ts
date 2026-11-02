@@ -8,5 +8,7 @@ export const LINE = "#555570";
 export const LABEL_BG = "#14141d";
 export const LABEL_TEXT = "#c4c4dc";
 export const DONE = "#4ade80";
+export const PLAY_BG = "rgba(0,0,0,0.7)";
+export const PLAY_ICON = "#ffffff";
 export const FONT = "system-ui, sans-serif";
 export const PAD = 40;

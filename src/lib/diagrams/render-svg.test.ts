@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Diagram, DiagramNode } from "@/types";
+import { LINK_THUMB, SONG_COVER } from "./cards";
+import { PROVIDER_COLORS } from "./embeds";
 import { escapeXml, renderDiagramSvg, wrapByWidth } from "./render-svg";
 
 const node = (extra: Partial<DiagramNode>): DiagramNode => ({ id: "n", type: "note", x: 0, y: 0, width: 200, height: 80, label: "", ...extra });
@@ -55,6 +57,25 @@ describe("renderDiagramSvg", () => {
   it("should draw a path when the board has a drawing", () => {
     const drawing = node({ type: "drawing", width: 10, height: 10, data: { points: [[0, 0], [10, 10]], box: { width: 10, height: 10 } } });
     expect(render(diagram([drawing]))).toContain('<path d="M0 0 L10 10"');
+  });
+
+  it("should draw a song with its service accent when a link card holds a Spotify album", () => {
+    const card = node({ type: "link", width: 300, height: 112, data: { url: "https://open.spotify.com/album/1ZfETfec0U02KrKNI8w3Gf", preview: { title: "Celeste" } } });
+    const svg = render(diagram([card]));
+    expect(svg).toContain(`fill="${PROVIDER_COLORS.spotify}"`);
+    expect(svg).toContain(`width="${SONG_COVER}" height="${SONG_COVER}"`);
+  });
+
+  it("should draw a video frame with the provider badge when a link card holds a YouTube video", () => {
+    const card = node({ type: "link", width: 320, height: 260, data: { url: "https://www.youtube.com/watch?v=yorTG9at90g" } });
+    const svg = render(diagram([card]));
+    expect(svg).toContain(">YouTube</tspan>");
+    expect(svg).toContain(`height="${320 / (16 / 9)}"`);
+  });
+
+  it("should draw a small thumbnail rather than a hero image when a link card holds a plain page", () => {
+    const card = node({ type: "link", width: 280, height: 64, data: { url: "https://lospec.com/palette-list", preview: { image: "https://cdn.lospec.com/card.png" } } });
+    expect(render(diagram([card]))).toMatch(new RegExp(`<svg x="12" y="12" width="${LINK_THUMB}" height="${LINK_THUMB}"`));
   });
 
   it("should draw an arrow line when two cards are connected", () => {

@@ -37,12 +37,13 @@ import {
   minSize,
   NODE_LABELS,
   SHAPE_COLORS,
+  linkCardSize,
   linkPreview,
   linkUrl,
   nodeAsset,
   type NodeType,
 } from "@/lib/diagrams/cards";
-import { isImageUrl, normalizeUrl } from "@/lib/diagrams/embeds";
+import { imageUrlFor, normalizeUrl } from "@/lib/diagrams/embeds";
 import { boundsOf, idsInside, stackColumn, type Point, type Rect } from "@/lib/diagrams/geometry";
 import {
   alignRects,
@@ -420,7 +421,7 @@ export default function DiagramsPage() {
   }
 
   function addLink(url: string, at: Point) {
-    const node = addNode("link", at, { data: { url } });
+    const node = addNode("link", at, { width: linkCardSize(url).width, data: { url } });
     void fetchPreview(node.id, url);
   }
 
@@ -428,7 +429,8 @@ export default function DiagramsPage() {
   function addFromText(text: string, at: Point) {
     const url = normalizeUrl(text);
     if (url && /^(https?:\/\/|www\.)/i.test(text.trim())) {
-      if (isImageUrl(url)) addImageFromUrl(url, at);
+      const image = imageUrlFor(url);
+      if (image) addImageFromUrl(image, at);
       else addLink(url, at);
       return;
     }

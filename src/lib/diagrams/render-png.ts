@@ -6,11 +6,15 @@ import {
   hostname,
   imageSrc,
   isBasicShape,
+  LINK_THUMB,
+  linkLook,
   linkPreview,
   linkUrl,
+  SONG_COVER,
+  type LinkLook,
 } from "./cards";
-import { embedFor } from "./embeds";
-import { BOARD_BG, CARD_BG, CARD_BORDER, DONE, FONT, LABEL_BG, LABEL_TEXT, LINE, MUTED, PAD, TEXT } from "./export-style";
+import { embedFor, imageUrlFor, PROVIDER_COLORS, PROVIDER_NAMES, type AudioEmbed, type EmbedProvider, type VideoEmbed } from "./embeds";
+import { BOARD_BG, CARD_BG, CARD_BORDER, DONE, FONT, LABEL_BG, LABEL_TEXT, LINE, MUTED, PAD, PLAY_BG, PLAY_ICON, TEXT } from "./export-style";
 import { DRAWING_STROKE, placedPoints } from "./freehand";
 import { boundsOf, edgeEndpoints, edgeLabelPos, type Rect } from "./geometry";
 import { shapeOutline } from "./shapes";
@@ -46,7 +50,8 @@ function imageSources(input: RenderInput): string[] {
     if (node.type === "image") return [imageSrc(node) ?? ""];
     if (node.type === "link") {
       const url = linkUrl(node);
-      return [linkPreview(node).image ?? (url ? embedFor(url)?.thumbnail : undefined) ?? ""];
+      if (!url) return [];
+      return [imageUrlFor(url) ?? linkPreview(node).image ?? embedFor(url)?.thumbnail ?? ""];
     }
     if (node.type === "asset") return [input.describeAsset(node)?.thumbnail ?? ""];
     return [];
@@ -211,30 +216,114 @@ function drawImageCard(ctx: CanvasRenderingContext2D, node: DiagramNode, r: Rect
   }
 }
 
-function drawLink(ctx: CanvasRenderingContext2D, node: DiagramNode, r: Rect, images: Map<string, HTMLImageElement | null>) {
-  cardBox(ctx, r, node);
-  const url = linkUrl(node) ?? "";
-  const preview = linkPreview(node);
-  const embed = url ? embedFor(url) : null;
-  const thumb = preview.image ?? embed?.thumbnail;
-  const img = thumb ? images.get(thumb) : null;
-  let y = r.y + 12;
-  if (thumb || embed) {
-    // Same 16:9 media area as on screen; a thumbnail the host won't share stays a dark panel.
-    const media = { x: r.x, y: r.y, width: r.width, height: Math.min(r.width / (16 / 9), r.height - 60) };
-    ctx.fillStyle = BOARD_BG;
-    ctx.beginPath();
-    ctx.roundRect(media.x, media.y, media.width, media.height, [10, 10, 0, 0]);
-    ctx.fill();
-    if (img) drawCover(ctx, img, media, 10);
-    y = r.y + media.height + 10;
-  }
-  ctx.fillStyle = TEXT;
+type Images = Map<string, HTMLImageElement | null>;
+
+/** A dark panel with the picture over it; a picture the host won't share leaves the panel. */
+function drawPanel(ctx: CanvasRenderingContext2D, rect: Rect, radius: number, src: string | undefined, images: Images) {
+  ctx.fillStyle = BOARD_BG;
+  ctx.beginPath();
+  ctx.roundRect(rect.x, rect.y, rect.width, rect.height, radius);
+  ctx.fill();
+  const img = src ? images.get(src) : null;
+  if (img) drawCover(ctx, img, rect, radius);
+}
+
+function drawText(ctx: CanvasRenderingContext2D, lines: string[], x: number, y: number, style: { font: string; color: string; lineHeight: number }, maxY: number) {
+  ctx.fillStyle = style.color;
+  ctx.font = `${style.font} ${FONT}`;
+  return drawLines(ctx, lines, x, y, style.lineHeight, maxY);
+}
+
+function drawPlayButton(ctx: CanvasRenderingContext2D, cx: number, cy: number, radius: number, fill: string, arrow: string) {
+  const s = radius * 0.42;
+  ctx.fillStyle = fill;
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = arrow;
+  ctx.beginPath();
+  ctx.moveTo(cx - s * 0.7, cy - s);
+  ctx.lineTo(cx + s, cy);
+  ctx.lineTo(cx - s * 0.7, cy + s);
+  ctx.fill();
+}
+
+function drawProviderBadge(ctx: CanvasRenderingContext2D, provider: EmbedProvider, x: number, y: number, maxY: number) {
+  ctx.fillStyle = PROVIDER_COLORS[provider];
+  ctx.beginPath();
+  ctx.arc(x + 4, y + 7, 4, 0, Math.PI * 2);
+  ctx.fill();
+  drawText(ctx, [PROVIDER_NAMES[provider]], x + 14, y, { font: "11px", color: MUTED, lineHeight: 14 }, maxY);
+}
+
+function drawVideoLink(ctx: CanvasRenderingContext2D, link: LinkLook, embed: VideoEmbed, r: Rect, images: Images) {
+  const media = { x: r.x, y: r.y, width: r.width, height: Math.max(0, Math.min(r.width / embed.player.aspect, r.height - 64)) };
+  drawPanel(ctx, media, 0, link.preview.image ?? embed.thumbnail, images);
+  const name = PROVIDER_NAMES[embed.provider];
+  ctx.font = `600 11px ${FONT}`;
+  ctx.fillStyle = PROVIDER_COLORS[embed.provider];
+  ctx.beginPath();
+  ctx.roundRect(r.x + 8, r.y + 8, ctx.measureText(name).width + 16, 18, 9);
+  ctx.fill();
+  drawText(ctx, [name], r.x + 16, r.y + 11, { font: "600 11px", color: BOARD_BG, lineHeight: 14 }, r.y + r.height);
+  drawPlayButton(ctx, media.x + media.width / 2, media.y + media.height / 2, 24, PLAY_BG, PLAY_ICON);
   ctx.font = `600 13px ${FONT}`;
-  y = drawLines(ctx, wrapText(ctx, preview.title || node.label || url, r.width - 28).slice(0, 2), r.x + 14, y, 18, r.y + r.height);
-  ctx.fillStyle = MUTED;
+  const title = wrapText(ctx, link.title, r.width - 28).slice(0, 2);
+  const y = drawText(ctx, title, r.x + 14, media.y + media.height + 10, { font: "600 13px", color: TEXT, lineHeight: 18 }, r.y + r.height);
+  drawProviderBadge(ctx, embed.provider, r.x + 14, y + 4, r.y + r.height);
+}
+
+function drawSongLink(ctx: CanvasRenderingContext2D, link: LinkLook, embed: AudioEmbed, r: Rect, images: Images) {
+  const accent = PROVIDER_COLORS[embed.provider];
+  ctx.fillStyle = accent;
+  ctx.fillRect(r.x, r.y, 4, r.height);
+  const cover = { x: r.x + 16, y: r.y + 12, width: SONG_COVER, height: SONG_COVER };
+  drawPanel(ctx, cover, 6, link.preview.image ?? embed.thumbnail, images);
+  const textX = cover.x + SONG_COVER + 12;
+  const textWidth = r.x + r.width - textX - (embed.player ? 48 : 12);
+  const maxY = r.y + r.height;
+  ctx.font = `600 13px ${FONT}`;
+  const title = wrapText(ctx, link.title, textWidth).slice(0, 2);
+  const y = drawText(ctx, title, textX, cover.y + 4, { font: "600 13px", color: TEXT, lineHeight: 18 }, maxY);
   ctx.font = `12px ${FONT}`;
-  drawLines(ctx, [preview.siteName || hostname(url)], r.x + 14, y + 2, 16, r.y + r.height);
+  const subtitle = link.preview.description ? wrapText(ctx, link.preview.description, textWidth).slice(0, 4 - title.length) : [];
+  drawText(ctx, subtitle, textX, y + 2, { font: "12px", color: MUTED, lineHeight: 16 }, maxY);
+  if (embed.player) drawPlayButton(ctx, r.x + r.width - 30, cover.y + SONG_COVER / 2, 18, accent, BOARD_BG);
+  drawProviderBadge(ctx, embed.provider, r.x + 16, cover.y + SONG_COVER + 10, maxY);
+}
+
+function drawImageLink(ctx: CanvasRenderingContext2D, link: LinkLook, src: string, r: Rect, images: Images) {
+  const media = { x: r.x, y: r.y, width: r.width, height: Math.max(0, r.height - 28) };
+  drawPanel(ctx, media, 0, src, images);
+  drawText(ctx, [hostname(link.url)], r.x + 14, media.y + media.height + 7, { font: "11px", color: MUTED, lineHeight: 14 }, r.y + r.height);
+}
+
+function drawPlainLink(ctx: CanvasRenderingContext2D, link: LinkLook, r: Rect, images: Images) {
+  const thumb = { x: r.x + 12, y: r.y + 12, width: LINK_THUMB, height: LINK_THUMB };
+  drawPanel(ctx, thumb, 6, link.preview.image, images);
+  const textX = thumb.x + LINK_THUMB + 12;
+  ctx.font = `600 13px ${FONT}`;
+  const title = wrapText(ctx, link.title, r.x + r.width - textX - 12).slice(0, 2);
+  const y = drawText(ctx, title, textX, r.y + 12, { font: "600 13px", color: TEXT, lineHeight: 18 }, r.y + r.height);
+  const site = link.preview.siteName ? `${link.preview.siteName} · ${hostname(link.url)}` : hostname(link.url);
+  drawText(ctx, [site], textX, y + 2, { font: "11px", color: MUTED, lineHeight: 14 }, r.y + r.height);
+}
+
+/** Same looks as on screen: a video frame, a song, the picture itself, or a compact link. */
+function drawLink(ctx: CanvasRenderingContext2D, node: DiagramNode, r: Rect, images: Images) {
+  cardBox(ctx, r, node);
+  const link = linkLook(node);
+  const image = link.url ? imageUrlFor(link.url) : null;
+  const embed = link.url ? embedFor(link.url) : null;
+  ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(r.x, r.y, r.width, r.height, 10);
+  ctx.clip();
+  if (image) drawImageLink(ctx, link, image, r, images);
+  else if (embed?.kind === "video") drawVideoLink(ctx, link, embed, r, images);
+  else if (embed?.kind === "audio") drawSongLink(ctx, link, embed, r, images);
+  else drawPlainLink(ctx, link, r, images);
+  ctx.restore();
 }
 
 function drawAssetCard(ctx: CanvasRenderingContext2D, node: DiagramNode, r: Rect, look: AssetLook | null, images: Map<string, HTMLImageElement | null>) {

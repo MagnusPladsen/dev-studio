@@ -1,4 +1,5 @@
 import type { AssetRef, DiagramNode } from "@/types";
+import { linkKind, type LinkKind } from "./embeds";
 
 export type NodeType = DiagramNode["type"];
 
@@ -122,6 +123,19 @@ export function defaultSize(type: NodeType): { width: number; height: number } {
   return { width, height };
 }
 
+/** Side of the square cover art on a song card, and of the small thumbnail on a plain link card. */
+export const SONG_COVER = 64;
+export const LINK_THUMB = 40;
+
+const LINK_WIDTHS: Record<LinkKind, number> = { video: 320, audio: 320, image: 280, link: 280 };
+const LINK_HEIGHTS: Record<LinkKind, number> = { video: 260, audio: 112, image: 220, link: 64 };
+
+/** A starting size that fits how the link will show; the card's height then follows its content. */
+export function linkCardSize(url: string): { width: number; height: number } {
+  const kind = linkKind(url);
+  return { width: LINK_WIDTHS[kind], height: LINK_HEIGHTS[kind] };
+}
+
 export function nodeAsset(node: DiagramNode): AssetRef | undefined {
   const asset = node.data?.asset as AssetRef | undefined;
   return asset && typeof asset.id === "string" && typeof asset.type === "string" ? asset : undefined;
@@ -158,6 +172,19 @@ export function linkPreview(node: DiagramNode): LinkPreview {
   if (!preview || typeof preview !== "object") return {};
   const text = (key: string) => (typeof preview[key] === "string" ? (preview[key] as string) : undefined);
   return { title: text("title"), description: text("description"), image: safeWebUrl(preview.image), siteName: text("siteName") };
+}
+
+export interface LinkLook {
+  url: string;
+  title: string;
+  preview: LinkPreview;
+}
+
+/** What a link card shows as text, falling back from the fetched title to the label and then the domain. */
+export function linkLook(node: DiagramNode): LinkLook {
+  const url = linkUrl(node) ?? "";
+  const preview = linkPreview(node);
+  return { url, preview, title: preview.title || node.label || hostname(url) };
 }
 
 /**

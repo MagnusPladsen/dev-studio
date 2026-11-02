@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { AssetRef } from "@/types";
 import { ASSET_KINDS } from "@/lib/assets";
-import { embedFor } from "@/lib/diagrams/embeds";
+import { embedFor, linkKind } from "@/lib/diagrams/embeds";
 import { diagramBoardExamples } from "./diagram-boards";
 import { EXAMPLE_SLUGS } from "./types";
 
@@ -33,5 +33,10 @@ describe("diagram board examples", () => {
     expect(nodes.some((n) => n.type === "link" && embedFor(n.data?.url as string)?.provider === "youtube")).toBe(true);
     expect(nodes.some((n) => n.type === "link" && embedFor(n.data?.url as string)?.provider === "spotify")).toBe(true);
     expect(nodes.filter((n) => n.type === "image").every((n) => String(n.data?.src).startsWith("data:image/svg+xml"))).toBe(true);
+  });
+
+  it("should show the Spotify album as a song when the saved card only holds its URL", () => {
+    const album = boards.flatMap((b) => b.nodes).find((n) => n.data?.url === "https://open.spotify.com/album/1ZfETfec0U02KrKNI8w3Gf");
+    expect(linkKind(album?.data?.url as string)).toBe("audio");
   });
 });
