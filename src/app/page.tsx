@@ -429,9 +429,9 @@ export default function LandingPage() {
           <div className="mb-6 rounded-xl border overflow-hidden max-md:overflow-x-auto" style={{ borderColor: "var(--border)" }}>
             <Image
               src="/landing/canvas-moodboard.webp"
-              width={1698}
-              height={522}
-              alt="Pip's Quest moodboard canvas: a Look and feel group with a meadow mood image, palette strip, style note and sprite, model and palette cards; a Sound and music group with a Spotify album shown as a song with a play button; a YouTube video card, a Lospec link card, an art to-do checklist and labelled arrows between them."
+              width={1696}
+              height={550}
+              alt="Pip's Quest moodboard canvas in three sections: Look and feel with a meadow mood image, palette strip, style notes and sprite, model and palette cards; Sound and music with a Spotify album shown as a song with a play button; Game feel with a YouTube video card, hand-drawn jump arcs, notes and a to-do checklist, joined by labelled arrows."
               sizes="(max-width: 768px) 900px, (max-width: 1152px) 100vw, 1152px"
               className="w-full h-auto max-md:w-[900px] max-md:max-w-none"
             />
