@@ -1,7 +1,11 @@
+import Image from "next/image";
 import Link from "next/link";
 import { BetaBadge } from "@/components/BetaBadge";
 import { DesktopDownload } from "@/components/DesktopDownload";
+import { ASSET_ICONS } from "@/components/asset-icons";
+import { ASSET_KINDS } from "@/lib/assets";
 import { supabaseEnabled } from "@/lib/supabase";
+import type { AssetType } from "@/types";
 import {
   Box,
   Paintbrush,
@@ -26,6 +30,7 @@ import {
   UserX,
   Gift,
   Monitor,
+  Link2,
 } from "lucide-react";
 
 function GithubIcon({ className }: { className?: string }) {
@@ -66,6 +71,105 @@ const tools = [
   { icon: SquareKanban, name: "Task Board", description: "Plan sprints like Jira: To Do, In Progress, Testing, Done. Issues link to the assets they're about." },
   { icon: NotebookPen, name: "Notebook", description: "Ideas, to-do lists, design docs and bug lists, with checklists and links to any asset." },
 ];
+
+const heroLinks: { type: AssetType; name: string }[] = [
+  { type: "story", name: "Pip" },
+  { type: "sprite", name: "Pip (walk)" },
+  { type: "sound", name: "Jump" },
+  { type: "model", name: "Pip (3D)" },
+  { type: "diagram", name: "Player States" },
+];
+
+function AssetChip({ type, name }: { type: AssetType; name: string }) {
+  const { color, label } = ASSET_KINDS[type];
+  const Icon = ASSET_ICONS[type];
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 pl-2 pr-2.5 py-1 rounded-md text-xs sm:text-sm whitespace-nowrap"
+      style={{ background: "var(--bg-card)", border: "1px solid var(--border)", color: "var(--text-primary)" }}
+    >
+      <Icon className="w-3.5 h-3.5 shrink-0" style={{ color }} />
+      {name}
+      <span style={{ color: "var(--text-muted)" }}>{label}</span>
+    </span>
+  );
+}
+
+const linkingExamples = [
+  {
+    image: "/landing/linking-story.webp",
+    width: 958,
+    height: 1090,
+    maxWidth: 480,
+    alt: "Pip's story entry: wiki links to The Great Fall, Elder Maren and The Lost Sword show as coloured chips, and the Linked panel lists Pip's sprite, jump sound, 3D model, state diagram, sprite sheet and related story entries.",
+    kicker: "Character hub",
+    title: "One story entry ties a character together",
+    description:
+      "Pip's story entry is the place to start. Type [[ to link another entry, like Elder Maren or the Sunsteel Sword, and use + Link to attach Pip's sprite, jump sound, 3D model and state diagram. Click any of them to jump straight into its tool.",
+    points: ["[[Wiki links]] between story entries", "Mentioned in: every entry that links back", "Links work both ways, so the sprite lists Pip too"],
+  },
+  {
+    image: "/landing/linking-board.webp",
+    width: 1280,
+    height: 985,
+    maxWidth: 910,
+    alt: "The Task Board with the issue Slime patrol and chase AI open on the right. Its description points to the Slime AI diagram, which is listed in its Linked panel.",
+    kicker: "Task Board",
+    title: "Tasks point at the work they're about",
+    description:
+      "Issues on the Task Board link to the assets they produce. Slime patrol & chase AI links to the Slime AI diagram, the title-music task to the track itself. The link count shows on every card, so you can see what's connected before you open it.",
+    points: ["Open the linked asset right from the issue", "Notes you add to an issue stay linked to it", "Bugs link to the notes that describe them"],
+  },
+  {
+    image: "/landing/linking-diagram.webp",
+    width: 1280,
+    height: 960,
+    maxWidth: 656,
+    alt: "A Look and feel group on a Diagrams board: a pixel-art meadow mood image, a 13-colour palette strip and a note, with cards for the Pip (walk) sprite, the Pip (3D) voxel model and the Mossbrook Meadow palette.",
+    kicker: "Diagrams & Boards",
+    title: "Put real assets on your moodboard",
+    description:
+      "Drop sprites, voxel models, palettes and music onto a board as cards, next to your notes, images and references. Each card shows the asset itself and opens it in its own tool, so the board stays in step as the game changes.",
+    points: ["Cards for any asset in the project", "Group, connect and label them", "Edit the asset and the card follows"],
+  },
+];
+
+function LinkingExample({ example, reversed }: { example: (typeof linkingExamples)[number]; reversed: boolean }) {
+  return (
+    <div className={`grid grid-cols-1 gap-6 lg:gap-12 items-center ${reversed ? "lg:grid-cols-[2fr_3fr]" : "lg:grid-cols-[3fr_2fr]"}`}>
+      <div className={reversed ? "lg:order-2" : undefined}>
+        <Image
+          src={example.image}
+          width={example.width}
+          height={example.height}
+          alt={example.alt}
+          sizes="(max-width: 1024px) 100vw, 660px"
+          className="w-full h-auto mx-auto rounded-xl border"
+          style={{ borderColor: "var(--border)", maxWidth: example.maxWidth }}
+        />
+      </div>
+      <div>
+        <div className="text-xs font-medium uppercase tracking-wide mb-2" style={{ color: "var(--accent)" }}>
+          {example.kicker}
+        </div>
+        <h3 className="text-2xl font-bold mb-3" style={{ color: "var(--text-primary)" }}>
+          {example.title}
+        </h3>
+        <p className="leading-relaxed mb-5" style={{ color: "var(--text-secondary)" }}>
+          {example.description}
+        </p>
+        <ul className="space-y-2">
+          {example.points.map((point) => (
+            <li key={point} className="flex items-start gap-2 text-sm" style={{ color: "var(--text-secondary)" }}>
+              <Link2 className="w-4 h-4 mt-0.5 shrink-0" style={{ color: "var(--accent)" }} />
+              {point}
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}
 
 const localPros = [
   { icon: WifiOff, title: "Works offline", description: "No internet needed once it's installed. Make your game on a plane or a train." },
@@ -186,6 +290,33 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* Linking idea */}
+      <section className="pb-8 px-4 sm:px-6">
+        <div className="max-w-4xl mx-auto rounded-2xl border p-6 sm:p-8 text-center" style={{ background: "var(--bg-secondary)", borderColor: "var(--border)" }}>
+          <h2 className="text-2xl sm:text-3xl font-bold mb-3" style={{ color: "var(--text-primary)" }}>
+            Everything links to everything
+          </h2>
+          <p className="max-w-2xl mx-auto mb-6 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+            Any asset can link to any other: sprites, voxels, tilemaps, palettes, music, sound effects,
+            dialogue, story entries, diagrams, notes and tasks. A character&apos;s story entry connects to
+            their sprite, theme music, dialogue and the tasks to build them, and story{" "}
+            <code style={{ color: "var(--text-primary)" }}>[[wiki links]]</code> count too.
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-x-1.5 gap-y-2 mb-6">
+            {heroLinks.map((asset, index) => (
+              <span key={asset.name} className="inline-flex items-center gap-1.5">
+                {index > 0 && <Link2 className="w-3.5 h-3.5" style={{ color: "var(--text-muted)" }} aria-hidden />}
+                <AssetChip {...asset} />
+              </span>
+            ))}
+          </div>
+          <a href="#linking" className="inline-flex items-center gap-1.5 text-sm font-medium hover:underline" style={{ color: "var(--accent)" }}>
+            See how linking works
+            <ArrowRight className="w-4 h-4" />
+          </a>
+        </div>
+      </section>
+
       {/* Tools Grid */}
       <section className="py-20 px-4 sm:px-6">
         <div className="max-w-6xl mx-auto">
@@ -201,6 +332,27 @@ export default function LandingPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {tools.map((tool) => (
               <ToolCard key={tool.name} {...tool} />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* How linking works */}
+      <section id="linking" className="py-20 px-4 sm:px-6 scroll-mt-16">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-14">
+            <h2 className="text-3xl sm:text-4xl font-bold mb-4" style={{ color: "var(--text-primary)" }}>
+              How linking works
+            </h2>
+            <p className="text-lg max-w-2xl mx-auto" style={{ color: "var(--text-secondary)" }}>
+              Every asset has a Linked panel. Press + Link, pick anything in the project, and both sides
+              show the connection. Here&apos;s how it looks in the example game you can add to any
+              project.
+            </p>
+          </div>
+          <div className="space-y-16 lg:space-y-20">
+            {linkingExamples.map((example, index) => (
+              <LinkingExample key={example.title} example={example} reversed={index % 2 === 1} />
             ))}
           </div>
         </div>
