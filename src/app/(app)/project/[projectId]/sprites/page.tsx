@@ -12,6 +12,7 @@ import { UndoRedoButtons } from "@/components/UndoRedoButtons";
 import { useHistory } from "@/hooks/useHistory";
 import { useAutosave } from "@/hooks/useAutosave";
 import { ExportMenu } from "@/components/ExportMenu";
+import { scalePixels, type ScaleFactor, type ScaleMethod } from "@/lib/pixel-scale";
 import { HelpButton } from "@/components/HelpButton";
 import { SaveIndicator } from "@/components/SaveIndicator";
 import { ExamplesBar } from "@/components/ExamplesBar";
@@ -79,6 +80,8 @@ export default function SpriteSheetPage() {
   const [current, setCurrent] = useState<SpriteSheet | null>(null);
   const [selectedSpriteIds, setSelectedSpriteIds] = useState<string[]>([]);
   const [padding, setPadding] = useState(1);
+  // export size: "1" or "<factor>-<sharp|smooth>"
+  const [exportScale, setExportScale] = useState("1");
   // id travels with the selection so a save that lands after switching sheets goes to the right one
   const selection = useMemo<Selection>(
     () => ({ id: current?.id ?? null, spriteIds: selectedSpriteIds, padding }),
@@ -222,17 +225,36 @@ export default function SpriteSheetPage() {
     a.click();
   }
 
+  function scaleOf(): { factor: 1 | ScaleFactor; method: ScaleMethod } {
+    const [f, m] = exportScale.split("-");
+    return { factor: Number(f) as 1 | ScaleFactor, method: (m as ScaleMethod) || "sharp" };
+  }
+
   function exportPNG() {
     const canvas = canvasRef.current;
     if (!canvas || rendering) return;
-    download(canvas.toDataURL("image/png"), `${safeName(current?.name || "spritesheet")}.png`);
+    const { factor, method } = scaleOf();
+    const suffix = factor === 1 ? "" : `@${factor}x`;
+    let href = canvas.toDataURL("image/png");
+    if (factor !== 1) {
+      const src = canvas.getContext("2d")!.getImageData(0, 0, canvas.width, canvas.height);
+      const out = scalePixels(src, factor, method);
+      const big = document.createElement("canvas");
+      big.width = out.width;
+      big.height = out.height;
+      big.getContext("2d")!.putImageData(new ImageData(out.data as Uint8ClampedArray<ArrayBuffer>, out.width, out.height), 0, 0);
+      href = big.toDataURL("image/png");
+    }
+    download(href, `${safeName(current?.name || "spritesheet")}${suffix}.png`);
   }
 
   function exportAtlas() {
-    const name = safeName(current?.name || "spritesheet");
+    const { factor } = scaleOf();
+    const name = safeName(current?.name || "spritesheet") + (factor === 1 ? "" : `@${factor}x`);
+    const scaleRect = (r: Record<string, number>) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, v * factor]));
     const atlas = {
-      frames: Object.fromEntries(layout.frames.map((f) => [f.key, f.rect])),
-      meta: { image: `${name}.png`, size: { w: layout.width, h: layout.height } },
+      frames: Object.fromEntries(layout.frames.map((f) => [f.key, scaleRect(f.rect as unknown as Record<string, number>)])),
+      meta: { image: `${name}.png`, size: { w: layout.width * factor, h: layout.height * factor }, scale: factor },
     };
     const url = URL.createObjectURL(new Blob([JSON.stringify(atlas, null, 2)], { type: "application/json" }));
     download(url, `${name}.json`);
@@ -392,6 +414,24 @@ export default function SpriteSheetPage() {
             />
             px
           </label>
+          <label className="flex items-center gap-1.5 text-xs shrink-0" style={{ color: current ? "var(--text-secondary)" : "var(--text-muted)" }} title="Export the sheet bigger: sharp keeps square pixels, smooth rounds diagonal edges">
+            Export size
+            <select
+              value={exportScale}
+              onChange={(e) => setExportScale(e.target.value)}
+              disabled={!current}
+              className="px-1 py-0.5 rounded text-xs outline-none disabled:opacity-40"
+              style={inputStyle}
+            >
+              <option value="1">1× (original)</option>
+              <option value="2-sharp">2× sharp</option>
+              <option value="3-sharp">3× sharp</option>
+              <option value="4-sharp">4× sharp</option>
+              <option value="2-smooth">2× smooth</option>
+              <option value="3-smooth">3× smooth</option>
+              <option value="4-smooth">4× smooth</option>
+            </select>
+          </label>
           <div className="ml-auto flex items-center gap-3 shrink-0">
             {current && (
               <>
@@ -405,8 +445,8 @@ export default function SpriteSheetPage() {
             <ExportMenu
               disabled={!current || layout.frames.length === 0}
               items={[
-                { label: "PNG", description: "The packed sheet image", onClick: exportPNG, disabled: rendering },
-                { label: "Atlas JSON", description: "Frame positions for your engine", onClick: exportAtlas },
+                { label: "PNG", description: exportScale === "1" ? "The packed sheet image" : `The packed sheet at ${exportScale.replace("-", " ")}`, onClick: exportPNG, disabled: rendering },
+                { label: "Atlas JSON", description: exportScale === "1" ? "Frame positions for your engine" : "Frame positions matching the scaled PNG", onClick: exportAtlas },
               ]}
             />
           </div>

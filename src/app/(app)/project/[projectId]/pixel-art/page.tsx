@@ -35,6 +35,7 @@ import { useUndoShortcuts } from "@/hooks/useHistory";
 import { UndoRedoButtons } from "@/components/UndoRedoButtons";
 import { storage } from "@/lib/storage";
 import { getLoadedImage, loadImage } from "@/lib/pixels";
+import { scalePixels, type ScaleFactor, type ScaleMethod } from "@/lib/pixel-scale";
 import { encodeGif } from "@/lib/gif";
 import { useOpenParam, useTrackOpenAsset, useStorageVersion } from "@/hooks/useStorage";
 import { useAutosave } from "@/hooks/useAutosave";
@@ -71,6 +72,8 @@ interface HistoryEntry {
   frames: FrameData[];
   activeFrame: number;
   activeLayer: number;
+  w: number;
+  h: number;
 }
 
 // ─── helpers ─────────────────────────────────────────────────────────
@@ -223,6 +226,13 @@ export default function PixelArtPage() {
   // ── canvas size ──
   const [canvasW, setCanvasW] = useState(32);
   const [canvasH, setCanvasH] = useState(32);
+  // the size as of the latest change, readable in the same handler that changed it (history needs it)
+  const sizeRef = useRef({ w: 32, h: 32 });
+  function setCanvasSize(w: number, h: number) {
+    sizeRef.current = { w, h };
+    setCanvasW(w);
+    setCanvasH(h);
+  }
 
   // ── frames / layers ──
   const [frames, setFrames] = useState<FrameData[]>([]);
@@ -241,6 +251,9 @@ export default function PixelArtPage() {
   const [onionSkin, setOnionSkin] = useState(true);
   const [onionOpacity, setOnionOpacity] = useState(0.3);
   const [sizeMenu, setSizeMenu] = useState(false);
+  const [scaleMethod, setScaleMethod] = useState<ScaleMethod>("sharp");
+  const [scaleCopy, setScaleCopy] = useState(false);
+  const [scaling, setScaling] = useState(false);
   const [pickW, setPickW] = useState("32");
   const [pickH, setPickH] = useState("32");
   const [playing, setPlaying] = useState(false);
@@ -286,8 +299,7 @@ export default function PixelArtPage() {
   function startSprite(w: number, h: number, save: boolean) {
     const id = uuid();
     const frame = makeBlankFrame(w, h);
-    setCanvasW(w);
-    setCanvasH(h);
+    setCanvasSize(w, h);
     setFrames([frame]);
     setActiveFrame(0);
     setActiveLayer(0);
@@ -308,8 +320,7 @@ export default function PixelArtPage() {
   // ── load sprite ──
   async function loadSprite(sprite: Sprite) {
     initializedRef.current = true;
-    setCanvasW(sprite.width);
-    setCanvasH(sprite.height);
+    setCanvasSize(sprite.width, sprite.height);
     setActiveSpriteId(sprite.id);
     setNewName(sprite.name);
     setFps(sprite.fps);
@@ -404,6 +415,8 @@ export default function PixelArtPage() {
       frames: JSON.parse(JSON.stringify(f)),
       activeFrame: af,
       activeLayer: al,
+      w: sizeRef.current.w,
+      h: sizeRef.current.h,
     };
     historyRef.current = historyRef.current.slice(0, historyIdxRef.current + 1);
     historyRef.current.push(entry);
@@ -416,6 +429,7 @@ export default function PixelArtPage() {
     if (historyIdxRef.current <= 0) return;
     historyIdxRef.current--;
     const e = historyRef.current[historyIdxRef.current];
+    setCanvasSize(e.w, e.h);
     setFrames(JSON.parse(JSON.stringify(e.frames)));
     setActiveFrame(e.activeFrame);
     setActiveLayer(e.activeLayer);
@@ -426,6 +440,7 @@ export default function PixelArtPage() {
     if (historyIdxRef.current >= historyRef.current.length - 1) return;
     historyIdxRef.current++;
     const e = historyRef.current[historyIdxRef.current];
+    setCanvasSize(e.w, e.h);
     setFrames(JSON.parse(JSON.stringify(e.frames)));
     setActiveFrame(e.activeFrame);
     setActiveLayer(e.activeLayer);
@@ -742,13 +757,64 @@ export default function PixelArtPage() {
         ),
       }))
     );
-    setCanvasW(w);
-    setCanvasH(h);
+    setCanvasSize(w, h);
     setFrames(next);
-    // undo across a size change would mix canvas sizes, so start history fresh
-    historyRef.current = [];
-    historyIdxRef.current = -1;
     pushHistory(next, activeFrame, activeLayer);
+  }
+
+  /** Every frame and layer scaled up; sharp = N×N blocks, smooth = Scale2x/3x. */
+  async function scaledFrames(factor: ScaleFactor, method: ScaleMethod): Promise<FrameData[]> {
+    return Promise.all(
+      frames.map(async (f) => ({
+        ...f,
+        layers: await Promise.all(
+          f.layers.map(async (l) => {
+            const src = await base64ToImageData(l.pixels, canvasW, canvasH);
+            const out = scalePixels(src, factor, method);
+            const c = document.createElement("canvas");
+            c.width = out.width;
+            c.height = out.height;
+            c.getContext("2d")!.putImageData(new ImageData(out.data as Uint8ClampedArray<ArrayBuffer>, out.width, out.height), 0, 0);
+            return { ...l, pixels: c.toDataURL() };
+          })
+        ),
+      }))
+    );
+  }
+
+  async function scaleSprite(factor: ScaleFactor, method: ScaleMethod, asCopy: boolean) {
+    const w = canvasW * factor;
+    const h = canvasH * factor;
+    const next = await scaledFrames(factor, method);
+    if (!asCopy) {
+      setCanvasSize(w, h);
+      setFrames(next);
+      pushHistory(next, activeFrame, activeLayer);
+      return;
+    }
+    flush();
+    const now = new Date().toISOString();
+    const copy: Sprite = {
+      id: uuid(),
+      projectId,
+      name: `${newName.trim() || DEFAULT_NAME} (${w}×${h})`,
+      width: w,
+      height: h,
+      fps,
+      frames: await Promise.all(
+        next.map(async (f) => ({
+          id: uuid(),
+          duration: f.duration,
+          pixels: await compositeFrame(f, w, h),
+          layers: f.layers.map((l) => ({ id: uuid(), name: l.name, visible: l.visible, pixels: l.pixels })),
+        }))
+      ),
+      tags: [],
+      createdAt: now,
+      updatedAt: now,
+    };
+    storage.save("sprites", copy, projectId);
+    await loadSprite(copy);
   }
 
   function pickedSize(): [number, number] {
@@ -1163,6 +1229,67 @@ export default function PixelArtPage() {
                 <p className="text-[11px] mt-2 leading-snug" style={{ color: "var(--text-muted)" }}>
                   Resizing keeps your drawing centred. Making it smaller crops the edges.
                 </p>
+
+                <div className="mt-3 pt-3 border-t" style={{ borderColor: "var(--border)" }}>
+                  <div className="text-xs font-medium mb-0.5" style={{ color: "var(--text-primary)" }}>Scale up the drawing</div>
+                  <p className="text-[11px] mb-2 leading-snug" style={{ color: "var(--text-muted)" }}>
+                    Turn an {canvasW}×{canvasH} sprite into a bigger one, every frame and layer.
+                  </p>
+                  <div className="grid grid-cols-2 gap-1 mb-2" role="radiogroup" aria-label="Scaling method">
+                    {([
+                      ["sharp", "Sharp", "Each pixel becomes a block. Exact."],
+                      ["smooth", "Smooth", "Rounds diagonal edges, keeps the pixel look."],
+                    ] as const).map(([value, label, hint]) => (
+                      <button
+                        key={value}
+                        role="radio"
+                        aria-checked={scaleMethod === value}
+                        onClick={() => setScaleMethod(value)}
+                        className="text-left px-2 py-1.5 rounded"
+                        style={{
+                          background: scaleMethod === value ? "var(--accent-glow)" : "var(--bg-hover)",
+                          border: `1px solid ${scaleMethod === value ? "var(--accent)" : "var(--border)"}`,
+                        }}
+                        title={hint}
+                      >
+                        <span className="block text-xs font-medium" style={{ color: "var(--text-primary)" }}>{label}</span>
+                        <span className="block text-[10px] leading-snug" style={{ color: "var(--text-muted)" }}>{hint}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-3 gap-1 mb-2">
+                    {([2, 3, 4] as const).map((f) => {
+                      const tooBig = canvasW * f > MAX_SIZE || canvasH * f > MAX_SIZE;
+                      return (
+                        <button
+                          key={f}
+                          disabled={tooBig || scaling}
+                          onClick={async () => {
+                            setScaling(true);
+                            try {
+                              await scaleSprite(f, scaleMethod, scaleCopy);
+                              setSizeMenu(false);
+                            } finally {
+                              setScaling(false);
+                            }
+                          }}
+                          className="py-1.5 rounded text-xs disabled:opacity-40"
+                          style={{ background: "var(--bg-hover)", color: "var(--text-primary)", border: "1px solid var(--border)" }}
+                          title={tooBig ? `Bigger than ${MAX_SIZE}×${MAX_SIZE}` : `Scale to ${canvasW * f}×${canvasH * f}`}
+                        >
+                          <span className="font-semibold">×{f}</span>
+                          <span className="block text-[10px] tabular-nums" style={{ color: "var(--text-muted)" }}>
+                            {canvasW * f}×{canvasH * f}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <label className="flex items-center gap-1.5 text-[11px]" style={{ color: "var(--text-secondary)" }}>
+                    <input type="checkbox" checked={scaleCopy} onChange={(e) => setScaleCopy(e.target.checked)} className="accent-[var(--accent)]" />
+                    Keep the original and make a scaled copy
+                  </label>
+                </div>
               </div>
             )}
           </div>

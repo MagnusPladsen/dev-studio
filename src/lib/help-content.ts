@@ -193,6 +193,7 @@ export const HELP: Record<HelpTopic, HelpContent> = {
       "Use layers, and frames for animation with onion skin.",
       "Play the animation and set its speed (fps).",
       "Resize the canvas and swap in a project palette.",
+      "Scale a sprite up (8×8 → 16×16 and more), sharp or smooth, in place or as a copy.",
       "Export a PNG, a sprite sheet or an animated GIF.",
     ],
     steps: [
@@ -204,6 +205,7 @@ export const HELP: Record<HelpTopic, HelpContent> = {
     tips: [
       "Keys: B pencil, E eraser, G fill, L line, R rectangle, O circle, I picker, M move.",
       "Scroll over the canvas to zoom.",
+      "To make a sprite bigger without redrawing it, open the Canvas menu and use Scale up.",
       UNDO_TIP,
       "Right-click a frame to duplicate, move or copy it as PNG.",
     ],
@@ -237,6 +239,7 @@ export const HELP: Record<HelpTopic, HelpContent> = {
       "Each sprite gets a row, with its frames left to right.",
       "Set padding between frames.",
       "Export the sheet as PNG plus an atlas JSON of frame positions.",
+      "Export at 2×, 3× or 4× size, sharp or smooth; the atlas scales with it.",
     ],
     steps: [
       "Draw some sprites in Pixel Art first.",
