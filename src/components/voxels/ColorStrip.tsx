@@ -26,7 +26,7 @@ const fieldStyle: React.CSSProperties = {
 
 function Swatches({ colors, value, onSelect }: Pick<Props, "colors" | "value" | "onSelect">): React.JSX.Element {
   return (
-    <div className="flex-1 flex items-center gap-1 flex-wrap min-w-0 p-0.5 md:max-h-16 md:overflow-y-auto max-md:flex-nowrap max-md:basis-full max-md:overflow-x-auto">
+    <div className="flex-1 flex items-center gap-1 flex-wrap min-w-0 p-0.5 md:max-h-16 md:overflow-y-auto max-xl:flex-nowrap max-xl:basis-full max-xl:overflow-x-auto">
       {colors.map((color, index) => {
         const swatchValue = index + 1;
         const isSelected = swatchValue === value;
@@ -123,7 +123,7 @@ function PalettePicker({ projectId, palettes, initialPaletteId, onUsePalette }: 
 export function ColorStrip(props: Props): React.JSX.Element {
   return (
     <div
-      className="shrink-0 flex items-center gap-3 px-3 py-2 border-t max-md:flex-wrap max-md:gap-2"
+      className="shrink-0 flex items-center gap-3 px-3 py-2 border-t max-xl:flex-wrap max-xl:gap-2 max-xl:landscape:flex-nowrap"
       style={{ borderColor: "var(--border)", background: "var(--bg-secondary)" }}
     >
       <Swatches colors={props.colors} value={props.value} onSelect={props.onSelect} />

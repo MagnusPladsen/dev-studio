@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ChevronDown, Download } from "lucide-react";
 
 export interface ExportItem {
@@ -14,6 +14,13 @@ export interface ExportItem {
 export function ExportMenu({ items, disabled, label = "Export" }: { items: ExportItem[]; disabled?: boolean; label?: string }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    const menu = menuRef.current;
+    if (!open || !menu) return;
+    menu.style.maxHeight = `${Math.max(120, window.innerHeight - menu.getBoundingClientRect().top - 8)}px`;
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -44,8 +51,9 @@ export function ExportMenu({ items, disabled, label = "Export" }: { items: Expor
       </button>
       {open && (
         <div
+          ref={menuRef}
           role="menu"
-          className="absolute right-0 top-full mt-1 z-50 min-w-56 rounded-lg p-1 shadow-xl"
+          className="absolute right-0 top-full mt-1 z-50 min-w-56 rounded-lg p-1 shadow-xl overflow-y-auto"
           style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)" }}
         >
           {items.map((it) => (

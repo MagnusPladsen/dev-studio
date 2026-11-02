@@ -176,7 +176,7 @@ export function VoxelToolbar(props: Props): React.JSX.Element {
   const { tool, size, onSizeChange, oneFingerOrbit, onOneFingerOrbitChange } = props;
   return (
     <div
-      className="h-11 flex items-center gap-2 px-3 border-b shrink-0 overflow-x-auto max-md:h-12"
+      className="h-11 flex items-center gap-2 px-3 border-b shrink-0 overflow-x-auto max-md:h-12 md:[@media(min-height:600px)]:h-auto md:[@media(min-height:600px)]:min-h-11 md:[@media(min-height:600px)]:py-1.5 md:[@media(min-height:600px)]:flex-wrap"
       style={{ borderColor: "var(--border)", background: "var(--bg-secondary)" }}
     >
       <EditViewToggle editView={props.editView} onEditViewChange={props.onEditViewChange} />

@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { Plus, Trash2, Package, Check, Images, Link2 } from "lucide-react";
+import { Plus, Trash2, Package, Check, Images, Link2, X } from "lucide-react";
 import { storage } from "@/lib/storage";
 import { loadImage, spriteFrameSrc } from "@/lib/pixels";
 import { useOpenParam, useTrackOpenAsset, useStorageVersion } from "@/hooks/useStorage";
@@ -397,48 +397,60 @@ export default function SpriteSheetPage() {
 
       {/* Main area */}
       <div className="flex-1 flex flex-col overflow-hidden max-md:min-h-[60vh]">
-        <div className="h-10 flex items-center gap-3 px-3 border-b shrink-0 max-md:overflow-x-auto" style={{ borderColor: "var(--border)", background: "var(--bg-secondary)" }}>
-          <UndoRedoButtons history={history} />
-          <div className="w-px h-5 shrink-0" style={{ background: "var(--border)" }} />
-          <label className="flex items-center gap-1.5 text-xs shrink-0" style={{ color: current ? "var(--text-secondary)" : "var(--text-muted)" }}>
-            Padding
-            <input
-              type="number"
-              min={0}
-              max={16}
-              value={padding}
-              onChange={(e) => setPadding(Math.max(0, Math.min(16, +e.target.value || 0)))}
-              disabled={!current}
-              className="w-12 px-1 py-0.5 rounded text-xs outline-none disabled:opacity-40"
-              style={inputStyle}
-            />
-            px
-          </label>
-          <label className="flex items-center gap-1.5 text-xs shrink-0" style={{ color: current ? "var(--text-secondary)" : "var(--text-muted)" }} title="Export the sheet bigger: sharp keeps square pixels, smooth rounds diagonal edges">
-            Export size
-            <select
-              value={exportScale}
-              onChange={(e) => setExportScale(e.target.value)}
-              disabled={!current}
-              className="px-1 py-0.5 rounded text-xs outline-none disabled:opacity-40"
-              style={inputStyle}
-            >
-              <option value="1">1× (original)</option>
-              <option value="2-sharp">2× sharp</option>
-              <option value="3-sharp">3× sharp</option>
-              <option value="4-sharp">4× sharp</option>
-              <option value="2-smooth">2× smooth</option>
-              <option value="3-smooth">3× smooth</option>
-              <option value="4-smooth">4× smooth</option>
-            </select>
-          </label>
+        <div className="h-10 flex items-center gap-3 px-3 border-b shrink-0 md:max-xl:h-auto md:max-xl:min-h-10 md:max-xl:py-1.5 md:max-xl:flex-wrap md:max-xl:gap-y-1.5" style={{ borderColor: "var(--border)", background: "var(--bg-secondary)" }}>
+          <div className="flex items-center gap-3 min-w-0 max-md:overflow-x-auto md:max-xl:flex-wrap md:max-xl:gap-y-1.5 [&>*]:shrink-0">
+            <UndoRedoButtons history={history} />
+            <div className="w-px h-5 shrink-0" style={{ background: "var(--border)" }} />
+            <label className="flex items-center gap-1.5 text-xs shrink-0" style={{ color: current ? "var(--text-secondary)" : "var(--text-muted)" }}>
+              Padding
+              <input
+                type="number"
+                min={0}
+                max={16}
+                value={padding}
+                onChange={(e) => setPadding(Math.max(0, Math.min(16, +e.target.value || 0)))}
+                disabled={!current}
+                className="w-12 px-1 py-0.5 rounded text-xs outline-none disabled:opacity-40"
+                style={inputStyle}
+              />
+              px
+            </label>
+            <label className="flex items-center gap-1.5 text-xs shrink-0" style={{ color: current ? "var(--text-secondary)" : "var(--text-muted)" }} title="Export the sheet bigger: sharp keeps square pixels, smooth rounds diagonal edges">
+              Export size
+              <select
+                value={exportScale}
+                onChange={(e) => setExportScale(e.target.value)}
+                disabled={!current}
+                className="px-1 py-0.5 rounded text-xs outline-none disabled:opacity-40"
+                style={inputStyle}
+              >
+                <option value="1">1× (original)</option>
+                <option value="2-sharp">2× sharp</option>
+                <option value="3-sharp">3× sharp</option>
+                <option value="4-sharp">4× sharp</option>
+                <option value="2-smooth">2× smooth</option>
+                <option value="3-smooth">3× smooth</option>
+                <option value="4-smooth">4× smooth</option>
+              </select>
+            </label>
+          </div>
           <div className="ml-auto flex items-center gap-3 shrink-0">
             {current && (
               <>
-                <span className="text-xs max-md:hidden" style={{ color: "var(--text-muted)" }}>
+                <span className="text-xs max-xl:hidden" style={{ color: "var(--text-muted)" }}>
                   {layout.frames.length} frames · {layout.width}×{layout.height}px
                 </span>
                 <SaveIndicator state={autosave.state} />
+                <button
+                  onClick={() => setMobilePanel((p) => (p === "links" ? null : "links"))}
+                  className="hidden md:max-xl:flex p-1.5 rounded-md"
+                  style={{ ...secondaryBtn, background: mobilePanel === "links" ? "var(--bg-hover)" : "transparent" }}
+                  title="Links"
+                  aria-label="Links"
+                  aria-expanded={mobilePanel === "links"}
+                >
+                  <Link2 className="w-4 h-4" />
+                </button>
               </>
             )}
             <HelpButton topic="sprites" />
@@ -452,7 +464,7 @@ export default function SpriteSheetPage() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-auto flex max-md:flex-col">
+        <div className="relative flex-1 overflow-auto flex max-md:flex-col">
           <div className="flex-1 overflow-auto flex items-center justify-center p-6">
             {current ? (
               layout.frames.length === 0 ? (
@@ -493,11 +505,22 @@ export default function SpriteSheetPage() {
           </div>
           {current && (
             <div
-              className={`w-56 max-md:w-full shrink-0 border-l max-md:border-l-0 max-md:border-t p-3 overflow-y-auto ${
-                mobilePanel === "links" ? "" : "max-md:hidden"
+              className={`w-56 max-md:w-full shrink-0 border-l max-md:border-l-0 max-md:border-t p-3 overflow-y-auto max-xl:shadow-2xl max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:max-h-[60dvh] max-md:z-30 md:max-xl:absolute md:max-xl:inset-y-0 md:max-xl:right-0 md:max-xl:z-20 ${
+                mobilePanel === "links" ? "" : "max-xl:hidden"
               }`}
               style={{ background: "var(--bg-secondary)", borderColor: "var(--border)" }}
             >
+              <div className="xl:hidden flex justify-end -mt-1 -mr-1">
+                <button
+                  onClick={() => setMobilePanel(null)}
+                  className="p-1 rounded"
+                  style={{ color: "var(--text-primary)" }}
+                  title="Close links"
+                  aria-label="Close links"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
               <LinkedAssets projectId={projectId} type="spritesheet" id={current.id} layout="panel" />
             </div>
           )}

@@ -438,9 +438,9 @@ export default function VoxelsPage(): React.JSX.Element {
                 />
               )}
               {(selection.box || selection.message || (tool === "select" && selection.hasClipboard)) && <SelectionBar selection={selection} />}
-              <div className="flex flex-1 min-h-0 max-md:flex-col">
+              <div className="flex flex-1 min-h-0 max-lg:portrait:flex-col">
               {editView === "slice" && (
-                <div className="flex-1 min-w-0 min-h-0 max-md:order-2">
+                <div className="flex-1 min-w-0 min-h-0 max-lg:portrait:order-2">
                   <SliceEditor
                     grid={strokes.displayGrid}
                     colors={doc.colors}
@@ -461,7 +461,7 @@ export default function VoxelsPage(): React.JSX.Element {
               <div
                 className={
                   editView === "slice"
-                    ? "relative shrink-0 w-80 border-l max-md:w-full max-md:h-44 max-md:border-l-0 max-md:border-b max-md:order-1"
+                    ? "relative shrink-0 w-80 border-l max-lg:landscape:w-2/5 max-lg:portrait:w-full max-lg:portrait:h-44 md:max-lg:portrait:h-72 max-lg:portrait:border-l-0 max-lg:portrait:border-b max-lg:portrait:order-1"
                     : "relative flex-1 min-h-0"
                 }
                 style={{ borderColor: "var(--border)" }}

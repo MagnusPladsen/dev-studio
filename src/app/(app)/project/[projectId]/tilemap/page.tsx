@@ -15,6 +15,7 @@ import {
   Layers,
   ChevronUp,
   ChevronDown,
+  X,
 } from "lucide-react";
 import { storage } from "@/lib/storage";
 import { getLoadedImage, preloadImages, spriteFrameSrc } from "@/lib/pixels";
@@ -434,7 +435,7 @@ export default function TilemapPage() {
   );
 
   return (
-    <div className="flex max-md:flex-col h-full max-md:h-auto max-md:min-h-full" style={{ background: "var(--bg-primary)" }}>
+    <div className="relative flex max-md:flex-col h-full max-md:h-auto max-md:min-h-full" style={{ background: "var(--bg-primary)" }}>
       {/* Phones: toggles for the side panels */}
       <div className="md:hidden flex items-center gap-2 px-3 py-2 border-b" style={{ borderColor: "var(--border)", background: "var(--bg-secondary)" }}>
         {mobileToggle("tiles", "Maps & tiles", Grid3X3)}
@@ -579,19 +580,31 @@ export default function TilemapPage() {
 
       {/* Main canvas area */}
       <div className="flex-1 flex flex-col overflow-hidden max-md:min-h-[60vh]">
-        <div className="h-10 flex items-center gap-2 px-3 border-b shrink-0 max-md:overflow-x-auto" style={{ borderColor: "var(--border)", background: "var(--bg-secondary)" }}>
-          <UndoRedoButtons history={history} />
-          <div className="w-px h-5 shrink-0" style={{ background: "var(--border)" }} />
-          {toolBtn("paint", Paintbrush, "Paint")}
-          {toolBtn("fill", PaintBucket, "Fill area")}
-          {toolBtn("erase", Eraser, "Erase")}
+        <div className="h-10 flex items-center gap-2 px-3 border-b shrink-0 md:max-xl:h-auto md:max-xl:min-h-10 md:max-xl:py-1.5 md:max-xl:flex-wrap md:max-xl:gap-y-1.5" style={{ borderColor: "var(--border)", background: "var(--bg-secondary)" }}>
+          <div className="flex items-center gap-2 min-w-0 max-md:overflow-x-auto [&>*]:shrink-0">
+            <UndoRedoButtons history={history} />
+            <div className="w-px h-5 shrink-0" style={{ background: "var(--border)" }} />
+            {toolBtn("paint", Paintbrush, "Paint")}
+            {toolBtn("fill", PaintBucket, "Fill area")}
+            {toolBtn("erase", Eraser, "Erase")}
+          </div>
           <div className="ml-auto flex items-center gap-3 shrink-0">
             {current && (
               <>
-                <span className="text-xs max-md:hidden" style={{ color: "var(--text-muted)" }}>
+                <span className="text-xs max-xl:hidden" style={{ color: "var(--text-muted)" }}>
                   {current.width}×{current.height} tiles · {current.tileSize}px
                 </span>
                 <SaveIndicator state={autosave.state} />
+                <button
+                  onClick={() => setMobilePanel((p) => (p === "layers" ? null : "layers"))}
+                  className="hidden md:max-xl:flex p-1.5 rounded-md"
+                  style={{ ...secondaryBtn, background: mobilePanel === "layers" ? "var(--bg-hover)" : "transparent" }}
+                  title="Layers & links"
+                  aria-label="Layers & links"
+                  aria-expanded={mobilePanel === "layers"}
+                >
+                  <Layers className="w-4 h-4" />
+                </button>
               </>
             )}
             <HelpButton topic="tilemap" />
@@ -609,7 +622,7 @@ export default function TilemapPage() {
           {current ? (
             <canvas
               ref={canvasRef}
-              className="border cursor-crosshair md:min-w-[var(--canvas-min-w)]"
+              className="border cursor-crosshair xl:min-w-[var(--canvas-min-w)]"
               style={
                 {
                   borderColor: "var(--border)",
@@ -658,8 +671,8 @@ export default function TilemapPage() {
       {/* Right panel */}
       {current && (
         <div
-          className={`w-56 max-md:w-full shrink-0 border-l max-md:border-l-0 max-md:border-t flex-col overflow-y-auto ${
-            mobilePanel === "layers" ? "flex" : "max-md:hidden flex"
+          className={`w-56 max-md:w-full shrink-0 border-l max-md:border-l-0 max-md:border-t flex-col overflow-y-auto max-xl:shadow-2xl max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:max-h-[60dvh] max-md:z-30 md:max-xl:absolute md:max-xl:inset-y-0 md:max-xl:right-0 md:max-xl:z-20 ${
+            mobilePanel === "layers" ? "flex" : "max-xl:hidden flex"
           }`}
           style={{ background: "var(--bg-secondary)", borderColor: "var(--border)" }}
         >
@@ -669,9 +682,20 @@ export default function TilemapPage() {
                 <Layers className="w-3 h-3" />
                 Layers
               </span>
-              <button onClick={addLayer} className="p-1 rounded" style={{ color: "var(--accent)" }} title="Add layer" aria-label="Add layer">
-                <Plus className="w-3 h-3" />
-              </button>
+              <div className="flex items-center gap-1">
+                <button onClick={addLayer} className="p-1 rounded" style={{ color: "var(--accent)" }} title="Add layer" aria-label="Add layer">
+                  <Plus className="w-3 h-3" />
+                </button>
+                <button
+                  onClick={() => setMobilePanel(null)}
+                  className="xl:hidden p-1 rounded"
+                  style={{ color: "var(--text-primary)" }}
+                  title="Close layers & links"
+                  aria-label="Close layers & links"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
             <div className="space-y-0.5">
               {current.layers.map((layer, i) => (
