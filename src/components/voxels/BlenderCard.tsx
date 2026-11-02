@@ -48,7 +48,7 @@ function FullText(): React.JSX.Element {
   return (
     <>
       <p className="text-sm font-semibold pr-6" style={{ color: "var(--text-primary)" }}>
-        Need more than voxels? Use Blender — it&apos;s free.
+        Need more than cubes? Use Blender — it&apos;s free.
       </p>
       <p className="text-xs mt-1.5 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
         This tool is for quick, chunky models. For smooth shapes, sculpting, UV textures, rigging and animation, use{" "}

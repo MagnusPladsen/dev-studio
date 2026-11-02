@@ -4,6 +4,7 @@ import {
   BufferAttribute,
   BufferGeometry,
   DirectionalLight,
+  EdgesGeometry,
   Float32BufferAttribute,
   HemisphereLight,
   InstancedMesh,
@@ -33,6 +34,8 @@ const GROUND_COLOR = 0x8a8aa6;
 const PREVIEW_ADD_COLOR = 0xffffff;
 const PREVIEW_ERASE_COLOR = 0xff4d5e;
 const PREVIEW_OPACITY = 0.4;
+const SELECTION_COLOR = 0x4dd0ff;
+const SLICE_COLOR = 0xffffff;
 const GIZMO_SIZE = 72;
 const GIZMO_MARGIN = 8;
 
@@ -40,6 +43,50 @@ interface PreviewLayer {
   mesh: InstancedMesh | null;
   geometry: BoxGeometry;
   material: MeshBasicMaterial;
+}
+
+/** A translucent box with outlined edges, used for the selection and the current slice. */
+interface Overlay {
+  fill: Mesh<BoxGeometry, MeshBasicMaterial>;
+  edges: LineSegments<EdgesGeometry, LineBasicMaterial>;
+}
+
+/** A box in grid cells: inclusive min and max corners. */
+export interface CellBox {
+  min: Vec3;
+  max: Vec3;
+}
+
+function createOverlay(color: number, fillOpacity: number, edgeOpacity: number): Overlay {
+  const box = new BoxGeometry(1, 1, 1);
+  const fill = new Mesh(box, new MeshBasicMaterial({ color, transparent: true, opacity: fillOpacity, depthWrite: false }));
+  const edges = new LineSegments(
+    new EdgesGeometry(box),
+    new LineBasicMaterial({ color, transparent: true, opacity: edgeOpacity, depthTest: false })
+  );
+  fill.renderOrder = 2;
+  edges.renderOrder = 3;
+  fill.visible = edges.visible = false;
+  return { fill, edges };
+}
+
+function placeOverlay(overlay: Overlay, box: CellBox | null, size: Vec3, pad: number): void {
+  overlay.fill.visible = overlay.edges.visible = !!box;
+  if (!box) return;
+  const dims = [0, 1, 2].map((axis) => box.max[axis] - box.min[axis] + 1 + pad);
+  const centre = [0, 1, 2].map((axis) => (box.min[axis] + box.max[axis] + 1) / 2) as Vec3;
+  const [x, y, z] = [centre[0] - size[0] / 2, centre[1], centre[2] - size[2] / 2];
+  for (const part of [overlay.fill, overlay.edges]) {
+    part.position.set(x, y, z);
+    part.scale.set(dims[0], dims[1], dims[2]);
+  }
+}
+
+function disposeOverlay(overlay: Overlay): void {
+  overlay.fill.geometry.dispose();
+  overlay.fill.material.dispose();
+  overlay.edges.geometry.dispose();
+  overlay.edges.material.dispose();
 }
 
 interface AxisGizmo {
@@ -56,6 +103,8 @@ export interface ViewportScene {
   voxels: Mesh<BufferGeometry, MeshLambertMaterial>;
   ground: LineSegments<BufferGeometry, LineBasicMaterial>;
   preview: PreviewLayer;
+  selection: Overlay;
+  slice: Overlay;
   gizmo: AxisGizmo;
   frame: number;
 }
@@ -92,8 +141,23 @@ export function createViewportScene(canvas: HTMLCanvasElement): ViewportScene {
     geometry: new BoxGeometry(1.04, 1.04, 1.04),
     material: new MeshBasicMaterial({ transparent: true, opacity: PREVIEW_OPACITY, depthWrite: false }),
   };
-  scene.add(voxels, ground);
-  return { renderer, scene, camera, controls, voxels, ground, preview, gizmo: createAxisGizmo(), frame: 0 };
+  const selection = createOverlay(SELECTION_COLOR, 0.12, 0.9);
+  const slice = createOverlay(SLICE_COLOR, 0.07, 0.5);
+  scene.add(voxels, ground, selection.fill, selection.edges, slice.fill, slice.edges);
+  return { renderer, scene, camera, controls, voxels, ground, preview, selection, slice, gizmo: createAxisGizmo(), frame: 0 };
+}
+
+export function setSelectionBox(viewport: ViewportScene, box: CellBox | null, size: Vec3): void {
+  placeOverlay(viewport.selection, box, size, 0.08);
+}
+
+/** Highlights one layer of the grid (the one shown in Slice view). */
+export function setSliceLayer(viewport: ViewportScene, layer: { axis: 0 | 1 | 2; index: number } | null, size: Vec3): void {
+  if (!layer) return placeOverlay(viewport.slice, null, size, 0);
+  const min: Vec3 = [0, 0, 0];
+  const max: Vec3 = [size[0] - 1, size[1] - 1, size[2] - 1];
+  min[layer.axis] = max[layer.axis] = layer.index;
+  placeOverlay(viewport.slice, { min, max }, size, 0.02);
 }
 
 export function applyControlScheme(controls: OrbitControls, oneFingerOrbit: boolean): void {
@@ -197,10 +261,16 @@ export function renderViewport(viewport: ViewportScene, withHelpers: boolean = t
   const { renderer, scene, camera, ground, preview } = viewport;
   const size = renderer.getSize(new Vector2());
   ground.visible = withHelpers;
+  const { selection, slice } = viewport;
+  const selectionShown = selection.fill.visible;
+  const sliceShown = slice.fill.visible;
+  if (!withHelpers) selection.fill.visible = selection.edges.visible = slice.fill.visible = slice.edges.visible = false;
   if (preview.mesh) preview.mesh.visible = withHelpers && preview.mesh.count > 0;
   renderer.setViewport(0, 0, size.x, size.y);
   renderer.render(scene, camera);
   if (withHelpers) renderGizmo(viewport);
+  selection.fill.visible = selection.edges.visible = selectionShown;
+  slice.fill.visible = slice.edges.visible = sliceShown;
   renderer.setViewport(0, 0, size.x, size.y);
 }
 
@@ -243,6 +313,8 @@ export function disposeViewportScene(viewport: ViewportScene): void {
   viewport.preview.mesh?.dispose();
   viewport.preview.geometry.dispose();
   viewport.preview.material.dispose();
+  disposeOverlay(viewport.selection);
+  disposeOverlay(viewport.slice);
   viewport.gizmo.axes.dispose();
   viewport.renderer.dispose();
 }

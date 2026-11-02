@@ -23,7 +23,7 @@ import { downloadBlob } from "@/lib/download";
 import { encodeGif } from "@/lib/gif";
 import { storage } from "@/lib/storage";
 import { addLink } from "@/lib/links";
-import { assetHref } from "@/lib/assets";
+import { ASSET_KINDS, assetHref } from "@/lib/assets";
 import { framesToSheet, imageToDataUrl, renderModelFrames } from "./render-2d";
 
 interface Props {
@@ -145,6 +145,15 @@ export function RenderDialog({ projectId, modelId, doc, onClose }: Props) {
   return createPortal(
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+      // portalled outside <main>, so carry the tool's colour in explicitly
+      style={
+        {
+          "--accent": ASSET_KINDS.model.color,
+          "--accent-glow": `color-mix(in srgb, ${ASSET_KINDS.model.color} 16%, transparent)`,
+          "--on-accent": "#0b0b10",
+          "--tool-color": ASSET_KINDS.model.color,
+        } as React.CSSProperties
+      }
       onClick={onClose}
       role="dialog"
       aria-modal="true"

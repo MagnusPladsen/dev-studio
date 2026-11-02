@@ -16,7 +16,10 @@ import {
   resizeViewport,
   setGroundGrid,
   setPreviewCells,
+  setSelectionBox,
+  setSliceLayer,
   setVoxelMesh,
+  type CellBox,
   snapshotViewportPng,
   type ViewportScene,
 } from "./viewport-scene";
@@ -32,6 +35,10 @@ export interface VoxelViewportProps {
   preview: Vec3[];
   oneFingerOrbit: boolean;
   view: { preset: ViewPreset; nonce: number };
+  /** The selected box, drawn as a translucent outline. */
+  selection?: CellBox | null;
+  /** The layer being edited in Slice view, highlighted in 3D. */
+  slice?: { axis: 0 | 1 | 2; index: number } | null;
   onStroke(event: StrokeEvent): void;
   onHover?(hit: RayHit | null): void;
   onReady?(api: VoxelViewportApi): void;
@@ -66,7 +73,10 @@ function connectViewport(viewport: ViewportScene, container: HTMLElement, input:
 }
 
 export default function VoxelViewport(props: VoxelViewportProps): React.JSX.Element {
-  const { grid, colors, tool, preview, oneFingerOrbit, view } = props;
+  const { grid, colors, tool, preview, oneFingerOrbit, view, selection = null, slice = null } = props;
+  const selectionKey = selection ? `${selection.min.join(",")}|${selection.max.join(",")}` : "";
+  const sliceAxis = slice?.axis ?? -1;
+  const sliceIndex = slice?.index ?? -1;
   const [sizeX, sizeY, sizeZ] = grid.size;
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -143,6 +153,21 @@ export default function VoxelViewport(props: VoxelViewportProps): React.JSX.Elem
     if (!viewport) return;
     applyControlScheme(viewport.controls, oneFingerOrbit);
   }, [oneFingerOrbit]);
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    setSelectionBox(viewport, latestProps.current.selection ?? null, [sizeX, sizeY, sizeZ]);
+    requestRender(viewport);
+  }, [selectionKey, sizeX, sizeY, sizeZ]);
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    const layer = sliceAxis >= 0 ? { axis: sliceAxis as 0 | 1 | 2, index: sliceIndex } : null;
+    setSliceLayer(viewport, layer, [sizeX, sizeY, sizeZ]);
+    requestRender(viewport);
+  }, [sliceAxis, sliceIndex, sizeX, sizeY, sizeZ]);
 
   return (
     <div ref={containerRef} className="relative h-full w-full overflow-hidden">

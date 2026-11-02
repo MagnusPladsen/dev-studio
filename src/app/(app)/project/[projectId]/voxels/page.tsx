@@ -12,8 +12,13 @@ import { BlenderCard } from "@/components/voxels/BlenderCard";
 import { BoxHeightBar } from "@/components/voxels/BoxHeightBar";
 import { ColorStrip } from "@/components/voxels/ColorStrip";
 import { ModelList } from "@/components/voxels/ModelList";
+import { RenderDialog } from "@/components/voxels/RenderDialog";
+import { SelectionBar } from "@/components/voxels/SelectionBar";
+import { SliceBar } from "@/components/voxels/SliceBar";
+import { SliceEditor } from "@/components/voxels/SliceEditor";
+import { useVoxelSelection, type VoxelSelection } from "@/components/voxels/useVoxelSelection";
 import { SpriteImportDialog, type SpriteVoxels } from "@/components/voxels/SpriteImportDialog";
-import type { ViewPreset, VoxelTool } from "@/components/voxels/types";
+import type { EditView, ViewPreset, VoxelTool } from "@/components/voxels/types";
 import { useVoxelDocument, DEFAULT_MODEL_NAME, type VoxelDoc } from "@/components/voxels/useVoxelDocument";
 import { useVoxelExports } from "@/components/voxels/useVoxelExports";
 import { useVoxelStrokes } from "@/components/voxels/useVoxelStrokes";
@@ -26,7 +31,9 @@ import { addLink } from "@/lib/links";
 import { storage } from "@/lib/storage";
 import { addColor, FALLBACK_COLORS, hexToRgb, MAX_COLORS, remapToPalette } from "@/lib/voxels/colors";
 import type { Symmetry } from "@/lib/voxels/edit";
-import { createGrid, DEFAULT_GRID_SIZE, resizeGrid, type VoxelGrid } from "@/lib/voxels/grid";
+import { createGrid, DEFAULT_GRID_SIZE, resizeGrid, type Vec3, type VoxelGrid } from "@/lib/voxels/grid";
+import { normalizeBox } from "@/lib/voxels/selection";
+import { AXIS_INDEX, layerCount, sliceToCell, type SliceAxis } from "@/lib/voxels/slice";
 import type { Palette, VoxelModel } from "@/types";
 
 const VoxelViewport = dynamic(() => import("@/components/voxels/VoxelViewport"), {
@@ -87,6 +94,79 @@ function useEditorKeys(onTool: (tool: VoxelTool) => void, onSave: () => void): v
   }, []);
 }
 
+/** Arrow keys move the selection; in Slice view they move it across the slice, Page Up/Down through the layers. */
+function arrowDelta(key: string, view: EditView, axis: SliceAxis, size: Vec3): Vec3 | null {
+  if (view === "slice") {
+    const step: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+    if (step[key]) {
+      const a = sliceToCell(size, axis, 0, [1, 1]);
+      const b = sliceToCell(size, axis, 0, [1 + step[key][0], 1 + step[key][1]]);
+      return [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+    }
+    if (key === "PageUp" || key === "PageDown") {
+      const delta: Vec3 = [0, 0, 0];
+      delta[AXIS_INDEX[axis]] = key === "PageUp" ? 1 : -1;
+      return delta;
+    }
+    return null;
+  }
+  const deltas: Record<string, Vec3> = {
+    ArrowLeft: [-1, 0, 0],
+    ArrowRight: [1, 0, 0],
+    ArrowUp: [0, 0, -1],
+    ArrowDown: [0, 0, 1],
+    PageUp: [0, 1, 0],
+    PageDown: [0, -1, 0],
+  };
+  return deltas[key] ?? null;
+}
+
+interface SelectionKeyOptions {
+  selection: VoxelSelection;
+  isBusy: boolean;
+  view: EditView;
+  sliceAxis: SliceAxis;
+  size: Vec3;
+  onLayerStep(step: number): void;
+}
+
+/** Clipboard, move, delete and deselect keys for the selection, plus [ and ] to step through slice layers. */
+function useSelectionKeys(options: SelectionKeyOptions): void {
+  const latest = useRef(options);
+  useEffect(() => {
+    latest.current = options;
+  });
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent): void => {
+      if (isTextField(event.target) || event.altKey) return;
+      const { selection, isBusy, view, sliceAxis, size, onLayerStep } = latest.current;
+      if (isBusy) return;
+      const mod = event.ctrlKey || event.metaKey;
+      const key = event.key.toLowerCase();
+      const run = (action: () => void): void => {
+        event.preventDefault();
+        action();
+      };
+      if (mod) {
+        if (key === "c" && selection.box) return run(selection.copy);
+        if (key === "x" && selection.box) return run(selection.cut);
+        if (key === "v" && selection.hasClipboard) return run(selection.paste);
+        if (key === "d" && selection.box) return run(selection.duplicate);
+        if (key === "a") return run(selection.selectAll);
+        return;
+      }
+      if (view === "slice" && (event.key === "[" || event.key === "]")) return run(() => onLayerStep(event.key === "]" ? 1 : -1));
+      if (!selection.box) return;
+      if (event.key === "Escape") return run(selection.deselect);
+      if (event.key === "Delete" || event.key === "Backspace") return run(selection.remove);
+      const delta = arrowDelta(event.key, view, sliceAxis, size);
+      if (delta) run(() => selection.move(delta));
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+}
+
 function UnsupportedNotice(): React.JSX.Element {
   return (
     <div className="h-full overflow-y-auto flex items-center justify-center p-6 max-md:p-4">
@@ -125,6 +205,12 @@ export default function VoxelsPage(): React.JSX.Element {
   const [autoConvertSpriteId, setAutoConvertSpriteId] = useState<string | null>(null);
   const [isModelsPanelOpen, setIsModelsPanelOpen] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [isRenderOpen, setIsRenderOpen] = useState(false);
+  const [editView, setEditView] = useState<EditView>("3d");
+  const [sliceAxis, setSliceAxis] = useState<SliceAxis>("y");
+  const [sliceLayers, setSliceLayers] = useState<Record<SliceAxis, number>>({ x: 0, y: 0, z: 0 });
+  const [showBelow, setShowBelow] = useState(true);
+  const [selectAllLayers, setSelectAllLayers] = useState(false);
   const viewportApiRef = useRef<VoxelViewportApi | null>(null);
 
   useEffect(() => {
@@ -133,10 +219,16 @@ export default function VoxelsPage(): React.JSX.Element {
     return () => clearTimeout(timer);
   }, [exportError]);
 
-  const exportItems = useVoxelExports(doc, viewportApiRef, setExportError);
+  const exportItems = useVoxelExports(doc, viewportApiRef, setExportError, () => setIsRenderOpen(true));
   const grid = doc?.grid ?? PLACEHOLDER_GRID;
   const colors = doc?.colors ?? FALLBACK_COLORS;
   const activeColorValue = Math.max(1, Math.min(colorValue, colors.length));
+  const selection = useVoxelSelection(grid, (next) => updateDoc({ grid: next }));
+  const layersInAxis = layerCount(grid.size, sliceAxis);
+  const sliceLayer = Math.max(0, Math.min(layersInAxis - 1, sliceLayers[sliceAxis]));
+  function setSliceLayer(layer: number): void {
+    setSliceLayers((current) => ({ ...current, [sliceAxis]: Math.max(0, Math.min(layersInAxis - 1, layer)) }));
+  }
   const strokes = useVoxelStrokes({
     grid,
     tool,
@@ -145,6 +237,15 @@ export default function VoxelsPage(): React.JSX.Element {
     isBoxErase,
     onCommit: (next) => updateDoc({ grid: next }),
     onPick: (value) => value > 0 && setColorValue(value),
+    onSelectDrag: (from, to) => (from && to ? selection.setBox(normalizeBox(from, to)) : selection.deselect()),
+  });
+  useSelectionKeys({
+    selection,
+    isBusy: !!strokes.box,
+    view: editView,
+    sliceAxis,
+    size: grid.size,
+    onLayerStep: (step) => setSliceLayer(sliceLayer + step),
   });
 
   function selectTool(next: VoxelTool): void {
@@ -157,6 +258,7 @@ export default function VoxelsPage(): React.JSX.Element {
     setIsModelsPanelOpen(false);
     if (model.id === activeModelId) return;
     strokes.reset();
+    selection.deselect();
     editor.openModel(model);
     setColorValue(getStartColorValue(model.colors));
   }
@@ -212,6 +314,7 @@ export default function VoxelsPage(): React.JSX.Element {
     const lostLabel = `${resized.lost} cube${resized.lost === 1 ? "" : "s"}`;
     if (resized.lost > 0 && !confirm(`Making the grid ${sizeLabel} removes ${lostLabel} that no longer fit. Continue?`)) return;
     strokes.reset();
+    selection.deselect();
     updateDoc({ grid: resized.grid });
   }
 
@@ -306,6 +409,8 @@ export default function VoxelsPage(): React.JSX.Element {
           ) : (
             <>
               <VoxelToolbar
+                editView={editView}
+                onEditViewChange={setEditView}
                 tool={tool}
                 onToolChange={selectTool}
                 isBoxErase={isBoxErase}
@@ -318,7 +423,49 @@ export default function VoxelsPage(): React.JSX.Element {
                 oneFingerOrbit={oneFingerOrbit}
                 onOneFingerOrbitChange={setOneFingerOrbit}
               />
-              <div className="relative flex-1 min-h-0">
+              {editView === "slice" && (
+                <SliceBar
+                  axis={sliceAxis}
+                  onAxisChange={setSliceAxis}
+                  layer={sliceLayer}
+                  layerCount={layersInAxis}
+                  onLayerChange={setSliceLayer}
+                  showBelow={showBelow}
+                  onShowBelowChange={setShowBelow}
+                  selectAllLayers={selectAllLayers}
+                  onSelectAllLayersChange={setSelectAllLayers}
+                  isSelectTool={tool === "select"}
+                />
+              )}
+              {(selection.box || selection.message || (tool === "select" && selection.hasClipboard)) && <SelectionBar selection={selection} />}
+              <div className="flex flex-1 min-h-0 max-md:flex-col">
+              {editView === "slice" && (
+                <div className="flex-1 min-w-0 min-h-0 max-md:order-2">
+                  <SliceEditor
+                    grid={strokes.displayGrid}
+                    colors={doc.colors}
+                    axis={sliceAxis}
+                    layer={sliceLayer}
+                    tool={tool}
+                    colorValue={activeColorValue}
+                    symmetry={symmetry}
+                    showBelow={showBelow}
+                    selection={selection.box}
+                    selectAllLayers={selectAllLayers}
+                    onCommit={(next) => updateDoc({ grid: next })}
+                    onPick={(value) => value > 0 && setColorValue(value)}
+                    onSelect={(box) => (box ? selection.setBox(box) : selection.deselect())}
+                  />
+                </div>
+              )}
+              <div
+                className={
+                  editView === "slice"
+                    ? "relative shrink-0 w-80 border-l max-md:w-full max-md:h-44 max-md:border-l-0 max-md:border-b max-md:order-1"
+                    : "relative flex-1 min-h-0"
+                }
+                style={{ borderColor: "var(--border)" }}
+              >
                 <VoxelViewport
                   grid={strokes.displayGrid}
                   colors={doc.colors}
@@ -326,6 +473,8 @@ export default function VoxelsPage(): React.JSX.Element {
                   preview={strokes.preview}
                   oneFingerOrbit={oneFingerOrbit}
                   view={view}
+                  selection={selection.box}
+                  slice={editView === "slice" ? { axis: AXIS_INDEX[sliceAxis], index: sliceLayer } : null}
                   onStroke={strokes.handleStroke}
                   onHover={strokes.handleHover}
                   onReady={(api) => (viewportApiRef.current = api)}
@@ -342,6 +491,7 @@ export default function VoxelsPage(): React.JSX.Element {
                   />
                 )}
               </div>
+              </div>
               <ColorStrip
                 key={activeModelId}
                 projectId={projectId}
@@ -357,6 +507,10 @@ export default function VoxelsPage(): React.JSX.Element {
           )}
         </div>
       </div>
+
+      {isRenderOpen && doc && (
+        <RenderDialog projectId={projectId} modelId={activeModelId} doc={doc} onClose={() => setIsRenderOpen(false)} />
+      )}
 
       {isSpriteDialogOpen && (
         <SpriteImportDialog

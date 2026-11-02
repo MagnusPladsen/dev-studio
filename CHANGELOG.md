@@ -7,9 +7,16 @@ a self-hosted copy.
 ## [Unreleased]
 
 ### Tools
+- **Pixel Art:** scale sprites up ×2/×3/×4 (sharp or smooth, in place or as a copy); Sprite Sheets export at
+  1×–4×
 - **3D Pixel Art** (voxel art, first called Voxels): 3D model editor with add, erase, paint, eyedropper, fill and box tools, X/Y/Z mirror, grid sizes
   8 to 64, undo/redo and autosave
-- Sprite to voxels import from Pixel Art
+- Sprite to 3D from Pixel Art: pick a frame, 1–8 cubes deep, flat or puffy, optional darker back; big sprites
+  shrink to fit
+- Slice view: draw one flat layer at a time with Pixel Art-style tools next to a live 3D preview
+- Select, move, copy, cut, paste, duplicate, rotate and flip cubes
+- Render for 2D: 1/4/8 directions from side, isometric or top-down as a linked sprite, a sprite sheet PNG or a
+  turntable GIF
 - Exports: .glb, .obj + .mtl, MagicaVoxel .vox and .png, at 1 voxel = 0.1 m, Y-up; free, no watermark
 - Pip's Quest example voxel models
 - **Diagrams:** now a Milanote-style board for moodboards, story flow, level planning and reference collections.

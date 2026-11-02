@@ -1,9 +1,9 @@
 "use client";
 
-import { Box, Eraser, Hand, PaintBucket, Paintbrush, Pipette, Plus, RotateCcw } from "lucide-react";
+import { Box, BoxSelect, Eraser, Hand, Layers, PaintBucket, Paintbrush, Pipette, Plus, RotateCcw } from "lucide-react";
 import { GRID_SIZES } from "@/lib/voxels/grid";
 import type { Symmetry } from "@/lib/voxels/edit";
-import type { ViewPreset, VoxelTool } from "./types";
+import type { EditView, ViewPreset, VoxelTool } from "./types";
 
 export const TOOL_META: Record<VoxelTool, { icon: typeof Plus; label: string; key: string }> = {
   add: { icon: Plus, label: "Add", key: "B" },
@@ -12,6 +12,7 @@ export const TOOL_META: Record<VoxelTool, { icon: typeof Plus; label: string; ke
   pick: { icon: Pipette, label: "Colour picker", key: "I" },
   fill: { icon: PaintBucket, label: "Fill face", key: "G" },
   box: { icon: Box, label: "Box", key: "R" },
+  select: { icon: BoxSelect, label: "Select", key: "V" },
 };
 
 const TOOLS = Object.keys(TOOL_META) as VoxelTool[];
@@ -23,6 +24,8 @@ const VIEWS: { preset: ViewPreset; label: string }[] = [
 ];
 
 interface Props {
+  editView: EditView;
+  onEditViewChange(view: EditView): void;
   tool: VoxelTool;
   onToolChange(tool: VoxelTool): void;
   isBoxErase: boolean;
@@ -140,6 +143,34 @@ function ViewButtons({ onView }: Pick<Props, "onView">): React.JSX.Element {
   );
 }
 
+function EditViewToggle({ editView, onEditViewChange }: Pick<Props, "editView" | "onEditViewChange">): React.JSX.Element {
+  const options: { view: EditView; label: string; icon: typeof Plus; hint: string }[] = [
+    { view: "3d", label: "3D", icon: Box, hint: "Edit in the 3D view" },
+    { view: "slice", label: "Slice", icon: Layers, hint: "Edit one flat layer at a time, like a pixel-art canvas" },
+  ];
+  return (
+    <div className="flex items-center rounded-md p-0.5 shrink-0" style={{ border: "1px solid var(--border)" }} role="radiogroup" aria-label="Editing view">
+      {options.map(({ view, label, icon: Icon, hint }) => (
+        <button
+          key={view}
+          role="radio"
+          aria-checked={editView === view}
+          onClick={() => onEditViewChange(view)}
+          className="flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium"
+          style={{
+            background: editView === view ? "var(--accent)" : "transparent",
+            color: editView === view ? "var(--on-accent, #fff)" : "var(--text-primary)",
+          }}
+          title={hint}
+        >
+          <Icon className="w-3.5 h-3.5" />
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 /** Tools, mirror toggles, camera views, grid size and the one-finger orbit switch. */
 export function VoxelToolbar(props: Props): React.JSX.Element {
   const { tool, size, onSizeChange, oneFingerOrbit, onOneFingerOrbitChange } = props;
@@ -148,12 +179,18 @@ export function VoxelToolbar(props: Props): React.JSX.Element {
       className="h-11 flex items-center gap-2 px-3 border-b shrink-0 overflow-x-auto max-md:h-12"
       style={{ borderColor: "var(--border)", background: "var(--bg-secondary)" }}
     >
+      <EditViewToggle editView={props.editView} onEditViewChange={props.onEditViewChange} />
+      <Divider />
       <ToolButtons tool={tool} onToolChange={props.onToolChange} />
       {tool === "box" && <BoxModeButtons isBoxErase={props.isBoxErase} onBoxEraseChange={props.onBoxEraseChange} />}
       <Divider />
       <MirrorButtons symmetry={props.symmetry} onSymmetryChange={props.onSymmetryChange} />
-      <Divider />
-      <ViewButtons onView={props.onView} />
+      {props.editView === "3d" && (
+        <>
+          <Divider />
+          <ViewButtons onView={props.onView} />
+        </>
+      )}
       <Divider />
       <select
         value={size}

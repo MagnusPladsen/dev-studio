@@ -39,6 +39,8 @@ interface Options {
   isBoxErase: boolean;
   onCommit(grid: VoxelGrid): void;
   onPick(value: number): void;
+  /** Select tool: the drag from one cell to another; `done` on release. A click on nothing passes null. */
+  onSelectDrag?(from: Vec3 | null, to: Vec3 | null, done: boolean): void;
 }
 
 export interface VoxelStrokes {
@@ -56,6 +58,7 @@ export interface VoxelStrokes {
 }
 
 function getHoverCells(hover: RayHit, tool: VoxelTool, isBoxErase: boolean): Vec3[] {
+  if (tool === "select") return [];
   if (tool === "add" || (tool === "box" && !isBoxErase)) return [hover.place];
   return hover.cell ? [hover.cell] : [];
 }
@@ -71,6 +74,7 @@ export function useVoxelStrokes(options: Options): VoxelStrokes {
     latest.current = options;
   });
   const strokeRef = useRef<BrushStroke | null>(null);
+  const selectAnchorRef = useRef<Vec3 | null>(null);
   const isConfirmingRef = useRef(false);
   const boxRef = useRef<BoxState | null>(null);
   const [liveGrid, setLiveGrid] = useState<VoxelGrid | null>(null);
@@ -176,9 +180,27 @@ export function useVoxelStrokes(options: Options): VoxelStrokes {
     if (boxRef.current?.stage === "base") updateBox(null);
   }
 
+  function handleSelectStroke(event: StrokeEvent): void {
+    const onSelect = latest.current.onSelectDrag;
+    const cell = event.hit ? event.hit.cell ?? event.hit.place : null;
+    if (event.phase === "start") {
+      selectAnchorRef.current = cell;
+      onSelect?.(cell, cell, false);
+      return;
+    }
+    const anchor = selectAnchorRef.current;
+    if (!anchor) return;
+    if (event.phase === "end") selectAnchorRef.current = null;
+    onSelect?.(anchor, cell ?? anchor, event.phase === "end");
+  }
+
   function handleStroke(event: StrokeEvent): void {
     if (event.phase === "start") setHover(null);
-    if (event.phase === "cancel") return cancelStroke();
+    if (event.phase === "cancel") {
+      selectAnchorRef.current = null;
+      return cancelStroke();
+    }
+    if (latest.current.tool === "select") return handleSelectStroke(event);
     if (latest.current.tool === "box") return handleBoxStroke(event);
     if (event.phase === "start") startStroke(event.hit);
     else if (event.phase === "move") applyBrushHit(event.hit);

@@ -1,4 +1,4 @@
-import { ArrowLeftRight, ArrowRight, Box, CalendarRange, CirclePlay, Columns3, Copy, Download, FileCode, FileText, FlipHorizontal2, FolderOpen, Gauge, Grid3X3, Image, Layers, LayoutGrid, LayoutTemplate, Link2, List, ListChecks, ListTodo, Maximize2, MessageSquare, MousePointer2, Music, Network, NotebookPen, PaintBucket, Paintbrush, Palette, Pencil, Piano, Pipette, Play, Rows3, Ruler, Scaling, Search, Shapes, Shuffle, SlidersHorizontal, Sparkles, SquareCheck, StickyNote, VolumeX, WandSparkles, Waypoints, type LucideIcon } from "lucide-react";
+import { ArrowLeftRight, Film, SquareDashed, ArrowRight, Box, CalendarRange, CirclePlay, Columns3, Copy, Download, FileCode, FileText, FlipHorizontal2, FolderOpen, Gauge, Grid3X3, Image, Layers, LayoutGrid, LayoutTemplate, Link2, List, ListChecks, ListTodo, Maximize2, MessageSquare, MousePointer2, Music, Network, NotebookPen, PaintBucket, Paintbrush, Palette, Pencil, Piano, Pipette, Play, Rows3, Ruler, Scaling, Search, Shapes, Shuffle, SlidersHorizontal, Sparkles, SquareCheck, StickyNote, VolumeX, WandSparkles, Waypoints, type LucideIcon } from "lucide-react";
 
 export type HelpTopic =
   | "assets"
@@ -307,9 +307,10 @@ export const HELP: Record<HelpTopic, HelpContent> = {
     summary: "Pixel art with depth: stack coloured cubes into 3D models (also called voxel art).",
     canDo: [
       { icon: Box, text: "Add, erase and paint cubes, fill faces and draw boxes." },
-      { icon: FlipHorizontal2, text: "Mirror edits across the X, Y or Z axis." },
-      { icon: Image, text: "Turn a sprite into a 3D model." },
-      { icon: Download, text: "Export .glb, OBJ + MTL, MagicaVoxel .vox or a PNG." },
+      { icon: Layers, text: "Draw one flat layer at a time in Slice view, like Pixel Art." },
+      { icon: SquareDashed, text: "Select cubes to move, copy, rotate or flip them; mirror edits across X, Y or Z." },
+      { icon: Image, text: "Turn a sprite into a 3D model, 1–8 cubes deep, flat or puffy." },
+      { icon: Film, text: "Render it as 2D sprites (1, 4 or 8 directions) or a turntable GIF; export .glb, OBJ, .vox or PNG." },
     ],
     steps: [
       "Press New model, or make one from a sprite.",
@@ -318,7 +319,9 @@ export const HELP: Record<HelpTopic, HelpContent> = {
       "Export it for Blender, Godot, Unity or the web.",
     ],
     tips: [
-      "Keys: B add, E erase, P paint, I picker, G fill, R box.",
+      "Keys: B add, E erase, P paint, I picker, G fill, R box, V select.",
+      "Slice view: switch with 3D / Slice; [ and ] change layer.",
+      "Selection: arrows move it (Page Up/Down for up/down in 3D); Ctrl/⌘+C, X, V copy, cut, paste; Ctrl/⌘+D duplicates; Delete removes; Esc deselects.",
       "Box tool: arrow keys change height, Enter places, Esc cancels.",
       "On a phone, two fingers turn and zoom, or turn on Orbit.",
       UNDO_TIP,
