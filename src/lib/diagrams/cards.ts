@@ -28,6 +28,10 @@ export const SHAPE_COLORS: Record<NodeType, string> = {
   link: "#666680",
   asset: "#666680",
   group: "#666680",
+  rectangle: "#a0a0b8",
+  ellipse: "#a0a0b8",
+  diamond: "#a0a0b8",
+  drawing: "#e4e4ee",
 };
 
 export const NODE_LABELS: Record<NodeType, string> = {
@@ -42,6 +46,10 @@ export const NODE_LABELS: Record<NodeType, string> = {
   link: "Link",
   asset: "Studio asset",
   group: "Group",
+  rectangle: "Rectangle",
+  ellipse: "Ellipse",
+  diamond: "Diamond",
+  drawing: "Drawing",
 };
 
 /** Swatches offered for any card; `undefined` means the card's default look. */
@@ -59,6 +67,7 @@ export const CARD_COLORS = [
 
 export const FLOW_SHAPES: NodeType[] = ["state", "action", "condition", "event"];
 export const BOARD_CARDS: NodeType[] = ["note", "checklist", "image", "link", "asset", "group"];
+export const BASIC_SHAPES: NodeType[] = ["rectangle", "ellipse", "diamond"];
 
 /** Cards whose height follows their content; the stored height is only a starting size. */
 const AUTO_HEIGHT: ReadonlySet<NodeType> = new Set(["note", "checklist", "image", "link", "asset"]);
@@ -69,6 +78,21 @@ export function isAutoHeight(type: NodeType): boolean {
 
 export function isFlowShape(type: NodeType): boolean {
   return FLOW_SHAPES.includes(type) || type === "custom";
+}
+
+export function isBasicShape(type: NodeType): boolean {
+  return BASIC_SHAPES.includes(type);
+}
+
+/** Cards drawn as an outline with a centred label: flow-chart shapes and basic shapes. */
+export function hasShapeBody(type: NodeType): boolean {
+  return isFlowShape(type) || isBasicShape(type);
+}
+
+/** The smallest a card may be resized to; drawings may shrink to a few pixels. */
+export function minSize(type: NodeType): { width: number; height: number } {
+  if (type === "drawing") return { width: 8, height: 8 };
+  return { width: type === "group" ? 160 : 80, height: 40 };
 }
 
 export function borderColor(node: DiagramNode): string {
@@ -87,6 +111,10 @@ const DEFAULT_SIZES: Record<NodeType, [number, number]> = {
   link: [280, 96],
   asset: [220, 64],
   group: [420, 320],
+  rectangle: [160, 100],
+  ellipse: [160, 100],
+  diamond: [160, 110],
+  drawing: [100, 100],
 };
 
 export function defaultSize(type: NodeType): { width: number; height: number } {

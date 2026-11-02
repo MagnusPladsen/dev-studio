@@ -2,14 +2,18 @@ import type { Diagram, DiagramEdge, DiagramNode } from "@/types";
 import {
   borderColor,
   checklistItems,
+  hasShapeBody,
   hostname,
   imageSrc,
-  isFlowShape,
+  isBasicShape,
   linkPreview,
   linkUrl,
 } from "./cards";
 import { embedFor } from "./embeds";
+import { BOARD_BG, CARD_BG, CARD_BORDER, DONE, FONT, LABEL_BG, LABEL_TEXT, LINE, MUTED, PAD, TEXT } from "./export-style";
+import { DRAWING_STROKE, placedPoints } from "./freehand";
 import { boundsOf, edgeEndpoints, edgeLabelPos, type Rect } from "./geometry";
+import { shapeOutline } from "./shapes";
 
 export interface AssetLook {
   name: string;
@@ -18,19 +22,14 @@ export interface AssetLook {
   thumbnail?: string;
 }
 
-interface RenderInput {
+export interface RenderInput {
   diagram: Diagram;
   rectOf(node: DiagramNode): Rect;
   describeAsset(node: DiagramNode): AssetLook | null;
 }
 
-const PAD = 40;
 const SCALE = 2;
 const MAX_SIDE = 8000;
-const CARD_BG = "#16161f";
-const TEXT = "#f0f0f5";
-const MUTED = "#8888a0";
-const FONT = "system-ui, sans-serif";
 
 function loadForCanvas(src: string): Promise<HTMLImageElement | null> {
   return new Promise((resolve) => {
@@ -94,7 +93,7 @@ function cardBox(ctx: CanvasRenderingContext2D, rect: Rect, node: DiagramNode, r
     ctx.fillStyle = tint(node.color, "26");
     ctx.fill();
   }
-  ctx.strokeStyle = node.color ?? "#2e2e40";
+  ctx.strokeStyle = node.color ?? CARD_BORDER;
   ctx.lineWidth = 1.5;
   ctx.stroke();
 }
@@ -112,26 +111,15 @@ function drawCover(ctx: CanvasRenderingContext2D, img: HTMLImageElement, rect: R
 }
 
 function shapePath(ctx: CanvasRenderingContext2D, node: DiagramNode, r: Rect) {
-  const cx = r.x + r.width / 2;
-  const cy = r.y + r.height / 2;
+  const outline = shapeOutline(node.type, r);
   ctx.beginPath();
-  if (node.type === "condition") {
-    ctx.moveTo(cx, r.y - 4);
-    ctx.lineTo(r.x + r.width + 4, cy);
-    ctx.lineTo(cx, r.y + r.height + 4);
-    ctx.lineTo(r.x - 4, cy);
+  if (outline.kind === "polygon") {
+    outline.points.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
     ctx.closePath();
-  } else if (node.type === "event") {
-    const inset = 16;
-    ctx.moveTo(r.x + inset, r.y);
-    ctx.lineTo(r.x + r.width - inset, r.y);
-    ctx.lineTo(r.x + r.width, cy);
-    ctx.lineTo(r.x + r.width - inset, r.y + r.height);
-    ctx.lineTo(r.x + inset, r.y + r.height);
-    ctx.lineTo(r.x, cy);
-    ctx.closePath();
+  } else if (outline.kind === "ellipse") {
+    ctx.ellipse(outline.cx, outline.cy, outline.rx, outline.ry, 0, 0, Math.PI * 2);
   } else {
-    ctx.roundRect(r.x, r.y, r.width, r.height, node.type === "state" ? 12 : 4);
+    ctx.roundRect(outline.x, outline.y, outline.width, outline.height, outline.radius);
   }
 }
 
@@ -139,17 +127,33 @@ function drawShape(ctx: CanvasRenderingContext2D, node: DiagramNode, r: Rect) {
   shapePath(ctx, node, r);
   ctx.fillStyle = CARD_BG;
   ctx.fill();
+  if (node.color && isBasicShape(node.type)) {
+    ctx.fillStyle = `${node.color}1f`;
+    ctx.fill();
+  }
   ctx.strokeStyle = borderColor(node);
-  ctx.lineWidth = 1.5;
+  ctx.lineWidth = isBasicShape(node.type) ? 2 : 1.5;
   ctx.stroke();
   ctx.fillStyle = TEXT;
   ctx.font = `13px ${FONT}`;
-  const lines = wrapText(ctx, node.label, r.width - 20).slice(0, 3);
+  const lines = wrapText(ctx, node.label, r.width - 20).slice(0, isBasicShape(node.type) ? 8 : 3);
   const lineHeight = 16;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   const top = r.y + r.height / 2 - ((lines.length - 1) * lineHeight) / 2;
   lines.forEach((line, i) => ctx.fillText(line, r.x + r.width / 2, top + i * lineHeight));
+}
+
+function drawDrawing(ctx: CanvasRenderingContext2D, node: DiagramNode) {
+  const points = placedPoints(node);
+  if (points.length === 0) return;
+  ctx.strokeStyle = borderColor(node);
+  ctx.lineWidth = DRAWING_STROKE;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.beginPath();
+  points.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
+  ctx.stroke();
 }
 
 function drawGroup(ctx: CanvasRenderingContext2D, node: DiagramNode, r: Rect) {
@@ -181,11 +185,11 @@ function drawChecklist(ctx: CanvasRenderingContext2D, node: DiagramNode, r: Rect
   ctx.font = `13px ${FONT}`;
   for (const item of checklistItems(node)) {
     if (y + 20 > r.y + r.height) break;
-    ctx.strokeStyle = item.done ? "#4ade80" : MUTED;
+    ctx.strokeStyle = item.done ? DONE : MUTED;
     ctx.lineWidth = 1.5;
     ctx.strokeRect(r.x + 14, y + 2, 12, 12);
     if (item.done) {
-      ctx.fillStyle = "#4ade80";
+      ctx.fillStyle = DONE;
       ctx.fillRect(r.x + 17, y + 5, 6, 6);
     }
     ctx.fillStyle = item.done ? MUTED : TEXT;
@@ -218,7 +222,7 @@ function drawLink(ctx: CanvasRenderingContext2D, node: DiagramNode, r: Rect, ima
   if (thumb || embed) {
     // Same 16:9 media area as on screen; a thumbnail the host won't share stays a dark panel.
     const media = { x: r.x, y: r.y, width: r.width, height: Math.min(r.width / (16 / 9), r.height - 60) };
-    ctx.fillStyle = "#0a0a0f";
+    ctx.fillStyle = BOARD_BG;
     ctx.beginPath();
     ctx.roundRect(media.x, media.y, media.width, media.height, [10, 10, 0, 0]);
     ctx.fill();
@@ -257,8 +261,8 @@ function drawAssetCard(ctx: CanvasRenderingContext2D, node: DiagramNode, r: Rect
 
 function drawEdge(ctx: CanvasRenderingContext2D, edge: DiagramEdge, from: Rect, to: Rect) {
   const { start, end } = edgeEndpoints(from, to);
-  ctx.strokeStyle = "#555570";
-  ctx.fillStyle = "#555570";
+  ctx.strokeStyle = LINE;
+  ctx.fillStyle = LINE;
   ctx.lineWidth = 1.5;
   ctx.setLineDash(edge.type === "dashed" ? [6, 4] : []);
   ctx.beginPath();
@@ -279,14 +283,14 @@ function drawEdge(ctx: CanvasRenderingContext2D, edge: DiagramEdge, from: Rect, 
   const pos = edgeLabelPos(start, end);
   ctx.font = `11px ${FONT}`;
   const width = ctx.measureText(edge.label).width + 12;
-  ctx.fillStyle = "#14141d";
-  ctx.strokeStyle = "#2e2e40";
+  ctx.fillStyle = LABEL_BG;
+  ctx.strokeStyle = CARD_BORDER;
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.roundRect(pos.x - width / 2, pos.y - 9, width, 18, 9);
   ctx.fill();
   ctx.stroke();
-  ctx.fillStyle = "#c4c4dc";
+  ctx.fillStyle = LABEL_TEXT;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText(edge.label, pos.x, pos.y + 0.5);
@@ -294,7 +298,8 @@ function drawEdge(ctx: CanvasRenderingContext2D, edge: DiagramEdge, from: Rect, 
 
 function drawNode(ctx: CanvasRenderingContext2D, node: DiagramNode, input: RenderInput, images: Map<string, HTMLImageElement | null>) {
   const rect = input.rectOf(node);
-  if (isFlowShape(node.type)) drawShape(ctx, node, rect);
+  if (hasShapeBody(node.type)) drawShape(ctx, node, rect);
+  else if (node.type === "drawing") drawDrawing(ctx, node);
   else if (node.type === "note") drawNote(ctx, node, rect);
   else if (node.type === "checklist") drawChecklist(ctx, node, rect);
   else if (node.type === "image") drawImageCard(ctx, node, rect, images);
@@ -317,7 +322,7 @@ export async function renderDiagramPng(input: RenderInput): Promise<HTMLCanvasEl
   canvas.height = Math.round(height * scale);
   const ctx = canvas.getContext("2d")!;
   ctx.scale(scale, scale);
-  ctx.fillStyle = "#0a0a0f";
+  ctx.fillStyle = BOARD_BG;
   ctx.fillRect(0, 0, width, height);
   ctx.translate(PAD - bounds.x, PAD - bounds.y);
 

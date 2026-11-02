@@ -119,7 +119,11 @@ export interface DiagramNode {
     | "image"
     | "link"
     | "asset"
-    | "group";
+    | "group"
+    | "rectangle"
+    | "ellipse"
+    | "diamond"
+    | "drawing";
   x: number;
   y: number;
   width: number;
