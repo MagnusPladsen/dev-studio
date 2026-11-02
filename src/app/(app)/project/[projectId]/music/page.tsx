@@ -32,6 +32,7 @@ import { rowButtonProps } from "@/lib/row-button";
 import { useAssetMenu } from "@/components/AssetContextMenu";
 import { AssetMenuButton, AssetPinButton, PasteButton } from "@/components/AssetMenuButton";
 import { midiToFreq, scheduleNote } from "@/lib/audio/music-synth";
+import { beatAt, scheduleWindow, type LiveSong, type PlayCursor } from "@/lib/audio/music-scheduler";
 import type { MusicTrack, MusicChannel, MusicNote } from "@/types";
 import { v4 as uuid } from "uuid";
 
@@ -104,6 +105,8 @@ const NOTE_LENGTHS = [
   { value: 4, label: "4 beats" },
 ];
 const PATTERN_LENGTHS = [8, 16, 32];
+/** How far ahead notes are handed to the audio clock; edits land after at most this long. */
+const LOOKAHEAD_SECONDS = 0.2;
 
 /** Shortest loop length that shows every note in the track. */
 function fitPatternLength(track: MusicTrack): number {
@@ -200,9 +203,14 @@ export default function MusicPage() {
     if (ctx && masterGainRef.current) masterGainRef.current.gain.setTargetAtTime(previewGain(volume), ctx.currentTime, 0.02);
   }, [volume]);
   const playIntervalRef = useRef<number | null>(null);
-  const startTimeRef = useRef(0);
+  const songRef = useRef<LiveSong | null>(null);
   const scheduledRef = useRef<AudioScheduledSourceNode[]>([]);
   const [loaded, setLoaded] = useState(false);
+
+  // the player reads the latest song on every tick, so edits and undo/redo are heard while it plays
+  useEffect(() => {
+    songRef.current = activeTrack ? { track: activeTrack, patternLen, muted, soloed, looping } : null;
+  }, [activeTrack, patternLen, muted, soloed, looping]);
 
   useEffect(() => {
     const saved = storage.getAll("music", projectId);
@@ -289,43 +297,26 @@ export default function MusicPage() {
     if (!activeTrack) return;
     stopPlayback();
     const ctx = getAudioCtx();
-    const beatDur = 60 / activeTrack.bpm;
-    const totalDur = patternLen * beatDur;
-    const anySoloed = soloed.some(Boolean);
+    let cursor: PlayCursor = { time: ctx.currentTime, beat: 0 };
 
-    function scheduleAll(offset: number) {
-      activeTrack!.channels.forEach((ch, ci) => {
-        const isMuted = muted[ci] || (anySoloed && !soloed[ci]);
-        if (isMuted) return;
-        const pattern = ch.patterns[0];
-        if (!pattern) return;
-        pattern.notes.forEach((note) => {
-          if (note.start < patternLen) {
-            track(scheduleNote(ctx, masterGainRef.current ?? ctx.destination, note, ch.instrument, ch.volume, ctx.currentTime + offset, beatDur));
-          }
-        });
+    function tick() {
+      const song = songRef.current;
+      if (!song) return;
+      const scheduled = scheduleWindow(song, cursor, ctx.currentTime + LOOKAHEAD_SECONDS);
+      scheduled.notes.forEach((due) => {
+        track(scheduleNote(ctx, masterGainRef.current ?? ctx.destination, due.note, due.instrument, due.volume, due.passStart, due.beatDuration));
       });
+      cursor = scheduled.cursor;
+      if (scheduled.ended && ctx.currentTime >= cursor.time) {
+        stopPlayback();
+        return;
+      }
+      setPlayhead(beatAt(song, cursor, ctx.currentTime));
     }
 
-    startTimeRef.current = ctx.currentTime;
-    scheduleAll(0);
-
+    tick();
     setPlaying(true);
-    const id = window.setInterval(() => {
-      const elapsed = ctx.currentTime - startTimeRef.current;
-      const beat = (elapsed / beatDur) % patternLen;
-      setPlayhead(beat);
-
-      if (elapsed >= totalDur) {
-        if (looping) {
-          startTimeRef.current = ctx.currentTime;
-          scheduleAll(0);
-        } else {
-          stopPlayback();
-        }
-      }
-    }, 30);
-    playIntervalRef.current = id;
+    playIntervalRef.current = window.setInterval(tick, 30);
   }
 
   /** Replace the open channel's notes. Functional so a drag always builds on the latest state. */
