@@ -15,6 +15,7 @@ import type {
   Issue,
   VoxelModel,
 } from "@/types";
+import { APP } from "./app-config";
 
 export type StorableTypes = {
   projects: Project;
@@ -166,7 +167,8 @@ export const storage = {
     try {
       const data = JSON.parse(json);
       if (!data.project?.id) return null;
-      const project = data.project as Project;
+      // a file exported from the other app becomes a project of this one
+      const project: Project = { ...data.project, app: APP.id };
       this.save("projects", project);
       for (const col of PROJECT_COLLECTIONS) {
         if (!Array.isArray(data[col])) continue;

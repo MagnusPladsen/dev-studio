@@ -4,10 +4,10 @@ import { diagramBoardExamples } from "./diagram-boards";
 
 // Example assets for: diagrams, dialogues — the logic and conversations of "Pip's Quest".
 
-type NodeSpec = [id: string, type: DiagramNode["type"], x: number, y: number, label: string, width?: number];
-type EdgeSpec = [from: string, to: string, label: string, type?: DiagramEdge["type"]];
+export type NodeSpec = [id: string, type: DiagramNode["type"], x: number, y: number, label: string, width?: number];
+export type EdgeSpec = [from: string, to: string, label: string, type?: DiagramEdge["type"]];
 
-function diagram(nodes: NodeSpec[], edges: EdgeSpec[]) {
+export function diagram(nodes: NodeSpec[], edges: EdgeSpec[]): { nodes: DiagramNode[]; edges: DiagramEdge[] } {
   return {
     nodes: nodes.map(([id, type, x, y, label, width = 140]): DiagramNode => ({
       id,

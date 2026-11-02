@@ -2,12 +2,12 @@
 
 [![Live site](https://img.shields.io/badge/live-gamedev--studio.pladsen.dev-7c5cfc?style=flat-square)](https://gamedev-studio.pladsen.dev)
 [![Status: beta](https://img.shields.io/badge/status-beta-fbbf24?style=flat-square)](#)
-[![Latest release](https://img.shields.io/github/v/release/MagnusPladsen/gamedev-studio?include_prereleases&style=flat-square&label=release)](https://github.com/MagnusPladsen/gamedev-studio/releases)
-[![License: MIT](https://img.shields.io/github/license/MagnusPladsen/gamedev-studio?style=flat-square)](LICENSE)
-[![Stars](https://img.shields.io/github/stars/MagnusPladsen/gamedev-studio?style=flat-square)](https://github.com/MagnusPladsen/gamedev-studio/stargazers)
-[![Forks](https://img.shields.io/github/forks/MagnusPladsen/gamedev-studio?style=flat-square)](https://github.com/MagnusPladsen/gamedev-studio/forks)
-[![Open issues](https://img.shields.io/github/issues/MagnusPladsen/gamedev-studio?style=flat-square)](https://github.com/MagnusPladsen/gamedev-studio/issues)
-[![Last commit](https://img.shields.io/github/last-commit/MagnusPladsen/gamedev-studio?style=flat-square)](https://github.com/MagnusPladsen/gamedev-studio/commits/main)
+[![Latest release](https://img.shields.io/github/v/release/MagnusPladsen/dev-studio?include_prereleases&style=flat-square&label=release)](https://github.com/MagnusPladsen/dev-studio/releases)
+[![License: MIT](https://img.shields.io/github/license/MagnusPladsen/dev-studio?style=flat-square)](LICENSE)
+[![Stars](https://img.shields.io/github/stars/MagnusPladsen/dev-studio?style=flat-square)](https://github.com/MagnusPladsen/dev-studio/stargazers)
+[![Forks](https://img.shields.io/github/forks/MagnusPladsen/dev-studio?style=flat-square)](https://github.com/MagnusPladsen/dev-studio/forks)
+[![Open issues](https://img.shields.io/github/issues/MagnusPladsen/dev-studio?style=flat-square)](https://github.com/MagnusPladsen/dev-studio/issues)
+[![Last commit](https://img.shields.io/github/last-commit/MagnusPladsen/dev-studio?style=flat-square)](https://github.com/MagnusPladsen/dev-studio/commits/main)
 [![Next.js 16](https://img.shields.io/badge/Next.js-16-000?style=flat-square&logo=nextdotjs)](https://nextjs.org)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-34d399?style=flat-square)](#contributing)
 
@@ -15,10 +15,23 @@ A free, open source game development toolkit. Create pixel art, music, sound eff
 
 **No watermarks. No paywalls. No account required.** Everything you make is yours.
 
-**[Open the app →](https://gamedev-studio.pladsen.dev)** &nbsp;·&nbsp; [Download the desktop app](https://github.com/MagnusPladsen/gamedev-studio/releases/latest) &nbsp;·&nbsp; [Report a bug](https://github.com/MagnusPladsen/gamedev-studio/issues/new)
+### Two apps, one codebase
+
+This repo builds two apps from the same code:
+
+| App | Tools | Live |
+| --- | --- | --- |
+| **GameDev Studio** | Every tool below | [gamedev-studio.pladsen.dev](https://gamedev-studio.pladsen.dev) |
+| **Dev Studio** | Task Board, Canvas, Wiki (Story) and Notebook, for any software project | [dev-studio.pladsen.dev](https://dev-studio.pladsen.dev) |
+
+The `NEXT_PUBLIC_APP` environment variable picks which one a build is (`dev-studio`, or unset for GameDev Studio).
+Each app has its own landing page, name, examples and help text; the editors, storage and sync are shared, so a
+fix lands in both. Signed in with the same account, each app can list your projects from the other and open them there.
+
+**[Open the app →](https://gamedev-studio.pladsen.dev)** &nbsp;·&nbsp; [Download the desktop app](https://github.com/MagnusPladsen/dev-studio/releases/latest) &nbsp;·&nbsp; [Report a bug](https://github.com/MagnusPladsen/dev-studio/issues/new)
 
 > **Beta:** GameDev Studio is under active development. Features may change and bugs are expected.
-> Use *Export project* now and then to keep a backup, and please [open an issue](https://github.com/MagnusPladsen/gamedev-studio/issues) if something breaks.
+> Use *Export project* now and then to keep a backup, and please [open an issue](https://github.com/MagnusPladsen/dev-studio/issues) if something breaks.
 
 ## Tools
 
@@ -61,7 +74,7 @@ Every tool ships with small hand-made examples to edit, so what you export is yo
 ## Desktop app
 
 Download GameDev Studio for macOS (`.dmg`), Windows (`.exe`) or Linux (`.AppImage` / `.deb`) from the
-[latest release](https://github.com/MagnusPladsen/gamedev-studio/releases/latest). It works offline and needs no
+[latest release](https://github.com/MagnusPladsen/dev-studio/releases/latest). It works offline and needs no
 account. Projects are saved inside the app, or use *Save to a local folder* to keep them as JSON files on disk.
 
 The builds aren't code-signed yet, so the first launch shows a warning: on macOS open System Settings →
@@ -89,22 +102,23 @@ You need [Node.js](https://nodejs.org) 20.9 or newer.
 **With git**
 
 ```bash
-git clone https://github.com/MagnusPladsen/gamedev-studio.git
-cd gamedev-studio
+git clone https://github.com/MagnusPladsen/dev-studio.git
+cd dev-studio
 npm install
 npm run build
 npm start
 ```
 
-**Without git:** download the source zip from the [latest release](https://github.com/MagnusPladsen/gamedev-studio/releases/latest),
+**Without git:** download the source zip from the [latest release](https://github.com/MagnusPladsen/dev-studio/releases/latest),
 unzip it, and run the same `npm install`, `npm run build`, `npm start` commands inside the folder.
 
-Open <http://localhost:3000>. It works without any configuration. Use *Save to a local folder* to keep your
+Open <http://localhost:3000>. It works without any configuration. Run `NEXT_PUBLIC_APP=dev-studio npm run dev`
+to work on Dev Studio instead. Use *Save to a local folder* to keep your
 projects on disk. (Use `npm run dev` instead of build + start if you want to change the code.)
 
 **Your own online copy:**
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FMagnusPladsen%2Fgamedev-studio)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FMagnusPladsen%2Fdev-studio)
 
 ### Optional: cloud sync with Supabase
 
@@ -118,6 +132,12 @@ projects on disk. (Use `npm run dev` instead of build + start if you want to cha
    callback URL is `https://<project-ref>.supabase.co/auth/v1/callback`.
 
 Each user can only read and write their own rows (row level security).
+
+### Deploying both apps
+
+Create two Vercel projects from this repo with the same Supabase env vars. On the Dev Studio project, also set
+`NEXT_PUBLIC_APP=dev-studio`. Add both domains' `/auth/callback` URLs to Supabase's redirect URLs. Both apps share
+the same tables; each project row records which app it belongs to.
 
 ## Tech
 

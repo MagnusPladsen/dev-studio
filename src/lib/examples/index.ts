@@ -9,16 +9,18 @@ import { planningExamples } from "./planning";
 import { writingExamples } from "./writing";
 import { boardExamples } from "./board";
 import { modelExamples } from "./models";
+import { devStudioExamples, DEV_STUDIO_LINKS } from "./dev-studio";
+import { isDevStudio } from "../app-config";
 
 export type { ExampleModule, ExampleContext } from "./types";
 export { EXAMPLE_SLUGS } from "./types";
 
-const MODULES: ExampleModule[] = [...artExamples, ...audioExamples, ...levelExamples, ...planningExamples, ...writingExamples, ...boardExamples, ...modelExamples];
+const GAME_MODULES: ExampleModule[] = [...artExamples, ...audioExamples, ...levelExamples, ...planningExamples, ...writingExamples, ...boardExamples, ...modelExamples];
 
 export const exampleId = (projectId: string, slug: string) => `${projectId}--ex--${slug}`;
 
 /** Links between the example assets, so the sample game shows how everything connects. */
-const EXAMPLE_LINKS: [AssetRef["type"], string, AssetRef["type"], string][] = [
+const GAME_LINKS: [AssetRef["type"], string, AssetRef["type"], string][] = [
   ["story", "hero", "sprite", "hero"],
   ["story", "hero", "sound", "jump"],
   ["story", "sword", "sprite", "sword"],
@@ -47,6 +49,9 @@ const EXAMPLE_LINKS: [AssetRef["type"], string, AssetRef["type"], string][] = [
   ["issue", "i-sword-sprite", "sprite", "sword"],
   ["issue", "i-jump-feel", "diagram", "player-states"],
 ];
+
+const MODULES = isDevStudio ? devStudioExamples : GAME_MODULES;
+const EXAMPLE_LINKS = isDevStudio ? DEV_STUDIO_LINKS : GAME_LINKS;
 
 type Item = { id: string; name?: string; title?: string; example?: boolean };
 

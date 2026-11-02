@@ -4,7 +4,7 @@
   "version": "0.1.0-beta",
   "description": "Free, open source game-dev toolkit that runs on your own computer.",
   "homepage": "https://gamedev-studio.pladsen.dev",
-  "repository": "github:MagnusPladsen/gamedev-studio",
+  "repository": "github:MagnusPladsen/dev-studio",
   "license": "MIT",
   "author": {
     "name": "Magnus Pladsen",

@@ -61,4 +61,4 @@ First public beta.
 - Autosave in every tool; "Pip's Quest" example assets that can be added or removed per tool
 - Each tool has its own colour; phone layouts for every tool
 
-[0.1.0-beta]: https://github.com/MagnusPladsen/gamedev-studio/releases/tag/v0.1.0-beta
+[0.1.0-beta]: https://github.com/MagnusPladsen/dev-studio/releases/tag/v0.1.0-beta

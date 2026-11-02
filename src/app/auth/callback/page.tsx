@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { getSupabase } from "@/lib/supabase";
+import { APP } from "@/lib/app-config";
 
 export default function AuthCallbackPage() {
   const router = useRouter();
@@ -47,7 +48,7 @@ export default function AuthCallbackPage() {
     <div className="min-h-screen flex items-center justify-center p-6" style={{ background: "var(--bg-primary)" }}>
       <div className="text-center max-w-sm">
         <div className="w-10 h-10 rounded-lg flex items-center justify-center font-bold text-sm mx-auto mb-4" style={{ background: "var(--accent)" }}>
-          GD
+          {APP.initials}
         </div>
         {error ? (
           <>

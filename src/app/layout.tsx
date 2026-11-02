@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
+import { APP, type AppId } from "@/lib/app-config";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -13,24 +14,33 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  metadataBase: new URL("https://gamedev-studio.pladsen.dev"),
-  title: "GameDev Studio (Beta) - Free Open Source Game Development Toolkit",
-  description:
-    "Create pixel art, music, sound effects, tilemaps, dialogue trees, and plan your game — all in one free, open source app. No watermarks. No paywalls.",
-  keywords: [
-    "game development",
-    "pixel art",
-    "sprite editor",
-    "game music",
-    "sound effects",
-    "tilemap editor",
-    "dialogue tree",
-    "open source",
-    "free",
-    "indie game dev",
-  ],
+const METADATA: Record<AppId, Metadata> = {
+  "gamedev-studio": {
+    title: "GameDev Studio (Beta) - Free Open Source Game Development Toolkit",
+    description:
+      "Create pixel art, music, sound effects, tilemaps, dialogue trees, and plan your game — all in one free, open source app. No watermarks. No paywalls.",
+    keywords: [
+      "game development",
+      "pixel art",
+      "sprite editor",
+      "game music",
+      "sound effects",
+      "tilemap editor",
+      "dialogue tree",
+      "open source",
+      "free",
+      "indie game dev",
+    ],
+  },
+  "dev-studio": {
+    title: "Dev Studio (Beta) - Free Open Source Project Planning Toolkit",
+    description:
+      "Plan software projects with a task board, a canvas for diagrams and moodboards, a linked wiki and a notebook — all connected in one free, open source app. No sign-up needed.",
+    keywords: ["task board", "kanban", "sprint planning", "whiteboard", "diagrams", "wiki", "notes", "open source", "free"],
+  },
 };
+
+export const metadata: Metadata = { metadataBase: new URL(APP.url), ...METADATA[APP.id] };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (

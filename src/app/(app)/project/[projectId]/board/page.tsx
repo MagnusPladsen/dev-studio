@@ -60,6 +60,7 @@ import {
   secondaryBtn,
   today,
 } from "@/components/board/meta";
+import { APP } from "@/lib/app-config";
 
 const MOVE_MENU_WIDTH = 176;
 const MOVE_MENU_ROW_HEIGHT = 30;
@@ -1560,7 +1561,7 @@ function EmptyState({ projectId, onCreate }: { projectId: string; onCreate(): vo
           <SquareKanban className="w-6 h-6" style={{ color: "var(--tool-color, var(--accent))" }} />
         </div>
         <h2 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
-          Plan your game, one issue at a time
+          Plan your {APP.subject}, one issue at a time
         </h2>
         <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>
           Issues move from To Do to In Progress, Testing and Done. Group them into sprints of a week or two, and link each issue to

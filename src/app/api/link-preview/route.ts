@@ -1,11 +1,12 @@
 import type { NextRequest } from "next/server";
 import { normalizeUrl } from "@/lib/diagrams/embeds";
 import { fetchLinkPreview, PreviewError } from "@/lib/link-preview/fetch-preview";
+import { APP } from "@/lib/app-config";
 import { isCrossSiteRequest } from "@/lib/link-preview/same-origin";
 
 export async function GET(request: NextRequest) {
   if (isCrossSiteRequest(request.headers, request.nextUrl.host)) {
-    return Response.json({ error: "Only available inside GameDev Studio" }, { status: 403 });
+    return Response.json({ error: `Only available inside ${APP.name}` }, { status: 403 });
   }
   const raw = request.nextUrl.searchParams.get("url") ?? "";
   const url = raw.length <= 2048 ? normalizeUrl(raw) : null;

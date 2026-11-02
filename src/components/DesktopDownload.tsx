@@ -5,7 +5,7 @@ import { Download, ExternalLink } from "lucide-react";
 
 type Platform = "mac" | "windows" | "linux";
 
-const RELEASES_URL = "https://github.com/MagnusPladsen/gamedev-studio/releases";
+const RELEASES_URL = "https://github.com/MagnusPladsen/dev-studio/releases";
 
 /** File names are fixed in desktop/package.json so these links always point at the newest release. */
 const DOWNLOADS: { platform: Platform; name: string; detail: string; file: string }[] = [
