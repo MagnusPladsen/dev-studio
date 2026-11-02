@@ -42,6 +42,19 @@ const DESCRIPTIONS: Record<AssetType, string> = {
   model: "Chunky 3D props and characters",
 };
 
+type SortOrder = "recent" | "name" | "type";
+
+const SORT_LABELS: Record<SortOrder, string> = { recent: "Recent first", name: "Name A–Z", type: "By tool" };
+
+function compareAssets(order: SortOrder) {
+  return (a: { name: string; type: AssetType; updatedAt?: string }, b: typeof a): number => {
+    const byName = a.name.localeCompare(b.name);
+    if (order === "name") return byName;
+    if (order === "type") return ASSET_KINDS[a.type].label.localeCompare(ASSET_KINDS[b.type].label) || byName;
+    return (b.updatedAt ?? "").localeCompare(a.updatedAt ?? "") || byName;
+  };
+}
+
 function parseLinksParam(value: string | null): AssetRef | null {
   if (!value) return null;
   const separator = value.indexOf(":");
@@ -61,6 +74,7 @@ export default function AssetsPage() {
   const version = useStorageVersion();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<AssetType | "all">("all");
+  const [sortOrder, setSortOrder] = useState<SortOrder>("recent");
 
   const project = storage.getById("projects", projectId);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -89,7 +103,7 @@ export default function AssetsPage() {
     return all
       .filter((a) => !linkedKeys || linkedKeys.has(`${a.type}:${a.id}`))
       .filter((a) => (filter === "all" || a.type === filter) && (!q || a.name.toLowerCase().includes(q)))
-      .sort((a, b) => (b.updatedAt ?? "").localeCompare(a.updatedAt ?? ""))
+      .sort(compareAssets(sortOrder))
       .map((a) => {
         const collection = ASSET_KINDS[a.type].collection;
         return {
@@ -99,7 +113,7 @@ export default function AssetsPage() {
         };
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [all, query, filter, projectId, version, linksKey, linksName]);
+  }, [all, query, filter, sortOrder, projectId, version, linksKey, linksName]);
 
   if (!project) {
     return (
@@ -192,6 +206,19 @@ export default function AssetsPage() {
         </h2>
         <div className="flex items-center gap-2">
           <PasteButton />
+          <select
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value as SortOrder)}
+            aria-label="Sort"
+            className="px-2 py-1.5 rounded-lg text-xs outline-none"
+            style={{ background: "var(--bg-card)", color: "var(--text-primary)", border: "1px solid var(--border)" }}
+          >
+            {(Object.keys(SORT_LABELS) as SortOrder[]).map((order) => (
+              <option key={order} value={order}>
+                {SORT_LABELS[order]}
+              </option>
+            ))}
+          </select>
           <select
             value={filter}
             onChange={(e) => setFilter(e.target.value as AssetType | "all")}
