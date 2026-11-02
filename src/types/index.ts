@@ -1,3 +1,5 @@
+import type { AppId } from "@/lib/app-config";
+
 export interface ProjectPins {
   tools: string[]; // tool paths, in pin order
   assets: AssetRef[];
@@ -11,6 +13,8 @@ export interface Project {
   pins?: ProjectPins;
   /** Show a short tutorial the first time each tool is opened. Missing (older projects) means off. */
   showTutorials?: boolean;
+  /** Which app the project was made in. Missing means GameDev Studio. */
+  app?: AppId;
   createdAt: string;
   updatedAt: string;
 }

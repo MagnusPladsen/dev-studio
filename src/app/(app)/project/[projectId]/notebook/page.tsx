@@ -34,13 +34,16 @@ import { ExamplesBar } from "@/components/ExamplesBar";
 import { HelpButton } from "@/components/HelpButton";
 import { useAssetMenu, type MenuTriggerProps } from "@/components/AssetContextMenu";
 import { AssetMenuButton, AssetPinButton, PasteButton } from "@/components/AssetMenuButton";
+import { isDevStudio } from "@/lib/app-config";
 
 const ACCENT = "#a3e635";
 const SAVE_DELAY = 600;
 
 // ─── templates ───────────────────────────────────────────────────────
 
-const TEMPLATES: { key: string; label: string; title: string; content: string }[] = [
+type NoteTemplate = { key: string; label: string; title: string; content: string };
+
+const GAME_TEMPLATES: NoteTemplate[] = [
   { key: "blank", label: "Blank", title: "Untitled note", content: "" },
   {
     key: "todo",
@@ -70,6 +73,32 @@ const TEMPLATES: { key: string; label: string; title: string; content: string }[
       "**Date:** \n**Tester:** \n**Build:** \n\n## What worked\n- \n\n## What was confusing\n- \n\n## Ideas to try\n- [ ] \n",
   },
 ];
+
+const DEV_TEMPLATES: NoteTemplate[] = [
+  GAME_TEMPLATES[0],
+  GAME_TEMPLATES[1],
+  {
+    key: "spec",
+    label: "Feature spec",
+    title: "Feature spec",
+    content:
+      "## Problem\nWho has it, and why does it matter?\n\n## Proposal\n\n## Out of scope\n- \n\n## Open questions\n- [ ] \n",
+  },
+  {
+    key: "bugs",
+    label: "Bug list",
+    title: "Bug list",
+    content: "## Open\n- [ ] What happens, and the steps to make it happen\n\n## Fixed\n- [x] Example: saving twice created a duplicate\n",
+  },
+  {
+    key: "meeting",
+    label: "Meeting notes",
+    title: "Meeting notes",
+    content: "**Date:** \n**People:** \n\n## Agenda\n- \n\n## Decisions\n- \n\n## Action items\n- [ ] \n",
+  },
+];
+
+const TEMPLATES = isDevStudio ? DEV_TEMPLATES : GAME_TEMPLATES;
 
 // ─── helpers ─────────────────────────────────────────────────────────
 

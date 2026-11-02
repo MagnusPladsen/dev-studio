@@ -2,18 +2,22 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2, FolderOpen, Download, Upload, Loader2 } from "lucide-react";
+import { Plus, Trash2, FolderOpen, Download, Upload, Loader2, ExternalLink } from "lucide-react";
 import { storage } from "@/lib/storage";
 import type { Project } from "@/types";
 import { v4 as uuid } from "uuid";
 import { addExamples } from "@/lib/examples";
 import { useStorageVersion } from "@/hooks/useStorage";
+import { APP, OTHER_APP, belongsToApp } from "@/lib/app-config";
 
 export default function ProjectsPage() {
   const router = useRouter();
   const version = useStorageVersion();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const projects = useMemo<Project[]>(() => storage.getAll("projects"), [version]);
+  const allProjects = useMemo<Project[]>(() => storage.getAll("projects"), [version]);
+  const projects = allProjects.filter((p) => belongsToApp(p));
+  const otherAppProjects = allProjects.filter((p) => !belongsToApp(p));
+  const [showOtherApp, setShowOtherApp] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -29,6 +33,7 @@ export default function ProjectsPage() {
       name: name.trim(),
       description: description.trim(),
       showTutorials: withTutorials,
+      app: APP.id,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -79,7 +84,7 @@ export default function ProjectsPage() {
         if (result) {
           setImportError(null);
         } else {
-          setImportError(`"${file.name}" isn't a GameDev Studio project file. Use a .gamedev.json file made with Export.`);
+          setImportError(`"${file.name}" isn't a ${APP.name} project file. Use a .gamedev.json file made with Export.`);
         }
       };
       reader.readAsText(file);
@@ -95,10 +100,10 @@ export default function ProjectsPage() {
             Projects
           </h1>
           <p className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}>
-            Each project keeps its assets separate. Create one per game.
+            Each project keeps its assets separate. Create one per {APP.subject}.
           </p>
           <p className="text-xs mt-2" style={{ color: "var(--yellow)" }}>
-            GameDev Studio is in beta. Export your projects now and then as a backup.
+            {APP.name} is in beta. Export your projects now and then as a backup.
           </p>
         </div>
         <div className="flex items-center gap-2 max-md:[&>button]:flex-1 max-md:[&>button]:justify-center">
@@ -173,7 +178,9 @@ export default function ProjectsPage() {
             <span>
               Start with example assets
               <span className="block text-xs mt-0.5" style={{ color: "var(--text-secondary)" }}>
-                A small sample game (Pip&apos;s Quest) across every tool. Remove it any time.
+                {APP.id === "dev-studio"
+                  ? "A small sample software project (Tidepool, a habit app) across every tool. Remove it any time."
+                  : "A small sample game (Pip's Quest) across every tool. Remove it any time."}
               </span>
             </span>
           </label>
@@ -209,7 +216,7 @@ export default function ProjectsPage() {
             No projects yet
           </p>
           <p className="text-sm mb-6" style={{ color: "var(--text-secondary)" }}>
-            Create a project to start building your game assets
+            Create a project to start building your {APP.subject}
           </p>
           <button
             onClick={() => setShowNew(true)}
@@ -223,64 +230,121 @@ export default function ProjectsPage() {
       ) : (
         <div className="grid gap-3">
           {projects.map((project) => (
-            <div
+            <ProjectRow
               key={project.id}
-              className="group flex items-center justify-between gap-3 min-w-0 p-4 rounded-xl border transition-colors cursor-pointer"
-              style={{ background: "var(--bg-card)", borderColor: "var(--border)" }}
-              onClick={() => router.push(`/project/${project.id}/assets`)}
-              onMouseOver={(e) => {
-                e.currentTarget.style.borderColor = "var(--border-hover)";
-                e.currentTarget.style.background = "var(--bg-hover)";
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.borderColor = "var(--border)";
-                e.currentTarget.style.background = "var(--bg-card)";
-              }}
-            >
-              <div className="min-w-0">
-                <h3 className="font-medium truncate" style={{ color: "var(--text-primary)" }}>
-                  {project.name}
-                </h3>
-                {project.description && (
-                  <p className="text-sm mt-0.5 break-words" style={{ color: "var(--text-secondary)" }}>
-                    {project.description}
-                  </p>
-                )}
-                <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
-                  Created {new Date(project.createdAt).toLocaleDateString()}
-                </p>
-              </div>
-              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 max-md:opacity-100 transition-opacity shrink-0">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    exportProject(project.id);
-                  }}
-                  className="p-2 rounded-lg transition-colors"
-                  style={{ color: "var(--text-secondary)" }}
-                  title="Export project"
-                  aria-label={`Export ${project.name}`}
-                >
-                  <Download className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    deleteProject(project.id);
-                  }}
-                  className="p-2 rounded-lg transition-colors"
-                  style={{ color: "var(--red)" }}
-                  title="Delete project"
-                  aria-label={`Delete ${project.name}`}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
+              project={project}
+              onOpen={() => router.push(`/project/${project.id}/assets`)}
+              onExport={() => exportProject(project.id)}
+              onDelete={() => deleteProject(project.id)}
+            />
           ))}
         </div>
       )}
+
+      {otherAppProjects.length > 0 && (
+        <OtherAppProjects projects={otherAppProjects} isShown={showOtherApp} onToggle={() => setShowOtherApp(!showOtherApp)} />
+      )}
     </div>
+  );
+}
+
+function ProjectRow({ project, badge, onOpen, onExport, onDelete }: {
+  project: Project;
+  badge?: React.ReactNode;
+  onOpen(): void;
+  onExport?(): void;
+  onDelete?(): void;
+}) {
+  return (
+    <div
+      className="group flex items-center justify-between gap-3 min-w-0 p-4 rounded-xl border transition-colors cursor-pointer"
+      style={{ background: "var(--bg-card)", borderColor: "var(--border)" }}
+      onClick={onOpen}
+      onMouseOver={(e) => {
+        e.currentTarget.style.borderColor = "var(--border-hover)";
+        e.currentTarget.style.background = "var(--bg-hover)";
+      }}
+      onMouseOut={(e) => {
+        e.currentTarget.style.borderColor = "var(--border)";
+        e.currentTarget.style.background = "var(--bg-card)";
+      }}
+    >
+      <div className="min-w-0">
+        <h3 className="font-medium truncate" style={{ color: "var(--text-primary)" }}>
+          {project.name}
+        </h3>
+        {project.description && (
+          <p className="text-sm mt-0.5 break-words" style={{ color: "var(--text-secondary)" }}>
+            {project.description}
+          </p>
+        )}
+        <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
+          Created {new Date(project.createdAt).toLocaleDateString()}
+        </p>
+      </div>
+      {badge}
+      {(onExport || onDelete) && (
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 max-md:opacity-100 transition-opacity shrink-0">
+          {onExport && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onExport();
+              }}
+              className="p-2 rounded-lg transition-colors"
+              style={{ color: "var(--text-secondary)" }}
+              title="Export project"
+              aria-label={`Export ${project.name}`}
+            >
+              <Download className="w-4 h-4" />
+            </button>
+          )}
+          {onDelete && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete();
+              }}
+              className="p-2 rounded-lg transition-colors"
+              style={{ color: "var(--red)" }}
+              title="Delete project"
+              aria-label={`Delete ${project.name}`}
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Projects your account has in the other app. They open on that app's site. */
+function OtherAppProjects({ projects, isShown, onToggle }: { projects: Project[]; isShown: boolean; onToggle(): void }) {
+  return (
+    <section className="mt-10">
+      <label className="flex items-center gap-2.5 text-sm cursor-pointer select-none" style={{ color: "var(--text-primary)" }}>
+        <input type="checkbox" checked={isShown} onChange={onToggle} className="w-4 h-4 accent-[var(--accent)]" />
+        Show projects from {OTHER_APP.name} ({projects.length})
+      </label>
+      {isShown && (
+        <div className="grid gap-3 mt-4">
+          {projects.map((project) => (
+            <ProjectRow
+              key={project.id}
+              project={project}
+              onOpen={() => window.open(`${OTHER_APP.url}/project/${project.id}/assets`, "_blank", "noopener")}
+              badge={
+                <span className="inline-flex items-center gap-1 text-xs shrink-0" style={{ color: "var(--text-secondary)" }}>
+                  Opens in {OTHER_APP.name}
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </span>
+              }
+            />
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 

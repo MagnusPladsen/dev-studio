@@ -18,6 +18,7 @@ import { NewBadge, isNewTool } from "@/components/NewBadge";
 import { HelpButton } from "@/components/HelpButton";
 import { TutorialsToggle } from "@/components/TutorialsToggle";
 import { ASSET_KINDS, ASSET_TYPES, assetHref, listAssets } from "@/lib/assets";
+import { isDevStudio } from "@/lib/app-config";
 import { getRelated } from "@/lib/links";
 import { getAssetName, getStoredAsset } from "@/lib/asset-actions";
 import { useAssetMenu } from "@/components/AssetContextMenu";
@@ -33,7 +34,7 @@ const DESCRIPTIONS: Record<AssetType, string> = {
   sound: "Generate sound effects",
   tilemap: "Paint levels with your sprites",
   diagram: "Moodboards, plans and flow charts",
-  story: "Lore, characters and places",
+  story: isDevStudio ? "Linked docs about your project" : "Lore, characters and places",
   dialogue: "Branching conversations",
   palette: "Shared colour palettes",
   spritesheet: "Pack sprites for your engine",

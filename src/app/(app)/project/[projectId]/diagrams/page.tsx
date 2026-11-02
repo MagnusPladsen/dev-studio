@@ -67,6 +67,7 @@ import { EdgeLayer } from "@/components/diagrams/EdgeLayer";
 import { MultiSelectionPanel, SelectionPanel } from "@/components/diagrams/SelectionPanel";
 import { AddCardMenu } from "@/components/diagrams/AddCardMenu";
 import { ToolPicker, type BoardTool } from "@/components/diagrams/ToolPicker";
+import { APP } from "@/lib/app-config";
 
 function downloadFile(name: string, href: string) {
   const a = document.createElement("a");
@@ -942,7 +943,7 @@ export default function DiagramsPage() {
               No canvases yet
             </p>
             <p className="text-sm mb-4 px-4" style={{ color: "var(--text-secondary)" }}>
-              Pin up notes, images, videos, links and to-dos, or plan game logic with flow charts
+              Pin up notes, images, videos, links and to-dos, or plan {APP.subject} logic with flow charts
             </p>
             <div className="flex justify-center gap-2">
               <button

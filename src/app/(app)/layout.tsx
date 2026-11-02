@@ -34,7 +34,8 @@ import { AccountPanel } from "@/components/AccountPanel";
 import { BetaBadge } from "@/components/BetaBadge";
 import { ToolTutorial } from "@/components/ToolTutorial";
 import { NewBadge, isNewTool } from "@/components/NewBadge";
-import { ASSET_KINDS } from "@/lib/assets";
+import { ASSET_KINDS, ASSET_TYPES } from "@/lib/assets";
+import { APP, isDevStudio } from "@/lib/app-config";
 import { getPins, isToolPinned, orderTools, toggleToolPin } from "@/lib/pins";
 import { useStorageVersion } from "@/hooks/useStorage";
 import { storage } from "@/lib/storage";
@@ -59,7 +60,7 @@ function toolTheme(color?: string, onAccent = "#0b0b10"): React.CSSProperties {
   } as React.CSSProperties;
 }
 
-const toolNav = [
+const allToolNav = [
   { icon: LayoutDashboard, name: "Assets", path: "assets", color: "var(--text-secondary)" },
   { icon: SquareKanban, name: "Task Board", path: "board", color: ASSET_KINDS.issue.color },
   { icon: Paintbrush, name: "Pixel Art", path: "pixel-art", color: ASSET_KINDS.sprite.color, onAccent: "#fff" },
@@ -68,12 +69,15 @@ const toolNav = [
   { icon: Volume2, name: "SFX", path: "sfx", color: ASSET_KINDS.sound.color },
   { icon: Grid3X3, name: "Tilemap", path: "tilemap", color: ASSET_KINDS.tilemap.color },
   { icon: GitBranch, name: "Canvas", path: "diagrams", color: ASSET_KINDS.diagram.color },
-  { icon: BookOpen, name: "Story", path: "story", color: ASSET_KINDS.story.color },
+  { icon: BookOpen, name: isDevStudio ? "Wiki" : "Story", path: "story", color: ASSET_KINDS.story.color },
   { icon: NotebookPen, name: "Notebook", path: "notebook", color: ASSET_KINDS.note.color },
   { icon: MessageSquare, name: "Dialogue", path: "dialogue", color: ASSET_KINDS.dialogue.color },
   { icon: Palette, name: "Palettes", path: "palettes", color: ASSET_KINDS.palette.color },
   { icon: Package, name: "Sprite Sheets", path: "sprites", color: ASSET_KINDS.spritesheet.color },
 ];
+
+const enabledToolPaths = new Set(ASSET_TYPES.map((type) => ASSET_KINDS[type].path));
+const toolNav = allToolNav.filter((tool) => tool.path === "assets" || enabledToolPaths.has(tool.path));
 
 function toolMenuEntries(projectId: string, path: string): ContextMenuEntry[] {
   const pinned = isToolPinned(projectId, path);
@@ -135,7 +139,7 @@ function AppSidebar({ children }: { children: React.ReactNode }) {
     | ((typeof toolNav)[number] & { onAccent?: string })
     | undefined;
   const projectName = projectId ? storage.getById("projects", projectId)?.name : undefined;
-  const pageTitle = activeTool?.name ?? (pathname.endsWith("/assets") ? "Project" : pathname === "/projects" ? "Projects" : "GameDev Studio");
+  const pageTitle = activeTool?.name ?? (pathname.endsWith("/assets") ? "Project" : pathname === "/projects" ? "Projects" : APP.name);
 
   return (
     <div className="flex h-[100dvh] overflow-hidden" style={{ background: "var(--bg-primary)" }}>
@@ -153,10 +157,10 @@ function AppSidebar({ children }: { children: React.ReactNode }) {
               className="w-7 h-7 rounded-md flex items-center justify-center font-bold text-xs"
               style={{ background: "var(--accent)" }}
             >
-              GD
+              {APP.initials}
             </div>
             <span className="font-semibold text-sm" style={{ color: "var(--text-primary)" }}>
-              GameDev Studio
+              {APP.name}
             </span>
             <BetaBadge />
           </Link>
@@ -292,7 +296,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <div className="flex h-screen items-center justify-center" style={{ background: "var(--bg-primary)" }}>
         <div className="text-center">
           <div className="w-10 h-10 rounded-lg flex items-center justify-center font-bold text-sm mx-auto mb-3" style={{ background: "var(--accent)" }}>
-            GD
+            {APP.initials}
           </div>
           <p style={{ color: "var(--text-secondary)" }}>Loading...</p>
         </div>

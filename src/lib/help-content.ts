@@ -1,4 +1,5 @@
 import { ArrowLeftRight, Film, SquareDashed, ArrowRight, Box, CalendarRange, CirclePlay, Columns3, Copy, Download, FileCode, FileText, FlipHorizontal2, FolderOpen, Gauge, Grid3X3, Image, Layers, LayoutGrid, LayoutTemplate, Link2, List, ListChecks, ListTodo, Maximize2, MessageSquare, MousePointer2, Music, Network, NotebookPen, PaintBucket, Paintbrush, Palette, Pencil, Piano, Pipette, Play, Rows3, Ruler, Scaling, Search, Shapes, Shuffle, SlidersHorizontal, Sparkles, SquareCheck, StickyNote, VolumeX, WandSparkles, Waypoints, type LucideIcon } from "lucide-react";
+import { isDevStudio } from "./app-config";
 
 export type HelpTopic =
   | "assets"
@@ -61,7 +62,7 @@ export const HELP: Record<HelpTopic, HelpContent> = {
   },
   board: {
     title: "Task Board",
-    summary: "Plan your game's work with issues, columns and sprints.",
+    summary: `Plan your ${isDevStudio ? "project" : "game"}'s work with issues, columns and sprints.`,
     canDo: [
       { icon: ListTodo, text: "Track tasks and bugs as issues with type, priority, points and labels." },
       { icon: Columns3, text: "Drag issues between columns, or use the Move to… menu." },
@@ -84,7 +85,9 @@ export const HELP: Record<HelpTopic, HelpContent> = {
   },
   diagrams: {
     title: "Canvas",
-    summary: "A free-form board for moodboards, story flow, level plans, sketches and references.",
+    summary: isDevStudio
+      ? "A free-form board for architecture sketches, flow charts, plans, moodboards and references."
+      : "A free-form board for moodboards, story flow, level plans, sketches and references.",
     canDo: [
       { icon: StickyNote, text: "Add notes, to-do lists, images, links, groups and any project asset as cards." },
       { icon: Shapes, text: "Draw rectangles, ellipses, diamonds and flow-chart shapes, and sketch with the pen." },
@@ -151,13 +154,13 @@ export const HELP: Record<HelpTopic, HelpContent> = {
   },
   notebook: {
     title: "Notebook",
-    summary: "Keep ideas, to-do lists, design notes and playtest feedback.",
+    summary: isDevStudio ? "Keep ideas, to-do lists, meeting notes and specs." : "Keep ideas, to-do lists, design notes and playtest feedback.",
     canDo: [
       { icon: FileText, text: "Write notes in Markdown, with headings, lists and code." },
       { icon: ListChecks, text: "Tick off checklists and see progress at a glance." },
       { icon: FolderOpen, text: "Sort notes into folders, add tags and pin the important ones." },
-      { icon: Link2, text: "Link to other notes and story entries with [[double brackets]]." },
-      { icon: LayoutTemplate, text: "Start from templates like a to-do list or game design doc." },
+      { icon: Link2, text: `Link to other notes and ${isDevStudio ? "wiki pages" : "story entries"} with [[double brackets]].` },
+      { icon: LayoutTemplate, text: isDevStudio ? "Start from templates like a to-do list or meeting notes." : "Start from templates like a to-do list or game design doc." },
     ],
     steps: [
       "Press New note, or pick a template from the arrow next to it.",
@@ -261,8 +264,10 @@ export const HELP: Record<HelpTopic, HelpContent> = {
     ],
   },
   story: {
-    title: "Story",
-    summary: "Write your game's lore: characters, places, items, quests and events.",
+    title: isDevStudio ? "Wiki" : "Story",
+    summary: isDevStudio
+      ? "Document your project: people, systems, components, goals and decisions, all linked."
+      : "Write your game's lore: characters, places, items, quests and events.",
     canDo: [
       { icon: FileText, text: "Write entries in Markdown, sorted by type and tags." },
       { icon: Link2, text: "Link entries with [[double brackets]]; hover a link for a summary." },
@@ -271,9 +276,9 @@ export const HELP: Record<HelpTopic, HelpContent> = {
     ],
     steps: [
       "Press New entry, pick a type and give it a title.",
-      "Write about it. Types like Character start from a template.",
+      `Write about it. Types like ${isDevStudio ? "Person" : "Character"} start from a template.`,
       "Type [[ to link another entry.",
-      "Open the graph button to see your world's connections.",
+      `Open the graph button to see your ${isDevStudio ? "project" : "world"}'s connections.`,
     ],
     tips: [
       "Click a [[link]] to an entry that doesn't exist yet to create it.",

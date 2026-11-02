@@ -39,25 +39,35 @@ import { HelpButton } from "@/components/HelpButton";
 import { useAssetMenu } from "@/components/AssetContextMenu";
 import { AssetMenuButton, AssetPinButton, PasteButton } from "@/components/AssetMenuButton";
 import { useToast } from "@/components/Toast";
+import { isDevStudio } from "@/lib/app-config";
 
 const ENTRY_TYPES = [
-  { value: "character" as const, label: "Character", icon: User, color: "#a78bfa" },
-  { value: "location" as const, label: "Location", icon: MapPin, color: "#60a5fa" },
-  { value: "item" as const, label: "Item", icon: Box, color: "#fbbf24" },
+  { value: "character" as const, label: isDevStudio ? "Person" : "Character", icon: User, color: "#a78bfa" },
+  { value: "location" as const, label: isDevStudio ? "System" : "Location", icon: MapPin, color: "#60a5fa" },
+  { value: "item" as const, label: isDevStudio ? "Component" : "Item", icon: Box, color: "#fbbf24" },
   { value: "event" as const, label: "Event", icon: Zap, color: "#f87171" },
-  { value: "lore" as const, label: "Lore", icon: Scroll, color: "#fb923c" },
-  { value: "quest" as const, label: "Quest", icon: Flag, color: "#34d399" },
+  { value: "lore" as const, label: isDevStudio ? "Reference" : "Lore", icon: Scroll, color: "#fb923c" },
+  { value: "quest" as const, label: isDevStudio ? "Goal" : "Quest", icon: Flag, color: "#34d399" },
   { value: "note" as const, label: "Other", icon: FileText, color: "#8888a0" },
 ] as const;
 
 type EntryType = (typeof ENTRY_TYPES)[number]["value"];
 
-const TEMPLATES: Partial<Record<EntryType, string>> = {
+const GAME_TEMPLATES: Partial<Record<EntryType, string>> = {
   character: "## Appearance\n\n## Personality\n\n## Backstory\n\n## Relationships\n",
   location: "## Description\n\n## Inhabitants\n\n## Points of Interest\n",
   item: "## Description\n\n## Properties\n\n## Where to Find\n",
   quest: "## Objective\n\n## Giver\n\n## Steps\n- \n\n## Reward\n",
 };
+
+const WIKI_TEMPLATES: Partial<Record<EntryType, string>> = {
+  character: "## Role\n\n## Owns\n\n## Contact\n",
+  location: "## Purpose\n\n## Parts\n\n## Owners\n",
+  item: "## What it does\n\n## Interfaces\n\n## Depends on\n",
+  quest: "## Objective\n\n## Owner\n\n## Steps\n- \n\n## Done when\n",
+};
+
+const TEMPLATES = isDevStudio ? WIKI_TEMPLATES : GAME_TEMPLATES;
 
 const WIKI_SPLIT = /(\[\[[^\]]+\]\])/g;
 const AUTOCOMPLETE = /\[\[([^\]\n]*)$/;

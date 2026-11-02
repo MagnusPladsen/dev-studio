@@ -13,7 +13,7 @@ export function issueNumber(key: string): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-type Draft = {
+export type IssueDraft = {
   slug: string;
   title: string;
   status: "todo" | "in-progress" | "testing" | "done";
@@ -25,7 +25,7 @@ type Draft = {
   dueInDays?: number;
 };
 
-const DRAFTS: Draft[] = [
+const DRAFTS: IssueDraft[] = [
   {
     slug: "i-movement",
     title: "Basic left/right movement",
@@ -133,8 +133,9 @@ const DRAFTS: Draft[] = [
   },
 ];
 
-export const boardExamples: ExampleModule[] = [
-  {
+/** An issues example module: keys follow the project name and continue after any existing issues. */
+export function issuesModule(drafts: IssueDraft[]): ExampleModule {
+  return {
     collection: "issues",
     build({ projectId, id }) {
       const prefix = issueKeyPrefix(storage.getById("projects", projectId)?.name);
@@ -143,7 +144,7 @@ export const boardExamples: ExampleModule[] = [
         .filter((i) => i.key.startsWith(prefix + "-"))
         .reduce((max, i) => Math.max(max, issueNumber(i.key)), 0);
       const now = Date.now();
-      return DRAFTS.map((d, i): Issue & Record<string, unknown> => ({
+      return drafts.map((d, i): Issue & Record<string, unknown> => ({
         id: id(d.slug),
         projectId,
         key: `${prefix}-${taken + i + 1}`,
@@ -159,9 +160,11 @@ export const boardExamples: ExampleModule[] = [
         order: i * 1000,
         resolvedAt: d.status === "done" ? new Date(now - 86_400_000).toISOString() : undefined,
         tags: [],
-        createdAt: new Date(now - (DRAFTS.length - i) * 3_600_000).toISOString(),
-        updatedAt: new Date(now - (DRAFTS.length - i) * 1_800_000).toISOString(),
+        createdAt: new Date(now - (drafts.length - i) * 3_600_000).toISOString(),
+        updatedAt: new Date(now - (drafts.length - i) * 1_800_000).toISOString(),
       }));
     },
-  },
-];
+  };
+}
+
+export const boardExamples: ExampleModule[] = [issuesModule(DRAFTS)];
