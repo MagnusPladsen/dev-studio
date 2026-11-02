@@ -44,6 +44,8 @@ export function useVoxelExports(
   doc: Pick<VoxelDoc, "grid" | "colors" | "name"> | null,
   viewportApiRef: RefObject<VoxelViewportApi | null>,
   onError: (message: string) => void,
+  /** Opens the "Render for 2D" dialog; the item is hidden when not given. */
+  onRenderFor2D?: () => void,
 ): ExportItem[] {
   if (!doc) return [];
   const { grid, colors } = doc;
@@ -56,6 +58,16 @@ export function useVoxelExports(
     { label: "OBJ + MTL", description: describe("Two files: the shape and its colours"), disabled: isEmpty, onClick: () => downloadObj(grid, colors, base) },
     { label: "MagicaVoxel (.vox)", description: describe("Opens in MagicaVoxel"), disabled: isEmpty, onClick: () => downloadVox(grid, colors, base) },
     { label: "Image (.png)", description: describe("The current view"), disabled: isEmpty, onClick: () => downloadPng(() => viewportApiRef.current?.snapshotPng() ?? null, base) },
+    ...(onRenderFor2D
+      ? [
+          {
+            label: "Render for 2D…",
+            description: describe("Pixel sprites from 1, 4 or 8 directions, a sprite sheet or a turntable GIF"),
+            disabled: isEmpty,
+            onClick: onRenderFor2D,
+          },
+        ]
+      : []),
     {
       label: "Open in Blender (free)",
       description: BLENDER_MENU_DESCRIPTION,
