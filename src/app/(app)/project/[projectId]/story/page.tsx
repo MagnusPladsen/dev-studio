@@ -27,8 +27,9 @@ import {
 import { v4 as uuid } from "uuid";
 import { storage } from "@/lib/storage";
 import { dropDeletedLinkTargets, getRelated, wikiTargets } from "@/lib/links";
-import { ASSET_KINDS, assetHref } from "@/lib/assets";
+import { assetHref } from "@/lib/assets";
 import { LinkedAssets } from "@/components/LinkedAssets";
+import { StoryGraph } from "@/components/story/StoryGraph";
 import { useOpenParam, useTrackOpenAsset, useStorageVersion } from "@/hooks/useStorage";
 import type { StoryEntry } from "@/types";
 import { useAutosave } from "@/hooks/useAutosave";
@@ -393,115 +394,20 @@ export default function StoryPage() {
       });
   }, [entries, selected]);
 
-  // ── graph ──
-  const graphData = useMemo(() => {
-    if (!showGraph) return { nodes: [], edges: [] };
-    type Node = { key: string; id: string; title: string; color: string; label: string; kind: "story" | "asset"; assetType?: keyof typeof ASSET_KINDS; x: number; y: number };
-    const nodes = new Map<string, Node>();
-    const edges = new Map<string, { from: string; to: string }>();
-    const addEdge = (a: string, b: string) => {
-      const k = a < b ? `${a}|${b}` : `${b}|${a}`;
-      if (a !== b) edges.set(k, { from: a, to: b });
-    };
-
-    const radius = Math.min(170, 60 + entries.length * 14);
-    entries.forEach((entry, i) => {
-      const angle = (2 * Math.PI * i) / Math.max(entries.length, 1);
-      const meta = getTypeMeta(entry.type);
-      nodes.set(`story:${entry.id}`, {
-        key: `story:${entry.id}`,
-        id: entry.id,
-        title: entry.title,
-        color: meta.color,
-        label: meta.label,
-        kind: "story",
-        x: 300 + Math.cos(angle) * radius,
-        y: 240 + Math.sin(angle) * radius,
-      });
-    });
-
-    const assets: Node[] = [];
-    for (const entry of entries) {
-      for (const r of getRelated(projectId, "story", entry.id)) {
-        const key = `${r.type}:${r.id}`;
-        if (r.type !== "story" && !nodes.has(key)) {
-          const node: Node = { key, id: r.id, title: r.name, color: ASSET_KINDS[r.type].color, label: ASSET_KINDS[r.type].label, kind: "asset", assetType: r.type, x: 0, y: 0 };
-          nodes.set(key, node);
-          assets.push(node);
-        }
-        addEdge(`story:${entry.id}`, key);
-      }
-    }
-    const outer = radius + 80;
-    assets.forEach((n, i) => {
-      const angle = (2 * Math.PI * i) / Math.max(assets.length, 1) + Math.PI / 7;
-      n.x = 300 + Math.cos(angle) * outer;
-      n.y = 240 + Math.sin(angle) * outer;
-    });
-    return { nodes: [...nodes.values()], edges: [...edges.values()] };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entries, showGraph, projectId, version]);
-
   if (showGraph) {
-    const byKey = new Map(graphData.nodes.map((n) => [n.key, n]));
     return (
-      <div className="h-full flex flex-col" style={{ background: "var(--bg-primary)" }}>
-        <div className="h-12 flex items-center justify-between px-4 border-b" style={{ borderColor: "var(--border)" }}>
-          <h2 className="font-semibold text-sm" style={{ color: "var(--text-primary)" }}>
-            Connection Graph
-          </h2>
-          <button onClick={() => setShowGraph(false)} className="p-1.5 rounded-lg" style={{ color: "var(--text-secondary)" }} title="Close graph" aria-label="Close graph">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-        <div className="flex-1 flex items-center justify-center p-4 min-h-0">
-          {graphData.nodes.length === 0 ? (
-            <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-              No entries yet.
-            </p>
-          ) : (
-            <svg viewBox="0 0 600 480" className="w-full max-w-3xl" style={{ maxHeight: "75vh" }}>
-              {graphData.edges.map((edge) => {
-                const from = byKey.get(edge.from);
-                const to = byKey.get(edge.to);
-                if (!from || !to) return null;
-                return <line key={`${edge.from}|${edge.to}`} x1={from.x} y1={from.y} x2={to.x} y2={to.y} stroke="var(--border-hover)" strokeWidth="1.5" />;
-              })}
-              {graphData.nodes.map((node) => (
-                <g
-                  key={node.key}
-                  {...(node.kind === "story"
-                    ? assetTriggerProps({ type: "story", id: node.id })
-                    : node.assetType
-                      ? assetTriggerProps({ type: node.assetType, id: node.id })
-                      : {})}
-                  onClick={() => {
-                    if (node.kind === "story") {
-                      selectEntry(node.id);
-                      setShowGraph(false);
-                    } else if (node.assetType) {
-                      router.push(assetHref(projectId, node.assetType, node.id));
-                    }
-                  }}
-                  className="cursor-pointer"
-                >
-                  {node.kind === "story" ? (
-                    <circle cx={node.x} cy={node.y} r="22" fill={`${node.color}30`} stroke={node.color} strokeWidth="1.5" />
-                  ) : (
-                    <rect x={node.x - 18} y={node.y - 14} width="36" height="28" rx="6" fill={`${node.color}25`} stroke={node.color} strokeWidth="1.5" strokeDasharray="3 2" />
-                  )}
-                  <text x={node.x} y={node.y + 3} textAnchor="middle" fill={node.color} fontSize="9" fontWeight="600">
-                    {node.title.length > 10 ? node.title.slice(0, 9) + "…" : node.title}
-                  </text>
-                  <text x={node.x} y={node.y + 36} textAnchor="middle" fill="var(--text-muted)" fontSize="8">
-                    {node.label}
-                  </text>
-                </g>
-              ))}
-            </svg>
-          )}
-        </div>
-      </div>
+      <StoryGraph
+        projectId={projectId}
+        entries={entries}
+        typeMeta={getTypeMeta}
+        menuProps={(node) => assetTriggerProps({ type: node.assetType, id: node.id })}
+        onOpen={(node) => {
+          if (node.kind === "asset") return router.push(assetHref(projectId, node.assetType, node.id));
+          selectEntry(node.id);
+          setShowGraph(false);
+        }}
+        onClose={() => setShowGraph(false)}
+      />
     );
   }
 
