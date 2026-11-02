@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Link2, Plus, Search, X } from "lucide-react";
 import type { AssetType } from "@/types";
 import { ASSET_KINDS, ASSET_TYPES, assetHref, listAssets, type AssetSummary } from "@/lib/assets";
-import { addLink, getRelated, removeLink } from "@/lib/links";
+import { addLink, getRelated, removeLink, type RelatedAsset } from "@/lib/links";
 import { useStorageVersion } from "@/hooks/useStorage";
 import { useAssetMenu } from "@/components/AssetContextMenu";
 
@@ -15,6 +15,8 @@ interface Props {
   id: string | null | undefined;
   /** "row" fits in a toolbar, "panel" stacks vertically in a sidebar. */
   layout?: "row" | "panel";
+  /** How many chips a row shows before the rest move behind a button; 0 shows only a "N linked" button. */
+  maxRowChips?: number;
 }
 
 function Thumb({ asset }: { asset: AssetSummary }) {
@@ -26,11 +28,44 @@ function Thumb({ asset }: { asset: AssetSummary }) {
   return <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />;
 }
 
-export function LinkedAssets({ projectId, type, id, layout = "panel" }: Props) {
+/** Chips shown inline in a toolbar row by default; the rest sit behind a button so the toolbar never wraps. */
+const ROW_CHIP_LIMIT = 2;
+
+function LinkChip({ projectId, self, asset }: { projectId: string; self: { type: AssetType; id: string }; asset: RelatedAsset }) {
   const { assetTriggerProps } = useAssetMenu();
+  return (
+    <div
+      {...assetTriggerProps({ type: asset.type, id: asset.id })}
+      className="group flex items-center gap-1.5 pl-1.5 pr-1 py-0.5 rounded text-xs max-w-full"
+      style={{ background: "var(--bg-card)", border: "1px solid var(--border)" }}
+      title={asset.excerpt ? `${ASSET_KINDS[asset.type].label}: ${asset.excerpt}` : ASSET_KINDS[asset.type].label}
+    >
+      <Thumb asset={asset} />
+      <Link href={assetHref(projectId, asset.type, asset.id)} className="truncate hover:underline" style={{ color: "var(--text-primary)" }}>
+        {asset.name}
+      </Link>
+      <span className="shrink-0" style={{ color: "var(--text-muted)" }}>
+        {ASSET_KINDS[asset.type].label}
+      </span>
+      {asset.source !== "wiki" && (
+        <button
+          onClick={() => removeLink(projectId, self, asset)}
+          className="opacity-0 group-hover:opacity-100 shrink-0"
+          style={{ color: "var(--text-muted)" }}
+          title="Remove link"
+        >
+          <X className="w-3 h-3" />
+        </button>
+      )}
+    </div>
+  );
+}
+
+export function LinkedAssets({ projectId, type, id, layout = "panel", maxRowChips = ROW_CHIP_LIMIT }: Props) {
   const version = useStorageVersion();
   const [picking, setPicking] = useState(false);
   const [query, setQuery] = useState("");
+  const [showingAll, setShowingAll] = useState(false);
 
   const related = useMemo(
     () => (id ? getRelated(projectId, type, id) : []),
@@ -58,10 +93,13 @@ export function LinkedAssets({ projectId, type, id, layout = "panel" }: Props) {
   }
 
   const self = { type, id };
+  const chipLimit = layout === "row" ? maxRowChips : related.length;
+  const shownChips = related.slice(0, chipLimit);
+  const hiddenChips = related.slice(chipLimit);
 
   return (
-    <div className={layout === "row" ? "relative flex items-center gap-1.5 flex-wrap" : "relative space-y-1.5"}>
-      <div className="flex items-center gap-1.5 text-xs" style={{ color: "var(--text-secondary)" }}>
+    <div className={layout === "row" ? "relative flex items-center gap-1.5 min-w-0" : "relative space-y-1.5"}>
+      <div className="flex items-center gap-1.5 text-xs shrink-0" style={{ color: "var(--text-secondary)" }}>
         <Link2 className="w-3.5 h-3.5" />
         {layout === "panel" && <span className="font-medium">Linked</span>}
         <button
@@ -75,40 +113,38 @@ export function LinkedAssets({ projectId, type, id, layout = "panel" }: Props) {
         </button>
       </div>
 
-      <div className={layout === "row" ? "flex items-center gap-1 flex-wrap" : "flex flex-col gap-1"}>
+      <div className={layout === "row" ? "flex items-center gap-1 min-w-0 [&>*]:max-w-56 [&>*]:min-w-0" : "flex flex-col gap-1"}>
         {related.length === 0 && layout === "panel" && (
           <p className="text-xs" style={{ color: "var(--text-muted)" }}>
             Nothing linked yet.
           </p>
         )}
-        {related.map((r) => (
-          <div
-            key={`${r.type}:${r.id}`}
-            {...assetTriggerProps({ type: r.type, id: r.id })}
-            className="group flex items-center gap-1.5 pl-1.5 pr-1 py-0.5 rounded text-xs max-w-full"
-            style={{ background: "var(--bg-card)", border: "1px solid var(--border)" }}
-            title={r.excerpt ? `${ASSET_KINDS[r.type].label}: ${r.excerpt}` : ASSET_KINDS[r.type].label}
-          >
-            <Thumb asset={r} />
-            <Link href={assetHref(projectId, r.type, r.id)} className="truncate hover:underline" style={{ color: "var(--text-primary)" }}>
-              {r.name}
-            </Link>
-            <span className="shrink-0" style={{ color: "var(--text-muted)" }}>
-              {ASSET_KINDS[r.type].label}
-            </span>
-            {r.source !== "wiki" && (
-              <button
-                onClick={() => removeLink(projectId, self, r)}
-                className="opacity-0 group-hover:opacity-100 shrink-0"
-                style={{ color: "var(--text-muted)" }}
-                title="Remove link"
-              >
-                <X className="w-3 h-3" />
-              </button>
-            )}
-          </div>
+        {shownChips.map((r) => (
+          <LinkChip key={`${r.type}:${r.id}`} projectId={projectId} self={self} asset={r} />
         ))}
+        {hiddenChips.length > 0 && (
+          <button
+            onClick={() => setShowingAll((v) => !v)}
+            className="px-1.5 py-0.5 rounded text-xs shrink-0 whitespace-nowrap"
+            style={{ color: "var(--text-primary)", border: "1px solid var(--border)" }}
+            title={showingAll ? "Hide the other links" : `Show ${hiddenChips.length} more: ${hiddenChips.map((r) => r.name).join(", ")}`}
+            aria-expanded={showingAll}
+          >
+            {shownChips.length === 0 ? `${hiddenChips.length} linked` : `+${hiddenChips.length}`}
+          </button>
+        )}
       </div>
+
+      {showingAll && hiddenChips.length > 0 && (
+        <div
+          className="absolute z-50 top-full left-0 mt-1 w-64 max-h-80 overflow-y-auto rounded-lg shadow-xl p-2 flex flex-col gap-1"
+          style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)" }}
+        >
+          {hiddenChips.map((r) => (
+            <LinkChip key={`${r.type}:${r.id}`} projectId={projectId} self={self} asset={r} />
+          ))}
+        </div>
+      )}
 
       {picking && (
         <div

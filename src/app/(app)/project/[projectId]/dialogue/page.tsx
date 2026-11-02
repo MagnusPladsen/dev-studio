@@ -25,6 +25,7 @@ import {
   ZoomIn,
   ZoomOut,
   RotateCcw,
+  ChevronDown,
 } from "lucide-react";
 import { v4 as uuid } from "uuid";
 import { storage } from "@/lib/storage";
@@ -55,6 +56,61 @@ const NODE_LABELS: Record<NodeType, string> = {
 /** Translucent version of a node colour (works with CSS variables too). */
 function tint(color: string, pct: number) {
   return `color-mix(in srgb, ${color} ${pct}%, transparent)`;
+}
+
+const NODE_TYPES: NodeType[] = ["start", "dialogue", "choice", "condition", "action", "end"];
+
+/** "Add node" as one dropdown, for desktop widths where the row of node buttons doesn't fit beside the title. */
+function AddNodeMenu({ onPick }: { onPick(type: NodeType): void }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const close = (event: PointerEvent) => !ref.current?.contains(event.target as Node) && setIsOpen(false);
+    const onKey = (event: KeyboardEvent) => event.key === "Escape" && setIsOpen(false);
+    window.addEventListener("pointerdown", close);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("pointerdown", close);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [isOpen]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center gap-1 px-2 py-1 rounded text-xs whitespace-nowrap"
+        style={{ background: "var(--bg-card)", color: "var(--text-primary)", border: "1px solid var(--border)" }}
+        aria-haspopup="menu"
+        aria-expanded={isOpen}
+      >
+        <Plus className="w-3.5 h-3.5" />
+        Add node
+        <ChevronDown className="w-3 h-3" />
+      </button>
+      {isOpen && (
+        <div role="menu" className="absolute top-full left-0 mt-1 py-1 w-40 rounded-lg border z-30" style={{ background: "var(--bg-card)", borderColor: "var(--border)" }}>
+          {NODE_TYPES.map((type) => (
+            <button
+              key={type}
+              role="menuitem"
+              onClick={() => {
+                setIsOpen(false);
+                onPick(type);
+              }}
+              className="flex items-center gap-2 w-full px-3 py-1.5 text-sm text-left hover:bg-[var(--bg-hover)]"
+              style={{ color: "var(--text-primary)" }}
+            >
+              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: NODE_COLORS[type] }} />
+              {NODE_LABELS[type]}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function isTyping(el: EventTarget | null) {
@@ -831,13 +887,13 @@ export default function DialoguePage() {
     <div className="flex flex-col h-full">
       {/* Toolbar */}
       <div
-        className="flex items-center justify-between px-4 h-12 border-b shrink-0 max-md:h-auto max-md:flex-wrap max-md:gap-y-1.5 max-md:py-1.5 max-md:px-2"
+        className="flex items-center justify-between flex-wrap md:gap-x-3 gap-y-1.5 px-4 min-h-12 py-1.5 border-b shrink-0 max-md:px-2"
         style={{
           background: "var(--bg-secondary)",
           borderColor: "var(--border)",
         }}
       >
-        <div className="flex items-center gap-2 min-w-0">
+        <div className="flex items-center gap-2 min-w-0 md:shrink-0">
           <button
             onClick={() => {
               setActiveTree(null);
@@ -852,7 +908,7 @@ export default function DialoguePage() {
           </button>
           <UndoRedoButtons history={history} />
           <input
-            className="bg-transparent text-sm font-medium outline-none w-48 max-md:w-36 min-w-0"
+            className="bg-transparent text-sm font-medium outline-none w-48 max-md:w-36 min-w-0 md:shrink-0"
             style={{ color: "var(--text-primary)" }}
             value={activeTree.name}
             onChange={(e) =>
@@ -861,17 +917,18 @@ export default function DialoguePage() {
             aria-label="Dialogue name"
           />
           <div className="hidden lg:block">
-            <LinkedAssets projectId={projectId} type="dialogue" id={activeTree.id} layout="row" />
+            <LinkedAssets projectId={projectId} type="dialogue" id={activeTree.id} layout="row" maxRowChips={0} />
           </div>
         </div>
 
-        <div className="flex items-center gap-1 max-md:order-last max-md:w-full max-md:overflow-x-auto">
+        <div className="hidden md:max-[1759px]:block">
+          <AddNodeMenu onPick={addNode} />
+        </div>
+        <div className="flex items-center gap-1 max-md:order-last max-md:w-full max-md:overflow-x-auto md:max-[1759px]:hidden">
           <span className="text-xs mr-1 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
             Add node:
           </span>
-          {(
-            ["start", "dialogue", "choice", "condition", "action", "end"] as NodeType[]
-          ).map((type) => (
+          {NODE_TYPES.map((type) => (
             <button
               key={type}
               onClick={() => addNode(type)}
