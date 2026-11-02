@@ -34,6 +34,7 @@ import { AssetMenuButton, AssetPinButton, PasteButton } from "@/components/Asset
 import { getAudioContext } from "@/lib/audio/context";
 import { midiToFreq, scheduleNote } from "@/lib/audio/music-synth";
 import { beatAt, scheduleWindow, type LiveSong, type PlayCursor } from "@/lib/audio/music-scheduler";
+import { cellsBetween, coversCell, eraseCells, paintCells, type GridCell, type NoteCell } from "@/lib/music-draw";
 import type { MusicTrack, MusicChannel, MusicNote } from "@/types";
 import { v4 as uuid } from "uuid";
 
@@ -334,68 +335,60 @@ export default function MusicPage() {
   }
 
   const snap = noteLen < 0.5 ? 0.25 : 0.5;
-  const dragRef = useRef<{ pitch: number; start: number } | null>(null);
-  const tapRef = useRef<{ x: number; y: number } | null>(null);
+  // a stroke paints notes into empty cells, or erases notes when it starts on one
+  const strokeRef = useRef<{ mode: "paint" | "erase"; last: GridCell } | null>(null);
+  const [isDrawing, setIsDrawing] = useState(false);
 
-  function gridPos(e: React.PointerEvent<HTMLDivElement>) {
+  function gridCell(e: React.PointerEvent<HTMLDivElement>): GridCell {
     const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const beat = Math.floor(x / (BEAT_W * snap)) * snap;
-    const pitch = MAX_MIDI - Math.floor(y / ROW_H);
-    return { x, y, beat, pitch, valid: pitch >= MIN_MIDI && pitch <= MAX_MIDI && beat >= 0 && beat < patternLen };
+    return { col: Math.floor((e.clientX - rect.left) / (BEAT_W * snap)), row: Math.floor((e.clientY - rect.top) / ROW_H) };
   }
 
-  /** Click on a note removes it; click on empty space adds one. Returns true if a note was added. */
-  function toggleAt(pitch: number, beat: number): boolean {
-    const hit = activeNotes.find((n) => n.pitch === pitch && n.start <= beat + 1e-6 && beat < n.start + n.duration - 1e-6);
-    if (hit) {
-      setActiveNotes((ns) => ns.filter((n) => n !== hit && !(n.pitch === hit.pitch && n.start === hit.start)));
-      return false;
-    }
-    const duration = Math.min(noteLen, patternLen - beat);
-    setActiveNotes((ns) => [...ns, { pitch, start: beat, duration, velocity: 0.8 }]);
-    return true;
+  function toNoteCells(cells: GridCell[]): NoteCell[] {
+    return cells
+      .map((c) => ({ pitch: MAX_MIDI - c.row, beat: c.col * snap }))
+      .filter((c) => c.pitch >= MIN_MIDI && c.pitch <= MAX_MIDI && c.beat >= 0 && c.beat < patternLen);
+  }
+
+  function drawCells(mode: "paint" | "erase", cells: GridCell[]) {
+    const noteCells = toNoteCells(cells);
+    if (noteCells.length === 0) return;
+    setActiveNotes((ns) => (mode === "erase" ? eraseCells(ns, noteCells) : paintCells(ns, noteCells, noteLen, patternLen)));
   }
 
   function onGridPointerDown(e: React.PointerEvent<HTMLDivElement>) {
-    const pos = gridPos(e);
-    if (!pos.valid) return;
-    // touch: wait for the finger to lift so scrolling the roll still works
-    if (e.pointerType === "touch") {
-      tapRef.current = { x: e.clientX, y: e.clientY };
-      return;
-    }
-    if (e.button !== 0) return;
-    if (toggleAt(pos.pitch, pos.beat)) {
-      dragRef.current = { pitch: pos.pitch, start: pos.beat };
-      e.currentTarget.setPointerCapture(e.pointerId);
-    }
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    const cell = gridCell(e);
+    const [start] = toNoteCells([cell]);
+    if (!start) return;
+    const mode = activeNotes.some((n) => coversCell(n, start)) ? "erase" : "paint";
+    strokeRef.current = { mode, last: cell };
+    history.checkpoint();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    setIsDrawing(true);
+    drawCells(mode, [cell]);
   }
 
   function onGridPointerMove(e: React.PointerEvent<HTMLDivElement>) {
-    const drag = dragRef.current;
-    if (!drag) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const endBeat = Math.ceil((e.clientX - rect.left) / BEAT_W / snap) * snap;
-    const duration = Math.min(patternLen - drag.start, Math.max(noteLen, endBeat - drag.start));
-    setActiveNotes((ns) =>
-      ns.map((n) => (n.pitch === drag.pitch && Math.abs(n.start - drag.start) < 1e-6 && n.duration !== duration ? { ...n, duration } : n))
-    );
+    const stroke = strokeRef.current;
+    if (!stroke) return;
+    const cell = gridCell(e);
+    if (cell.col === stroke.last.col && cell.row === stroke.last.row) return;
+    drawCells(stroke.mode, cellsBetween(stroke.last, cell).slice(1));
+    stroke.last = cell;
   }
 
-  function onGridPointerUp(e: React.PointerEvent<HTMLDivElement>) {
-    dragRef.current = null;
-    const tap = tapRef.current;
-    tapRef.current = null;
-    if (tap && Math.hypot(e.clientX - tap.x, e.clientY - tap.y) < 8) {
-      const pos = gridPos(e);
-      if (pos.valid) toggleAt(pos.pitch, pos.beat);
-    }
+  function endStroke() {
+    strokeRef.current = null;
+    setIsDrawing(false);
   }
+
+  // while a stroke is drawn the history sees the track as it was, so the whole stroke is one undo step
+  const [stableTrack, setStableTrack] = useState(activeTrack);
+  if (!isDrawing && stableTrack !== activeTrack) setStableTrack(activeTrack);
 
   const history = useHistory(
-    activeTrack,
+    isDrawing ? stableTrack : activeTrack,
     (t) => {
       if (!t) return;
       setActiveTrack(t);
@@ -874,8 +867,8 @@ export default function MusicPage() {
                 </select>
               </label>
               <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-                <span className="max-md:hidden">Click to add a note, click it again to remove. Drag right for a longer note.</span>
-                <span className="md:hidden">Tap to add a note, tap it again to remove.</span>
+                <span className="max-md:hidden">Click or drag in any direction to draw notes. Start on a note to erase instead.</span>
+                <span className="md:hidden">Tap or drag to draw notes, start on a note to erase. Drag the piano keys to scroll.</span>
               </span>
             </div>
 
@@ -982,14 +975,11 @@ export default function MusicPage() {
                   {/* Click area for adding/removing notes */}
                   <div
                     className="absolute inset-0"
-                    style={{ cursor: "crosshair" }}
+                    style={{ cursor: "crosshair", touchAction: "none" }}
                     onPointerDown={onGridPointerDown}
                     onPointerMove={onGridPointerMove}
-                    onPointerUp={onGridPointerUp}
-                    onPointerCancel={() => {
-                      dragRef.current = null;
-                      tapRef.current = null;
-                    }}
+                    onPointerUp={endStroke}
+                    onPointerCancel={endStroke}
                   />
 
                   {/* Playhead */}

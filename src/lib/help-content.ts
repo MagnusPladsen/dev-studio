@@ -132,11 +132,11 @@ export const HELP: Record<HelpTopic, HelpContent> = {
     steps: [
       "Press + to make a new track, or add the examples.",
       "Pick a channel, then click the grid to place a note.",
-      "Drag right while placing to make a note longer.",
+      "Drag in any direction to draw a run of notes; Note length sets how long each one is.",
       "Press Play, turn on Loop, and keep tweaking.",
     ],
     tips: [
-      "Click a note again to remove it.",
+      "Click a note again to remove it, or start a drag on a note to erase along the way.",
       "Ctrl/⌘ + scroll zooms time; add Shift to zoom pitch.",
       UNDO_TIP,
     ],

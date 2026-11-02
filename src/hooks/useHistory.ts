@@ -10,6 +10,8 @@ export interface History {
   redo(): void;
   canUndo: boolean;
   canRedo: boolean;
+  /** End the current burst, so the next change starts a new undo step. */
+  checkpoint(): void;
 }
 
 export function isTextField(el: EventTarget | null): boolean {
@@ -110,7 +112,11 @@ export function useHistory<T>(
 
   const undo = useCallback(() => step(past, future), [step]);
   const redo = useCallback(() => step(future, past), [step]);
+  const checkpoint = useCallback(() => {
+    if (burst.current) clearTimeout(burst.current);
+    burst.current = null;
+  }, []);
   useUndoShortcuts(undo, redo);
 
-  return { undo, redo, canUndo: past.current.length > 0, canRedo: future.current.length > 0 };
+  return { undo, redo, canUndo: past.current.length > 0, canRedo: future.current.length > 0, checkpoint };
 }
