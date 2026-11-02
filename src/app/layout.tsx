@@ -42,11 +42,19 @@ const METADATA: Record<AppId, Metadata> = {
 
 export const metadata: Metadata = { metadataBase: new URL(APP.url), ...METADATA[APP.id] };
 
+/** Each app's brand colour, so the two sites can't be mixed up at a glance. */
+const appTheme = {
+  "--accent": APP.accent,
+  "--accent-hover": APP.accentHover,
+  "--accent-glow": `color-mix(in srgb, ${APP.accent} 15%, transparent)`,
+} as React.CSSProperties;
+
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      style={appTheme}
     >
       <body className="min-h-full flex flex-col">
         {children}

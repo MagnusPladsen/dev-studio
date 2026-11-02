@@ -11,6 +11,9 @@ export interface AppConfig {
   name: string;
   initials: string;
   url: string;
+  /** Brand colour for the logo, favicon and primary buttons outside the tools. */
+  accent: string;
+  accentHover: string;
   /** What a project is about, as in "Plan your game". */
   subject: string;
   assetTypes: AssetType[];
@@ -21,6 +24,8 @@ const GAMEDEV_STUDIO: AppConfig = {
   name: "GameDev Studio",
   initials: "GD",
   url: "https://gamedev-studio.pladsen.dev",
+  accent: "#7c5cfc",
+  accentHover: "#6a4ae0",
   subject: "game",
   assetTypes: ["sprite", "sound", "music", "tilemap", "diagram", "story", "dialogue", "palette", "spritesheet", "note", "issue", "model"],
 };
@@ -30,6 +35,8 @@ const DEV_STUDIO: AppConfig = {
   name: "Dev Studio",
   initials: "DS",
   url: "https://dev-studio.pladsen.dev",
+  accent: "#0d9488",
+  accentHover: "#0f766e",
   subject: "project",
   assetTypes: ["issue", "diagram", "story", "note"],
 };

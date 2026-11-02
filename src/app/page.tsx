@@ -2,7 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { DesktopDownload } from "@/components/DesktopDownload";
 import { DevStudioLanding } from "@/components/landing/DevStudioLanding";
-import { AssetChip, GITHUB_URL, GithubIcon, LandingFooter, LandingNav, ToolCard } from "@/components/landing/LandingParts";
+import { AssetChip, GITHUB_URL, GithubIcon, LandingFooter, LandingNav, OtherAppPromo, ToolCard } from "@/components/landing/LandingParts";
 import { isDevStudio } from "@/lib/app-config";
 import type { AssetType } from "@/types";
 import {
@@ -203,7 +203,7 @@ function GameDevLanding() {
         <div className="max-w-4xl mx-auto text-center relative">
           <div
             className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium mb-6 animate-fade-in"
-            style={{ background: "var(--accent-glow)", color: "var(--accent)", border: "1px solid rgba(124,92,252,0.2)" }}
+            style={{ background: "var(--accent-glow)", color: "var(--accent)", border: "1px solid color-mix(in srgb, var(--accent) 20%, transparent)" }}
           >
             <Sparkles className="w-3 h-3" />
             Public beta · Free &amp; open source · No watermarks
@@ -414,7 +414,7 @@ function GameDevLanding() {
           <div>
             <div
               className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium mb-5"
-              style={{ background: "var(--accent-glow)", color: "var(--accent)", border: "1px solid rgba(124,92,252,0.2)" }}
+              style={{ background: "var(--accent-glow)", color: "var(--accent)", border: "1px solid color-mix(in srgb, var(--accent) 20%, transparent)" }}
             >
               <Monitor className="w-3 h-3" />
               Desktop app for Mac, Windows &amp; Linux
@@ -482,6 +482,8 @@ function GameDevLanding() {
           </Link>
         </div>
       </section>
+
+      <OtherAppPromo />
 
       <LandingFooter />
     </div>
