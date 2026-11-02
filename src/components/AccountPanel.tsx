@@ -250,7 +250,7 @@ export function AccountPanel() {
           </button>
         ))}
 
-      <p className="leading-snug pt-1" style={{ color: "var(--text-muted)" }}>
+      <p className="leading-snug pt-1 [@media(max-height:500px)]:hidden" style={{ color: "var(--text-muted)" }}>
         Everything you make is yours: free downloads, no watermark, no attribution needed.
       </p>
 

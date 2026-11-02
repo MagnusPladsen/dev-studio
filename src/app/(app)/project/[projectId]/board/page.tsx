@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
+import { createPortal } from "react-dom";
 import {
   Archive,
   ArchiveRestore,
@@ -36,6 +37,7 @@ import { SaveIndicator } from "@/components/SaveIndicator";
 import { useAssetMenu } from "@/components/AssetContextMenu";
 import { AssetMenuButton, AssetPinButton, PasteButton } from "@/components/AssetMenuButton";
 import { IssueDetail } from "@/components/board/IssueDetail";
+import { positionMenu, type MenuPlacement } from "@/lib/menu-position";
 import {
   CATEGORY_LABEL,
   COLUMN_COLORS,
@@ -58,6 +60,10 @@ import {
   secondaryBtn,
   today,
 } from "@/components/board/meta";
+
+const MOVE_MENU_WIDTH = 176;
+const MOVE_MENU_ROW_HEIGHT = 30;
+const MOVE_MENU_PADDING = 32;
 
 type View = "board" | "backlog" | "all";
 type Filters = { q: string; type: IssueType | ""; priority: IssuePriority | ""; label: string };
@@ -762,7 +768,7 @@ function IssueCard({
   const version = useStorageVersion();
   const { assetTriggerProps } = useAssetMenu();
   const trigger = assetTriggerProps({ type: "issue", id: issue.id });
-  const [menu, setMenu] = useState(false);
+  const [menu, setMenu] = useState<MenuPlacement | null>(null);
   const related = useMemo(
     () => getRelated(projectId, "issue", issue.id),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -846,7 +852,10 @@ function IssueCard({
       <button
         onClick={(e) => {
           e.stopPropagation();
-          setMenu((m) => !m);
+          const rect = e.currentTarget.getBoundingClientRect();
+          const rows = board.columns.length + (done ? 1 : 0);
+          const size = { width: MOVE_MENU_WIDTH, height: MOVE_MENU_ROW_HEIGHT * rows + MOVE_MENU_PADDING };
+          setMenu((open) => (open ? null : positionMenu({ x: rect.right - size.width, y: rect.bottom + 4 }, size, { width: innerWidth, height: innerHeight })));
         }}
         className="absolute top-1.5 right-1.5 p-1 rounded-md md:opacity-0 md:group-hover:opacity-100 focus:opacity-100"
         style={{ color: "var(--text-secondary)", background: "var(--bg-card)" }}
@@ -855,12 +864,12 @@ function IssueCard({
       >
         <MoreHorizontal className="w-3.5 h-3.5" />
       </button>
-      {menu && (
+      {menu && createPortal(
         <div
-          className="absolute right-1 top-8 z-30 w-44 p-1 rounded-lg shadow-xl"
-          style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)" }}
+          className="fixed z-50 w-44 p-1 rounded-lg shadow-xl overflow-y-auto"
+          style={{ ...menu, background: "var(--bg-secondary)", border: "1px solid var(--border)" }}
           onClick={(e) => e.stopPropagation()}
-          onMouseLeave={() => setMenu(false)}
+          onMouseLeave={() => setMenu(null)}
         >
           <p className="px-2 py-1 text-[10px] uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
             Move to
@@ -872,7 +881,7 @@ function IssueCard({
                 key={c.id}
                 onClick={() => {
                   onMove(c.id);
-                  setMenu(false);
+                  setMenu(null);
                 }}
                 className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs text-left hover:bg-[var(--bg-hover)]"
                 style={{ color: "var(--text-primary)" }}
@@ -885,7 +894,7 @@ function IssueCard({
             <button
               onClick={() => {
                 saveIssue(projectId, board, issue, { archived: true });
-                setMenu(false);
+                setMenu(null);
               }}
               className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs text-left hover:bg-[var(--bg-hover)]"
               style={{ color: "var(--text-primary)" }}
@@ -893,7 +902,8 @@ function IssueCard({
               <Archive className="w-3 h-3" /> Archive
             </button>
           )}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

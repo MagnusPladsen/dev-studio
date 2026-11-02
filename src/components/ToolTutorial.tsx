@@ -89,7 +89,7 @@ function trapTab(event: KeyboardEvent, panel: HTMLElement | null) {
 function useFocusOnOpen(buttonRef: React.RefObject<HTMLButtonElement | null>) {
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
-    buttonRef.current?.focus();
+    buttonRef.current?.focus({ preventScroll: true });
     return () => previous?.focus?.();
   }, [buttonRef]);
 }

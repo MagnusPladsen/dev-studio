@@ -569,14 +569,14 @@ export default function MusicPage() {
     <div className="flex flex-col h-full" style={{ background: "var(--bg-primary)" }}>
       {/* Top bar */}
       <div
-        className="flex items-center justify-between px-4 h-12 border-b shrink-0"
+        className="flex items-center justify-between gap-2 px-4 max-md:px-2 h-12 border-b shrink-0"
         style={{ background: "var(--bg-secondary)", borderColor: "var(--border)" }}
       >
-        <div className="flex items-center gap-3 min-w-0">
+        <div className="flex items-center gap-3 max-md:gap-2 min-w-0">
           <UndoRedoButtons history={history} />
           <button
             onClick={() => setTracksOpen(true)}
-            className="md:hidden flex items-center gap-1 px-2 py-1.5 rounded-md text-xs"
+            className="md:hidden flex items-center gap-1 px-2 py-1.5 rounded-md text-xs shrink-0"
             style={{ color: "var(--text-primary)", border: "1px solid var(--border)" }}
             aria-label="Show tracks"
           >
@@ -591,8 +591,8 @@ export default function MusicPage() {
             </span>
           )}
         </div>
-        <div className="flex items-center gap-3">
-          {activeTrack && <SaveIndicator state={autosave.state} />}
+        <div className="flex items-center gap-3 max-md:gap-1.5 shrink-0">
+          {activeTrack && <SaveIndicator state={autosave.state} className="max-[359px]:hidden" />}
           <HelpButton topic="music" />
           <ExportMenu
             disabled={!activeTrack}

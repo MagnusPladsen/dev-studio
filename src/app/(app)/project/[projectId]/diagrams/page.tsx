@@ -1034,10 +1034,10 @@ export default function DiagramsPage() {
     <div className="flex flex-col h-full" onKeyDown={handleKeyDown} tabIndex={0}>
       {/* Top toolbar */}
       <div
-        className="flex items-center justify-between px-3 h-12 border-b shrink-0 max-md:h-auto max-md:flex-wrap max-md:gap-y-1.5 max-md:py-1.5"
+        className="flex items-center justify-between flex-wrap md:gap-x-3 gap-y-1.5 px-3 min-h-12 py-1.5 border-b shrink-0"
         style={{ background: "var(--bg-secondary)", borderColor: "var(--border)" }}
       >
-        <div className="flex items-center gap-1 min-w-0">
+        <div className="flex items-center gap-1 min-w-0 md:shrink-0">
           <button
             onClick={() => { autosave.flush(); setShowList(true); }}
             className="px-2 py-1 rounded text-xs whitespace-nowrap"
@@ -1061,6 +1061,7 @@ export default function DiagramsPage() {
                 type="diagram"
                 id={diagrams.some((d) => d.id === current.id) ? current.id : null}
                 layout="row"
+                maxRowChips={0}
               />
             </div>
           )}
@@ -1068,7 +1069,7 @@ export default function DiagramsPage() {
         <div className="flex items-center gap-1 max-md:flex-wrap">
           <ToolPicker tool={mode} onChange={changeTool} />
 
-          <div className="w-px h-5 mx-1" style={{ background: "var(--border)" }} />
+          <div className="w-px h-5 mx-0.5 lg:mx-1" style={{ background: "var(--border)" }} />
 
           <AddCardMenu onPick={addFromMenu} />
 
@@ -1084,7 +1085,7 @@ export default function DiagramsPage() {
             </button>
           )}
 
-          <div className="w-px h-5 mx-1" style={{ background: "var(--border)" }} />
+          <div className="w-px h-5 mx-0.5 lg:mx-1" style={{ background: "var(--border)" }} />
 
           <button onClick={() => zoomBy(1.2)} className="p-1.5 rounded" style={{ color: "var(--text-secondary)" }} title="Zoom in" aria-label="Zoom in">
             <ZoomIn className="w-4 h-4" />
@@ -1096,7 +1097,7 @@ export default function DiagramsPage() {
             <Maximize className="w-4 h-4" />
           </button>
 
-          <div className="w-px h-5 mx-1" style={{ background: "var(--border)" }} />
+          <div className="w-px h-5 mx-0.5 lg:mx-1" style={{ background: "var(--border)" }} />
 
           <SaveIndicator state={autosave.state} className="px-1" />
           <HelpButton topic="diagrams" />

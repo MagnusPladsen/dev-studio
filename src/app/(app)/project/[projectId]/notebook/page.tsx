@@ -858,7 +858,7 @@ export default function NotebookPage() {
           <>
             {/* Header */}
             <div className="shrink-0 border-b px-4 py-2.5 space-y-2" style={{ borderColor: "var(--border)", background: "var(--bg-secondary)" }}>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <button onClick={() => select(null)} className="md:hidden p-1 -ml-1 rounded" style={{ color: "var(--text-secondary)" }} aria-label="Back to notes">
                   <ChevronLeft className="w-4 h-4" />
                 </button>
@@ -866,7 +866,7 @@ export default function NotebookPage() {
                   value={draft.title}
                   onChange={(e) => update({ title: e.target.value })}
                   placeholder="Untitled note"
-                  className="flex-1 min-w-0 bg-transparent text-base font-semibold outline-none"
+                  className="flex-1 min-w-40 bg-transparent text-base font-semibold outline-none"
                   style={{ color: "var(--text-primary)" }}
                 />
                 <SaveIndicator state={saveState === "saving" ? "saving" : "saved"} className="hidden sm:inline-flex shrink-0" />

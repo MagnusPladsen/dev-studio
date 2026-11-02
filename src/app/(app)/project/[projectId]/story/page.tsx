@@ -541,7 +541,7 @@ export default function StoryPage() {
         <div className={`flex-1 flex flex-col min-w-0 ${mobileView === "list" ? "max-md:hidden" : ""}`}>
           {/* Header */}
           <div className="flex items-center justify-between gap-2 px-5 max-md:px-3 py-3 border-b max-md:flex-wrap" style={{ borderColor: "var(--border)" }}>
-            <div className="flex items-center gap-2 min-w-0 max-md:flex-1">
+            <div className="flex items-center gap-2 min-w-0 max-md:basis-full">
               <button
                 onClick={() => {
                   flushDraft();

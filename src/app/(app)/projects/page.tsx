@@ -225,7 +225,7 @@ export default function ProjectsPage() {
           {projects.map((project) => (
             <div
               key={project.id}
-              className="group flex items-center justify-between p-4 rounded-xl border transition-colors cursor-pointer"
+              className="group flex items-center justify-between gap-3 min-w-0 p-4 rounded-xl border transition-colors cursor-pointer"
               style={{ background: "var(--bg-card)", borderColor: "var(--border)" }}
               onClick={() => router.push(`/project/${project.id}/assets`)}
               onMouseOver={(e) => {
@@ -242,7 +242,7 @@ export default function ProjectsPage() {
                   {project.name}
                 </h3>
                 {project.description && (
-                  <p className="text-sm mt-0.5" style={{ color: "var(--text-secondary)" }}>
+                  <p className="text-sm mt-0.5 break-words" style={{ color: "var(--text-secondary)" }}>
                     {project.description}
                   </p>
                 )}
