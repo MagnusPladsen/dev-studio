@@ -31,6 +31,7 @@ import { ExamplesBar } from "@/components/ExamplesBar";
 import { rowButtonProps } from "@/lib/row-button";
 import { useAssetMenu } from "@/components/AssetContextMenu";
 import { AssetMenuButton, AssetPinButton, PasteButton } from "@/components/AssetMenuButton";
+import { getAudioContext } from "@/lib/audio/context";
 import { midiToFreq, scheduleNote } from "@/lib/audio/music-synth";
 import { beatAt, scheduleWindow, type LiveSong, type PlayCursor } from "@/lib/audio/music-scheduler";
 import type { MusicTrack, MusicChannel, MusicNote } from "@/types";
@@ -195,12 +196,11 @@ export default function MusicPage() {
   const [soloed, setSoloed] = useState<boolean[]>([false, false, false, false]);
   const [editingName, setEditingName] = useState(false);
 
-  const audioCtxRef = useRef<AudioContext | null>(null);
   const masterGainRef = useRef<GainNode | null>(null);
   const volume = usePreviewVolume();
   useEffect(() => {
-    const ctx = audioCtxRef.current;
-    if (ctx && masterGainRef.current) masterGainRef.current.gain.setTargetAtTime(previewGain(volume), ctx.currentTime, 0.02);
+    const gain = masterGainRef.current;
+    if (gain) gain.gain.setTargetAtTime(previewGain(volume), gain.context.currentTime, 0.02);
   }, [volume]);
   const playIntervalRef = useRef<number | null>(null);
   const songRef = useRef<LiveSong | null>(null);
@@ -274,16 +274,15 @@ export default function MusicPage() {
   }, loaded);
   useTrackOpenAsset(activeTrack?.id ? { type: "music", id: activeTrack?.id } : null);
 
+  // Play is a click handler, so the shared context is unlocked inside the user gesture.
   function getAudioCtx() {
-    if (!audioCtxRef.current) {
-      audioCtxRef.current = new AudioContext();
-      masterGainRef.current = audioCtxRef.current.createGain();
+    const ctx = getAudioContext();
+    if (!masterGainRef.current) {
+      masterGainRef.current = ctx.createGain();
       masterGainRef.current.gain.value = previewGain();
-      masterGainRef.current.connect(audioCtxRef.current.destination);
+      masterGainRef.current.connect(ctx.destination);
     }
-    // Play is a click handler, so resuming here happens inside the user gesture.
-    if (audioCtxRef.current.state === "suspended") void audioCtxRef.current.resume();
-    return audioCtxRef.current;
+    return ctx;
   }
 
   function track(node: AudioScheduledSourceNode) {

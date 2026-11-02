@@ -1,10 +1,10 @@
 import { previewGain } from "@/hooks/usePreviewVolume";
 import { getStoredAsset } from "@/lib/asset-actions";
 import type { AssetRef, MusicTrack, SoundEffect } from "@/types";
+import { getAudioContext } from "./context";
 import { scheduleNote, trackLengthSeconds } from "./music-synth";
 import { SAMPLE_RATE, synthesize } from "./sfx-synth";
 
-let context: AudioContext | null = null;
 let stopCurrent: (() => void) | null = null;
 let previewing: AssetRef | null = null;
 const listeners = new Set<() => void>();
@@ -16,12 +16,6 @@ function notifyListeners(): void {
 function setPreviewing(ref: AssetRef | null): void {
   previewing = ref;
   notifyListeners();
-}
-
-function getContext(): AudioContext {
-  context ??= new AudioContext();
-  if (context.state === "suspended") void context.resume();
-  return context;
 }
 
 function createOutput(audio: AudioContext): GainNode {
@@ -54,7 +48,7 @@ function trackEnding(ref: AssetRef, sources: AudioScheduledSourceNode[], endsAft
 function startSound(ref: AssetRef, sound: SoundEffect): void {
   const samples = synthesize(sound.params);
   if (samples.length === 0) return;
-  const audio = getContext();
+  const audio = getAudioContext();
   const buffer = audio.createBuffer(1, samples.length, SAMPLE_RATE);
   buffer.getChannelData(0).set(samples);
   const source = audio.createBufferSource();
@@ -66,7 +60,7 @@ function startSound(ref: AssetRef, sound: SoundEffect): void {
 }
 
 function startMusic(ref: AssetRef, track: MusicTrack): void {
-  const audio = getContext();
+  const audio = getAudioContext();
   const output = createOutput(audio);
   const beatDuration = 60 / track.bpm;
   const sources = track.channels.flatMap((channel) =>

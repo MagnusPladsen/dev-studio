@@ -19,6 +19,7 @@ import { ExamplesBar } from "@/components/ExamplesBar";
 import { rowButtonProps } from "@/lib/row-button";
 import { useAssetMenu } from "@/components/AssetContextMenu";
 import { AssetMenuButton, AssetPinButton, PasteButton } from "@/components/AssetMenuButton";
+import { getAudioContext } from "@/lib/audio/context";
 import { SAMPLE_RATE, synthesize } from "@/lib/audio/sfx-synth";
 import type { SoundEffect, SfxParams } from "@/types";
 
@@ -183,15 +184,13 @@ function bufferToWav(buffer: Float32Array): ArrayBuffer {
   return arrayBuffer;
 }
 
-let audioCtx: AudioContext | null = null;
 let masterGain: GainNode | null = null;
 let currentSource: AudioBufferSourceNode | null = null;
 
 // Called from click handlers, so the context is created/resumed inside a user gesture.
 function playBuffer(buffer: Float32Array) {
   if (buffer.length === 0) return;
-  audioCtx ??= new AudioContext();
-  if (audioCtx.state === "suspended") void audioCtx.resume();
+  const audioCtx = getAudioContext();
   if (!masterGain) {
     masterGain = audioCtx.createGain();
     masterGain.connect(audioCtx.destination);
@@ -256,7 +255,7 @@ const btnSecondary: React.CSSProperties = { background: "var(--bg-hover)", color
 export default function SfxPage() {
   const volume = usePreviewVolume();
   useEffect(() => {
-    if (masterGain && audioCtx) masterGain.gain.setTargetAtTime(previewGain(volume), audioCtx.currentTime, 0.02);
+    if (masterGain) masterGain.gain.setTargetAtTime(previewGain(volume), masterGain.context.currentTime, 0.02);
   }, [volume]);
   const params = useParams();
   const projectId = params.projectId as string;
