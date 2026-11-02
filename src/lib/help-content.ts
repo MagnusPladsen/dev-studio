@@ -75,7 +75,7 @@ export const HELP: Record<HelpTopic, HelpContent> = {
     ],
   },
   diagrams: {
-    title: "Diagrams",
+    title: "Canvas",
     summary: "A free-form board for moodboards, story flow, level plans, sketches and references.",
     canDo: [
       "Add notes, to-do lists, images, links, groups and any project asset as cards.",

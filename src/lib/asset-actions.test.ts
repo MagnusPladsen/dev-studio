@@ -245,9 +245,9 @@ describe("diagram, note and task helpers", () => {
     expect(addAssetToDiagram("p1", "flow", noteRef)!.nodes.at(-1)).toMatchObject({ x: 280, y: 50 });
   });
 
-  it("creates a diagram containing the asset", () => {
+  it("creates a canvas containing the asset", () => {
     const diagram = createDiagramWith("p1", pip);
-    expect(diagram.name).toBe("Pip diagram");
+    expect(diagram.name).toBe("Pip canvas");
     expect(diagram.nodes[0]).toMatchObject({ label: "Pip", data: { asset: pip } });
     expect(storage.getById("diagrams", diagram.id, "p1")).toBeDefined();
   });

@@ -855,7 +855,7 @@ export default function DiagramsPage() {
     const d: Diagram = {
       id: uuid(),
       projectId,
-      name: "Untitled Diagram",
+      name: "Untitled canvas",
       nodes: [],
       edges: [],
       tags: [],
@@ -892,19 +892,19 @@ export default function DiagramsPage() {
   async function exportPng() {
     if (!current) return;
     const canvas = await renderDiagramPng({ diagram: current, rectOf, describeAsset: (node) => describeAsset(projectId, node) });
-    downloadFile(`${current.name || "diagram"}.png`, canvas.toDataURL("image/png"));
+    downloadFile(`${current.name || "canvas"}.png`, canvas.toDataURL("image/png"));
   }
 
   function exportSvg() {
     if (!current) return;
     const svg = renderDiagramSvg({ diagram: current, rectOf, describeAsset: (node) => describeAsset(projectId, node) });
-    downloadBlob(`${current.name || "diagram"}.svg`, new Blob([svg], { type: "image/svg+xml" }));
+    downloadBlob(`${current.name || "canvas"}.svg`, new Blob([svg], { type: "image/svg+xml" }));
   }
 
   function exportJson() {
     if (!current) return;
     const url = URL.createObjectURL(new Blob([JSON.stringify(current, null, 2)], { type: "application/json" }));
-    downloadFile(`${current.name || "diagram"}.diagram.json`, url);
+    downloadFile(`${current.name || "canvas"}.canvas.json`, url);
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
@@ -914,7 +914,7 @@ export default function DiagramsPage() {
       <div className="p-6 md:p-10 max-w-3xl mx-auto">
         <div className="flex items-center justify-between gap-3 mb-1">
           <h1 className="text-2xl font-bold" style={{ color: "var(--text-primary)" }}>
-            Diagrams
+            Canvas
           </h1>
           <div className="flex items-center gap-2 shrink-0">
             <HelpButton topic="diagrams" />
@@ -925,7 +925,7 @@ export default function DiagramsPage() {
               style={{ background: "var(--accent)", color: "white" }}
             >
               <Plus className="w-4 h-4" />
-              New Diagram
+              New canvas
             </button>
           </div>
         </div>
@@ -937,7 +937,7 @@ export default function DiagramsPage() {
           <div {...pasteTriggerProps("diagram")} className="text-center py-20 rounded-xl border border-dashed" style={{ borderColor: "var(--border)" }}>
             <GitBranch className="w-12 h-12 mx-auto mb-4" style={{ color: "var(--text-muted)" }} />
             <p className="text-lg font-medium mb-2" style={{ color: "var(--text-primary)" }}>
-              No diagrams yet
+              No canvases yet
             </p>
             <p className="text-sm mb-4 px-4" style={{ color: "var(--text-secondary)" }}>
               Pin up notes, images, videos, links and to-dos, or plan game logic with flow charts
@@ -948,7 +948,7 @@ export default function DiagramsPage() {
                 className="px-4 py-2 rounded-lg text-sm font-medium"
                 style={{ background: "var(--accent)", color: "white" }}
               >
-                New Diagram
+                New canvas
               </button>
             </div>
           </div>
@@ -984,7 +984,7 @@ export default function DiagramsPage() {
                     onClick={(e) => { e.stopPropagation(); if (confirm(`Delete "${d.name}"?`)) deleteDiagram(d.id); }}
                     className="p-2 rounded md:opacity-0 md:group-hover:opacity-100 transition-opacity"
                     style={{ color: "var(--red)" }}
-                    title="Delete diagram"
+                    title="Delete canvas"
                     aria-label={`Delete ${d.name}`}
                   >
                     <Trash2 className="w-4 h-4" />
@@ -1041,7 +1041,7 @@ export default function DiagramsPage() {
             className="px-2 py-1 rounded text-xs whitespace-nowrap"
             style={{ color: "var(--text-primary)" }}
           >
-            ← All diagrams
+            ← All canvases
           </button>
           <UndoRedoButtons history={history} />
           <input
@@ -1049,7 +1049,7 @@ export default function DiagramsPage() {
             style={{ color: "var(--text-primary)", width: `${Math.max(10, (current?.name || "").length + 2)}ch` }}
             value={current?.name || ""}
             onChange={(e) => updateCurrent((d) => ({ ...d, name: e.target.value }))}
-            aria-label="Diagram name"
+            aria-label="Canvas name"
             title={current?.name}
           />
           {current && (

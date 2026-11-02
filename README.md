@@ -29,7 +29,7 @@ A free, open source game development toolkit. Create pixel art, music, sound eff
 | **Music** | Piano-roll composer with melody, harmony, bass and drum channels, zoomable. WAV export |
 | **SFX** | Retro sound effect generator (jump, laser, coin, explosion…) with sliders and WAV export |
 | **Tilemap** | Paint levels with the sprites you drew, on multiple layers. PNG export |
-| **Diagrams** | Milanote-style boards for moodboards, story flow, level planning and reference collections: notes, to-do lists, images, YouTube/Spotify/Vimeo/SoundCloud players, link previews, asset cards, groups and colours. Also flow charts and state machines |
+| **Canvas** | Milanote-style boards for moodboards, story flow, level planning and reference collections: notes, to-do lists, images, YouTube/Spotify/Vimeo/SoundCloud players, link previews, asset cards, groups and colours. Also flow charts and state machines |
 | **Story** | Obsidian-style wiki: `[[links]]`, hover summaries, backlinks, graph view, templates |
 | **Dialogue** | Branching conversations with choices, conditions and a play-through preview. JSON export |
 | **Palettes** | Shared colour palettes with PICO-8, Game Boy, NES and more presets |

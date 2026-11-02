@@ -209,7 +209,7 @@ export function createDiagramWith(projectId: string, ref: AssetRef): Diagram {
   const diagram: Diagram = {
     id: uuid(),
     projectId,
-    name: `${nameOf(projectId, ref)} diagram`,
+    name: `${nameOf(projectId, ref)} canvas`,
     nodes: [assetNode(projectId, ref, 0, 0)],
     edges: [],
     tags: [],

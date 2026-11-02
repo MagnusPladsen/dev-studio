@@ -289,10 +289,10 @@ function openDiagramPicker(run: ActionRun): void {
   const changed = (ref: AssetRef | null): MutationOutcome => (ref ? { kind: "changed", ref } : null);
   services.openPicker(
     {
-      title: "Add to diagram",
+      title: "Add to canvas",
       types: ["diagram"],
       exclude: [context.ref],
-      createLabel: "New diagram",
+      createLabel: "New canvas",
       onCreate: () => void addToDiagram(services, () => created(toRef(createDiagramWith(projectId, context.ref).id))),
       onPick: (picked) =>
         void addToDiagram(services, () => changed(toRef(addAssetToDiagram(projectId, picked.id, context.ref)?.id))),

@@ -65,7 +65,7 @@ const toolNav = [
   { icon: Music, name: "Music", path: "music", color: ASSET_KINDS.music.color },
   { icon: Volume2, name: "SFX", path: "sfx", color: ASSET_KINDS.sound.color },
   { icon: Grid3X3, name: "Tilemap", path: "tilemap", color: ASSET_KINDS.tilemap.color },
-  { icon: GitBranch, name: "Diagrams", path: "diagrams", color: ASSET_KINDS.diagram.color },
+  { icon: GitBranch, name: "Canvas", path: "diagrams", color: ASSET_KINDS.diagram.color },
   { icon: BookOpen, name: "Story", path: "story", color: ASSET_KINDS.story.color },
   { icon: NotebookPen, name: "Notebook", path: "notebook", color: ASSET_KINDS.note.color },
   { icon: MessageSquare, name: "Dialogue", path: "dialogue", color: ASSET_KINDS.dialogue.color },

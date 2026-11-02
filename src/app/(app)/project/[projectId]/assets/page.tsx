@@ -165,7 +165,7 @@ export default function AssetsPage() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between">
                   <span className="font-medium text-sm flex items-center gap-2" style={{ color: "var(--text-primary)" }}>
-                    {t === "spritesheet" ? "Sprite Sheets" : t === "note" ? "Notebook" : t === "issue" ? "Task Board" : kind.label === "Story" ? "Story" : `${kind.label}s`.replace("Musics", "Music")}
+                    {t === "spritesheet" ? "Sprite Sheets" : t === "note" ? "Notebook" : t === "issue" ? "Task Board" : t === "diagram" || kind.label === "Story" ? kind.label : `${kind.label}s`.replace("Musics", "Music")}
                     {isNewTool(kind.path) && <NewBadge />}
                   </span>
                   <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: kind.color }} />
