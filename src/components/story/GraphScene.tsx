@@ -105,35 +105,37 @@ function NodeView({ node, hasLabel, index, position, camera, highlight, handlers
   const radius = node.radius * camera.scale;
   const isDimmed = highlight.activeKey !== null && !isEmphasised(node.key, highlight);
   const isStory = node.kind === "story";
+  // Position on a plain group: globals.css animates `transform` on [role="button"], which made nodes trail their edges.
   return (
-    <g
-      transform={`translate(${x} ${y})`}
-      role="button"
-      tabIndex={0}
-      aria-label={`Open ${node.label.toLowerCase()} ${node.title}`}
-      opacity={isDimmed ? DIMMED_OPACITY : 1}
-      className="transition-opacity duration-150 outline-none"
-      style={{ cursor: "pointer" }}
-      {...nodeEventProps(node, index, handlers)}
-    >
-      <circle r={Math.max(radius, 12)} fill="transparent" />
-      {node.key === highlight.focusKey && <circle r={radius + 5} fill="none" stroke="var(--accent)" strokeWidth={2} />}
-      <circle r={radius} fill={isStory ? node.color : "var(--bg-primary)"} stroke={node.color} strokeWidth={isStory ? 0 : 2} />
-      {hasLabel && (
-        <text
-          y={radius + LABEL_FONT_PX + 2}
-          textAnchor="middle"
-          fontSize={LABEL_FONT_PX}
-          fontWeight={node.key === highlight.activeKey ? 600 : 400}
-          fill={isStory ? "var(--text-primary)" : "var(--text-secondary)"}
-          stroke="var(--bg-primary)"
-          strokeWidth={3}
-          paintOrder="stroke"
-          className="select-none pointer-events-none"
-        >
-          {labelText(node.title)}
-        </text>
-      )}
+    <g transform={`translate(${x} ${y})`}>
+      <g
+        role="button"
+        tabIndex={0}
+        aria-label={`Open ${node.label.toLowerCase()} ${node.title}`}
+        opacity={isDimmed ? DIMMED_OPACITY : 1}
+        className="transition-opacity duration-150 outline-none"
+        style={{ cursor: "pointer" }}
+        {...nodeEventProps(node, index, handlers)}
+      >
+        <circle r={Math.max(radius, 12)} fill="transparent" />
+        {node.key === highlight.focusKey && <circle r={radius + 5} fill="none" stroke="var(--accent)" strokeWidth={2} />}
+        <circle r={radius} fill={isStory ? node.color : "var(--bg-primary)"} stroke={node.color} strokeWidth={isStory ? 0 : 2} />
+        {hasLabel && (
+          <text
+            y={radius + LABEL_FONT_PX + 2}
+            textAnchor="middle"
+            fontSize={LABEL_FONT_PX}
+            fontWeight={node.key === highlight.activeKey ? 600 : 400}
+            fill={isStory ? "var(--text-primary)" : "var(--text-secondary)"}
+            stroke="var(--bg-primary)"
+            strokeWidth={3}
+            paintOrder="stroke"
+            className="select-none pointer-events-none"
+          >
+            {labelText(node.title)}
+          </text>
+        )}
+      </g>
     </g>
   );
 }
