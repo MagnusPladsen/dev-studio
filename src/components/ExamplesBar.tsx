@@ -46,11 +46,12 @@ export function ExamplesBar({
   const btn = "inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs";
   return (
     <div className={`flex items-center gap-2 flex-wrap text-xs ${className}`} style={{ color: "var(--text-muted)" }}>
-      <Sparkles className="w-3.5 h-3.5 shrink-0" style={{ color: "var(--tool-color, var(--accent))" }} />
       {count > 0 ? (
         confirming ? (
           <>
-            <span style={{ color: "var(--text-secondary)" }}>Remove {count} example{count === 1 ? "" : "s"}? Your own work stays.</span>
+            <ExamplesLabel color="var(--text-secondary)">
+              Remove {count} example{count === 1 ? "" : "s"}? Your own work stays.
+            </ExamplesLabel>
             <button onClick={remove} className={btn} style={{ background: "var(--red)", color: "#fff" }}>
               Remove
             </button>
@@ -60,9 +61,9 @@ export function ExamplesBar({
           </>
         ) : (
           <>
-            <span>
+            <ExamplesLabel>
               {count} example{count === 1 ? "" : "s"} to learn from and edit
-            </span>
+            </ExamplesLabel>
             <button onClick={() => setConfirming(true)} className={btn} style={{ color: "var(--text-secondary)", border: "1px solid var(--border)" }} title="Delete the example assets in this tool">
               <Trash2 className="w-3 h-3" /> Remove examples
             </button>
@@ -70,12 +71,22 @@ export function ExamplesBar({
         )
       ) : (
         <>
-          <span>No examples here</span>
+          <ExamplesLabel>No examples here</ExamplesLabel>
           <button onClick={add} disabled={busy} className={btn} style={{ color: "var(--text-secondary)", border: "1px solid var(--border)" }} title="Add starter assets you can edit and learn from">
             {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />} Add examples
           </button>
         </>
       )}
     </div>
+  );
+}
+
+/** Keeps the sparkle on the same line as the text, so a narrow panel wraps the button rather than the icon. */
+function ExamplesLabel({ color, children }: { color?: string; children: React.ReactNode }) {
+  return (
+    <span className="flex items-start gap-2 min-w-0" style={{ color }}>
+      <Sparkles className="w-3.5 h-3.5 shrink-0 mt-px" style={{ color: "var(--tool-color, var(--accent))" }} />
+      <span className="min-w-0">{children}</span>
+    </span>
   );
 }
