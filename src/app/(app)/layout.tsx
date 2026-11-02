@@ -31,6 +31,7 @@ import { anchorPoint, type Point } from "@/lib/menu-position";
 import { SidebarPins } from "@/components/SidebarPins";
 import { AccountPanel } from "@/components/AccountPanel";
 import { BetaBadge } from "@/components/BetaBadge";
+import { ToolTutorial } from "@/components/ToolTutorial";
 import { NewBadge, isNewTool } from "@/components/NewBadge";
 import { ASSET_KINDS } from "@/lib/assets";
 import { getPins, isToolPinned, orderTools, toggleToolPin } from "@/lib/pins";
@@ -251,6 +252,7 @@ function AppSidebar({ children }: { children: React.ReactNode }) {
         {ready ? (
           <div key={generation} className="h-full">
             {children}
+            {projectId && <ToolTutorial projectId={projectId} />}
           </div>
         ) : (
           <div className="h-full flex items-center justify-center text-sm" style={{ color: "var(--text-secondary)" }}>

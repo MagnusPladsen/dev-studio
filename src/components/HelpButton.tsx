@@ -95,7 +95,7 @@ function HelpDialog({ topic, theme, onClose }: { topic: HelpTopic; theme: React.
         <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
           {help.summary}
         </p>
-        <HelpSection title="What you can do" items={help.canDo} />
+        <HelpSection title="What you can do" items={help.canDo.map((feature) => feature.text)} />
         <HelpSection title="Quick start" items={help.steps} isNumbered />
         <HelpSection title="Tips" items={help.tips} />
       </div>

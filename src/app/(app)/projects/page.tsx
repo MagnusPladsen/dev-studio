@@ -18,6 +18,7 @@ export default function ProjectsPage() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [withExamples, setWithExamples] = useState(true);
+  const [withTutorials, setWithTutorials] = useState(true);
   const [creating, setCreating] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
 
@@ -27,6 +28,7 @@ export default function ProjectsPage() {
       id: uuid(),
       name: name.trim(),
       description: description.trim(),
+      showTutorials: withTutorials,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -175,6 +177,7 @@ export default function ProjectsPage() {
               </span>
             </span>
           </label>
+          <TutorialChoice isOn={withTutorials} onChange={setWithTutorials} />
           <div className="flex gap-2">
             <button
               onClick={createProject}
@@ -277,6 +280,36 @@ export default function ProjectsPage() {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+/** Yes/No choice for the short first-visit tutorial on each tool. */
+function TutorialChoice({ isOn, onChange }: { isOn: boolean; onChange(isOn: boolean): void }) {
+  const option = (value: boolean, label: string) => (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={isOn === value}
+      onClick={() => onChange(value)}
+      className="px-3 py-1 rounded-md text-xs font-medium"
+      style={isOn === value ? { background: "var(--accent)", color: "white" } : { color: "var(--text-primary)" }}
+    >
+      {label}
+    </button>
+  );
+  return (
+    <div className="flex items-start justify-between gap-3 mb-4 text-sm max-md:flex-col" style={{ color: "var(--text-primary)" }}>
+      <span id="tutorial-choice-label">
+        Show a short tutorial on each tool
+        <span className="block text-xs mt-0.5" style={{ color: "var(--text-secondary)" }}>
+          The first time you open a tool, see what it&apos;s for and its main features.
+        </span>
+      </span>
+      <div role="radiogroup" aria-labelledby="tutorial-choice-label" className="flex shrink-0 p-0.5 rounded-lg" style={{ border: "1px solid var(--border)" }}>
+        {option(true, "Yes")}
+        {option(false, "No")}
+      </div>
     </div>
   );
 }

@@ -1,3 +1,5 @@
+import { ArrowLeftRight, ArrowRight, Box, CalendarRange, CirclePlay, Columns3, Copy, Download, FileCode, FileText, FlipHorizontal2, FolderOpen, Gauge, Grid3X3, Image, Layers, LayoutGrid, LayoutTemplate, Link2, List, ListChecks, ListTodo, Maximize2, MessageSquare, MousePointer2, Music, Network, NotebookPen, PaintBucket, Paintbrush, Palette, Pencil, Piano, Pipette, Play, Rows3, Ruler, Scaling, Search, Shapes, Shuffle, SlidersHorizontal, Sparkles, SquareCheck, StickyNote, VolumeX, WandSparkles, Waypoints, type LucideIcon } from "lucide-react";
+
 export type HelpTopic =
   | "assets"
   | "board"
@@ -13,12 +15,18 @@ export type HelpTopic =
   | "tilemap"
   | "voxels";
 
+/** One thing a tool can do, with the icon the first-visit tutorial shows next to it. */
+export interface HelpFeature {
+  icon: LucideIcon;
+  text: string;
+}
+
 export interface HelpContent {
   title: string;
   /** One sentence. */
   summary: string;
-  /** 3-5 short bullets. */
-  canDo: string[];
+  /** 3-5 short bullets, most important first. */
+  canDo: HelpFeature[];
   /** 3-4 quick-start steps. */
   steps: string[];
   /** 2-4 tips, keyboard shortcuts where real. */
@@ -33,11 +41,11 @@ export const HELP: Record<HelpTopic, HelpContent> = {
     title: "Project dashboard",
     summary: "Your project's home: open any tool and see everything you've made.",
     canDo: [
-      "Open any of the tools from the cards at the top.",
-      "See every asset in the project, newest first, with its links.",
-      "Search by name or filter by type.",
-      "Add or remove the example assets for the whole project.",
-      "Export the whole project as one JSON file.",
+      { icon: LayoutGrid, text: "Open any of the tools from the cards at the top." },
+      { icon: List, text: "See every asset in the project, newest first, with its links." },
+      { icon: Search, text: "Search by name or filter by type." },
+      { icon: Sparkles, text: "Add or remove the example assets for the whole project." },
+      { icon: Download, text: "Export the whole project as one JSON file." },
     ],
     steps: [
       "Pick a tool card, for example Pixel Art.",
@@ -55,11 +63,11 @@ export const HELP: Record<HelpTopic, HelpContent> = {
     title: "Task Board",
     summary: "Plan your game's work with issues, columns and sprints.",
     canDo: [
-      "Track tasks and bugs as issues with type, priority, points and labels.",
-      "Drag issues between columns, or use the Move to… menu.",
-      "Plan sprints in Backlog, then start and complete them.",
-      "Search and filter everything in All issues, archived ones too.",
-      "Add notes to an issue; they live in the Notebook.",
+      { icon: ListTodo, text: "Track tasks and bugs as issues with type, priority, points and labels." },
+      { icon: Columns3, text: "Drag issues between columns, or use the Move to… menu." },
+      { icon: CalendarRange, text: "Plan sprints in Backlog, then start and complete them." },
+      { icon: Search, text: "Search and filter everything in All issues, archived ones too." },
+      { icon: NotebookPen, text: "Add notes to an issue; they live in the Notebook." },
     ],
     steps: [
       "Press Create issue and give it a title.",
@@ -78,11 +86,11 @@ export const HELP: Record<HelpTopic, HelpContent> = {
     title: "Canvas",
     summary: "A free-form board for moodboards, story flow, level plans, sketches and references.",
     canDo: [
-      "Add notes, to-do lists, images, links, groups and any project asset as cards.",
-      "Draw rectangles, ellipses, diamonds and flow-chart shapes, and sketch with the pen.",
-      "Connect cards and shapes with arrows to show flow.",
-      "Select many cards at once to move, recolour, duplicate, align or distribute them.",
-      "Play YouTube, Spotify, Vimeo and SoundCloud links right on the board.",
+      { icon: StickyNote, text: "Add notes, to-do lists, images, links, groups and any project asset as cards." },
+      { icon: Shapes, text: "Draw rectangles, ellipses, diamonds and flow-chart shapes, and sketch with the pen." },
+      { icon: ArrowRight, text: "Connect cards and shapes with arrows to show flow." },
+      { icon: MousePointer2, text: "Select many cards at once to move, recolour, duplicate, align or distribute them." },
+      { icon: CirclePlay, text: "Play YouTube, Spotify, Vimeo and SoundCloud links right on the board." },
     ],
     steps: [
       "Add a card or shape from Add, or paste and drop pictures and links in.",
@@ -101,10 +109,10 @@ export const HELP: Record<HelpTopic, HelpContent> = {
     title: "Dialogue Trees",
     summary: "Write branching conversations for your characters.",
     canDo: [
-      "Build a tree from Start, Dialogue, Choice, Condition, Action and End nodes.",
-      "Give each line a speaker, and choices their own branches.",
-      "Play through a conversation with Preview.",
-      "Export as JSON or a Yarn Spinner script.",
+      { icon: Waypoints, text: "Build a tree from Start, Dialogue, Choice, Condition, Action and End nodes." },
+      { icon: MessageSquare, text: "Give each line a speaker, and choices their own branches." },
+      { icon: Play, text: "Play through a conversation with Preview." },
+      { icon: FileCode, text: "Export as JSON or a Yarn Spinner script." },
     ],
     steps: [
       "Press New Dialogue to start a tree.",
@@ -123,11 +131,11 @@ export const HELP: Record<HelpTopic, HelpContent> = {
     title: "Music Composer",
     summary: "Compose chiptune loops on a four-channel piano roll.",
     canDo: [
-      "Write notes for melody, harmony, bass and drums channels.",
-      "Pick an instrument per channel: square, triangle, noise and more.",
-      "Set tempo (BPM), loop length and note length.",
-      "Mute or solo channels while you listen.",
-      "Export the pattern as a WAV file.",
+      { icon: Music, text: "Write notes for melody, harmony, bass and drums channels." },
+      { icon: Piano, text: "Pick an instrument per channel: square, triangle, noise and more." },
+      { icon: Gauge, text: "Set tempo (BPM), loop length and note length." },
+      { icon: VolumeX, text: "Mute or solo channels while you listen." },
+      { icon: Download, text: "Export the pattern as a WAV file." },
     ],
     steps: [
       "Press + to make a new track, or add the examples.",
@@ -145,11 +153,11 @@ export const HELP: Record<HelpTopic, HelpContent> = {
     title: "Notebook",
     summary: "Keep ideas, to-do lists, design notes and playtest feedback.",
     canDo: [
-      "Write notes in Markdown, with headings, lists and code.",
-      "Tick off checklists and see progress at a glance.",
-      "Sort notes into folders, add tags and pin the important ones.",
-      "Link to other notes and story entries with [[double brackets]].",
-      "Start from templates like a to-do list or game design doc.",
+      { icon: FileText, text: "Write notes in Markdown, with headings, lists and code." },
+      { icon: ListChecks, text: "Tick off checklists and see progress at a glance." },
+      { icon: FolderOpen, text: "Sort notes into folders, add tags and pin the important ones." },
+      { icon: Link2, text: "Link to other notes and story entries with [[double brackets]]." },
+      { icon: LayoutTemplate, text: "Start from templates like a to-do list or game design doc." },
     ],
     steps: [
       "Press New note, or pick a template from the arrow next to it.",
@@ -167,11 +175,11 @@ export const HELP: Record<HelpTopic, HelpContent> = {
     title: "Palettes",
     summary: "Keep your game's colours in one place and reuse them.",
     canDo: [
-      "Make your own palettes or start from a preset copy.",
-      "Add colours with a picker or a hex code.",
-      "Click a swatch to copy its hex code.",
-      "Open Pixel Art with a palette loaded.",
-      "Export as a .txt hex list or a GIMP .gpl palette.",
+      { icon: Palette, text: "Make your own palettes or start from a preset copy." },
+      { icon: Pipette, text: "Add colours with a picker or a hex code." },
+      { icon: Copy, text: "Click a swatch to copy its hex code." },
+      { icon: Paintbrush, text: "Open Pixel Art with a palette loaded." },
+      { icon: Download, text: "Export as a .txt hex list or a GIMP .gpl palette." },
     ],
     steps: [
       "Press + for a new palette, or click a preset.",
@@ -189,12 +197,11 @@ export const HELP: Record<HelpTopic, HelpContent> = {
     title: "Pixel Art",
     summary: "Draw sprites and animate them frame by frame.",
     canDo: [
-      "Draw with pencil, eraser, fill, line, rectangle, circle and move tools.",
-      "Use layers, and frames for animation with onion skin.",
-      "Play the animation and set its speed (fps).",
-      "Resize the canvas and swap in a project palette.",
-      "Scale a sprite up (8×8 → 16×16 and more), sharp or smooth, in place or as a copy.",
-      "Export a PNG, a sprite sheet or an animated GIF.",
+      { icon: Pencil, text: "Draw with pencil, eraser, fill, line, rectangle, circle and move tools." },
+      { icon: Layers, text: "Use layers, and frames for animation with onion skin." },
+      { icon: Play, text: "Play the animation and set its speed (fps)." },
+      { icon: Scaling, text: "Resize the canvas, scale a sprite up (8×8 → 16×16 and more) or swap in a project palette." },
+      { icon: Download, text: "Export a PNG, a sprite sheet or an animated GIF." },
     ],
     steps: [
       "Press New sprite and pick a size.",
@@ -214,10 +221,10 @@ export const HELP: Record<HelpTopic, HelpContent> = {
     title: "SFX Generator",
     summary: "Make retro sound effects with a few clicks.",
     canDo: [
-      "Generate sounds like Jump, Coin, Laser, Explosion and Hit.",
-      "Randomise a sound, or Mutate it a little.",
-      "Fine-tune wave type, pitch, length and more with sliders.",
-      "Keep sounds in your project and export them as WAV.",
+      { icon: WandSparkles, text: "Generate sounds like Jump, Coin, Laser, Explosion and Hit." },
+      { icon: Shuffle, text: "Randomise a sound, or Mutate it a little." },
+      { icon: SlidersHorizontal, text: "Fine-tune wave type, pitch, length and more with sliders." },
+      { icon: Download, text: "Keep sounds in your project and export them as WAV." },
     ],
     steps: [
       "Click a generator, for example Jump. Each click makes a new variant.",
@@ -235,11 +242,11 @@ export const HELP: Record<HelpTopic, HelpContent> = {
     title: "Sprite Sheets",
     summary: "Pack your sprites into one image for your game engine.",
     canDo: [
-      "Pick which sprites go on a sheet.",
-      "Each sprite gets a row, with its frames left to right.",
-      "Set padding between frames.",
-      "Export the sheet as PNG plus an atlas JSON of frame positions.",
-      "Export at 2×, 3× or 4× size, sharp or smooth; the atlas scales with it.",
+      { icon: SquareCheck, text: "Pick which sprites go on a sheet." },
+      { icon: Rows3, text: "Each sprite gets a row, with its frames left to right." },
+      { icon: Ruler, text: "Set padding between frames." },
+      { icon: Download, text: "Export the sheet as PNG plus an atlas JSON of frame positions." },
+      { icon: Maximize2, text: "Export at 2×, 3× or 4× size, sharp or smooth; the atlas scales with it." },
     ],
     steps: [
       "Draw some sprites in Pixel Art first.",
@@ -257,10 +264,10 @@ export const HELP: Record<HelpTopic, HelpContent> = {
     title: "Story",
     summary: "Write your game's lore: characters, places, items, quests and events.",
     canDo: [
-      "Write entries in Markdown, sorted by type and tags.",
-      "Link entries with [[double brackets]]; hover a link for a summary.",
-      "See which entries mention this one.",
-      "View how everything connects in the graph.",
+      { icon: FileText, text: "Write entries in Markdown, sorted by type and tags." },
+      { icon: Link2, text: "Link entries with [[double brackets]]; hover a link for a summary." },
+      { icon: ArrowLeftRight, text: "See which entries mention this one." },
+      { icon: Network, text: "View how everything connects in the graph." },
     ],
     steps: [
       "Press New entry, pick a type and give it a title.",
@@ -278,10 +285,10 @@ export const HELP: Record<HelpTopic, HelpContent> = {
     title: "Tilemap",
     summary: "Paint game levels with your own sprites as tiles.",
     canDo: [
-      "Paint with your project sprites or basic colour tiles.",
-      "Paint, fill an area or erase.",
-      "Stack layers, hide them and change their order.",
-      "Export a PNG of the map or Tiled-style JSON.",
+      { icon: Grid3X3, text: "Paint with your project sprites or basic colour tiles." },
+      { icon: PaintBucket, text: "Paint, fill an area or erase." },
+      { icon: Layers, text: "Stack layers, hide them and change their order." },
+      { icon: Download, text: "Export a PNG of the map or Tiled-style JSON." },
     ],
     steps: [
       "Press + and set the map's width and height in tiles.",
@@ -299,10 +306,10 @@ export const HELP: Record<HelpTopic, HelpContent> = {
     title: "3D Pixel Art",
     summary: "Pixel art with depth: stack coloured cubes into 3D models (also called voxel art).",
     canDo: [
-      "Add, erase and paint cubes, fill faces and draw boxes.",
-      "Mirror edits across the X, Y or Z axis.",
-      "Turn a sprite into a 3D model.",
-      "Export .glb, OBJ + MTL, MagicaVoxel .vox or a PNG.",
+      { icon: Box, text: "Add, erase and paint cubes, fill faces and draw boxes." },
+      { icon: FlipHorizontal2, text: "Mirror edits across the X, Y or Z axis." },
+      { icon: Image, text: "Turn a sprite into a 3D model." },
+      { icon: Download, text: "Export .glb, OBJ + MTL, MagicaVoxel .vox or a PNG." },
     ],
     steps: [
       "Press New model, or make one from a sprite.",

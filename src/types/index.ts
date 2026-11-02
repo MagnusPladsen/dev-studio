@@ -9,6 +9,8 @@ export interface Project {
   description: string;
   thumbnail?: string;
   pins?: ProjectPins;
+  /** Show a short tutorial the first time each tool is opened. Missing (older projects) means off. */
+  showTutorials?: boolean;
   createdAt: string;
   updatedAt: string;
 }
