@@ -1,4 +1,5 @@
 import type { AssetRef, DiagramEdge, DiagramNode } from "@/types";
+import { linkCardSize } from "@/lib/diagrams/cards";
 import type { ExampleContext } from "./types";
 
 // Milanote-style example boards for Diagrams: a moodboard and a level plan for "Pip's Quest".
@@ -74,8 +75,10 @@ const image = (id: string, x: number, y: number, width: number, src: string, asp
 const assetCard = (id: string, x: number, y: number, label: string, asset: AssetRef) =>
   card(id, "asset", x, y, 220, 64, label, { data: { asset } });
 
-const link = (id: string, x: number, y: number, url: string, preview: Record<string, string>) =>
-  card(id, "link", x, y, 300, 240, "", { data: { url, preview } });
+function link(id: string, x: number, y: number, url: string, preview: Record<string, string>) {
+  const { width, height } = linkCardSize(url);
+  return card(id, "link", x, y, width, height, "", { data: { url, preview } });
+}
 
 function checklist(id: string, x: number, y: number, title: string, items: [string, boolean][]) {
   return card(id, "checklist", x, y, 240, 160, title, {
