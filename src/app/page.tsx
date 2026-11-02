@@ -31,6 +31,9 @@ import {
   Gift,
   Monitor,
   Link2,
+  Clapperboard,
+  PenTool,
+  LayoutGrid,
 } from "lucide-react";
 
 function GithubIcon({ className }: { className?: string }) {
@@ -63,7 +66,7 @@ const tools = [
   { icon: Music, name: "Music Composer", description: "Pattern-based music creation with multiple channels and instruments. Think BeepBox meets FL Studio." },
   { icon: Volume2, name: "SFX Generator", description: "Generate retro and modern sound effects with presets for explosions, lasers, pickups, and more." },
   { icon: Grid3X3, name: "Tilemap Editor", description: "Paint game levels using your own sprites. Multiple layers, auto-tiling, and collision maps." },
-  { icon: GitBranch, name: "Diagrams & Boards", description: "Moodboards, story flow, level plans and reference boards with notes, images, videos, links and to-dos. Flow charts and state machines too." },
+  { icon: GitBranch, name: "Canvas", description: "Moodboards, story flow, level plans and reference boards with notes, images, videos, links and to-dos. Flow charts and state machines too." },
   { icon: BookOpen, name: "Story & Worldbuilding", description: "Write lore, create characters, and link everything together. Wiki-style connections like Obsidian." },
   { icon: MessageSquare, name: "Dialogue Trees", description: "Visual branching dialogue editor for RPGs and adventure games. Connect speakers and choices." },
   { icon: Palette, name: "Color Palettes", description: "Manage and share color palettes across all your tools. Built-in game-ready palette presets." },
@@ -125,11 +128,11 @@ const linkingExamples = [
     width: 1280,
     height: 960,
     maxWidth: 656,
-    alt: "A Look and feel group on a Diagrams board: a pixel-art meadow mood image, a 13-colour palette strip and a note, with cards for the Pip (walk) sprite, the Pip (3D) voxel model and the Mossbrook Meadow palette.",
-    kicker: "Diagrams & Boards",
+    alt: "A Look and feel group on a Canvas: a pixel-art meadow mood image, a 13-colour palette strip and a note, with cards for the Pip (walk) sprite, the Pip (3D) voxel model and the Mossbrook Meadow palette.",
+    kicker: "Canvas",
     title: "Put real assets on your moodboard",
     description:
-      "Drop sprites, 3D models, palettes and music onto a board as cards, next to your notes, images and references. Each card shows the asset itself and opens it in its own tool, so the board stays in step as the game changes.",
+      "Drop sprites, 3D models, palettes and music onto a canvas as cards, next to your notes, images and references. Each card shows the asset itself and opens it in its own tool, so the canvas stays in step as the game changes.",
     points: ["Cards for any asset in the project", "Group, connect and label them", "Edit the asset and the card follows"],
   },
 ];
@@ -180,6 +183,47 @@ const localPros = [
   { icon: GithubIcon, title: "Open source", description: "MIT licensed. Read the code, change it, or run it from source." },
 ];
 
+const canvasServices = ["YouTube", "Vimeo", "Twitch", "TikTok", "Streamable", "Spotify", "Apple Music", "TIDAL", "Deezer", "SoundCloud", "YouTube Music", "Bandcamp", "Imgur"];
+
+const canvasFeatures = [
+  {
+    icon: Clapperboard,
+    title: "Paste anything",
+    description:
+      "Paste or drop a link and the canvas knows what it is. Videos play right on the canvas, songs and playlists get a player, images show as images, and every other site becomes a tidy link card.",
+  },
+  {
+    icon: PenTool,
+    title: "Sketch and diagram",
+    description:
+      "Rectangles, ellipses, diamonds and a freehand pen, joined by labelled arrows. Flow-chart cards for states, actions and conditions turn a sketch into a state machine.",
+  },
+  {
+    icon: LayoutGrid,
+    title: "Organise like a moodboard",
+    description:
+      "Notes, checklists and groups that stack cards into columns. Box-select, align, distribute, bring to front, copy and duplicate, with undo for every step.",
+  },
+  {
+    icon: Package,
+    title: "Your real assets on the canvas",
+    description:
+      "Sprites, 3D models, palettes, music and sounds sit on the canvas as live cards. Open one and you're straight in its tool.",
+  },
+  {
+    icon: Download,
+    title: "Export it",
+    description: "Save the whole canvas as a PNG or SVG picture, or as JSON to re-import or use in code. Free, with no watermark.",
+  },
+];
+
+const navSections = [
+  { href: "#tools", label: "Tools" },
+  { href: "#linking", label: "Linking" },
+  { href: "#canvas", label: "Canvas" },
+  { href: "#download", label: "Desktop app" },
+];
+
 export default function LandingPage() {
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "var(--bg-primary)" }}>
@@ -194,6 +238,18 @@ export default function LandingPage() {
               GameDev Studio
             </span>
             <BetaBadge className="max-[380px]:hidden" />
+          </div>
+          <div className="hidden md:flex items-center gap-1">
+            {navSections.map((section) => (
+              <a
+                key={section.href}
+                href={section.href}
+                className="px-3 py-2 rounded-lg text-sm font-medium transition-colors hover:bg-[var(--bg-hover)]"
+                style={{ color: "var(--text-secondary)" }}
+              >
+                {section.label}
+              </a>
+            ))}
           </div>
           <div className="flex items-center gap-1.5 sm:gap-3">
             <a
@@ -318,7 +374,7 @@ export default function LandingPage() {
       </section>
 
       {/* Tools Grid */}
-      <section className="py-20 px-4 sm:px-6">
+      <section id="tools" className="py-20 px-4 sm:px-6 scroll-mt-16">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-14">
             <h2 className="text-3xl sm:text-4xl font-bold mb-4" style={{ color: "var(--text-primary)" }}>
@@ -353,6 +409,47 @@ export default function LandingPage() {
           <div className="space-y-16 lg:space-y-20">
             {linkingExamples.map((example, index) => (
               <LinkingExample key={example.title} example={example} reversed={index % 2 === 1} />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Canvas */}
+      <section id="canvas" className="py-20 px-4 sm:px-6 scroll-mt-16">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-10">
+            <h2 className="text-3xl sm:text-4xl font-bold mb-4" style={{ color: "var(--text-primary)" }}>
+              One canvas for everything
+            </h2>
+            <p className="text-lg max-w-2xl mx-auto" style={{ color: "var(--text-secondary)" }}>
+              A moodboard like Milanote and a sketchpad like Excalidraw in one. Collect references, plan
+              levels, map out state machines, and keep your actual game assets right next to them.
+            </p>
+          </div>
+          <div className="mb-6 rounded-xl border overflow-hidden max-md:overflow-x-auto" style={{ borderColor: "var(--border)" }}>
+            <Image
+              src="/landing/canvas-moodboard.webp"
+              width={1698}
+              height={522}
+              alt="Pip's Quest moodboard canvas: a Look and feel group with a meadow mood image, palette strip, style note and sprite, model and palette cards; a Sound and music group with a Spotify album shown as a song with a play button; a YouTube video card, a Lospec link card, an art to-do checklist and labelled arrows between them."
+              sizes="(max-width: 768px) 900px, (max-width: 1152px) 100vw, 1152px"
+              className="w-full h-auto max-md:w-[900px] max-md:max-w-none"
+            />
+          </div>
+          <div className="flex flex-wrap justify-center gap-2 mb-12">
+            {canvasServices.map((service) => (
+              <span
+                key={service}
+                className="px-2.5 py-1 rounded-md text-xs sm:text-sm"
+                style={{ background: "var(--bg-card)", border: "1px solid var(--border)", color: "var(--text-secondary)" }}
+              >
+                {service}
+              </span>
+            ))}
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {canvasFeatures.map((feature) => (
+              <ToolCard key={feature.title} icon={feature.icon} name={feature.title} description={feature.description} />
             ))}
           </div>
         </div>
