@@ -164,23 +164,24 @@ export function AccountPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sync.ready]);
 
+  // Signed in and up to date needs no line of its own: the cloud icon on the account row shows it.
+  const synced = !!user && status.state !== "saving" && status.state !== "error";
   const statusLine =
     status.state === "saving" ? (
-      <span className="flex items-center gap-1">
-        <Loader2 className="w-3 h-3 animate-spin" /> {status.message ?? "Saving…"}
-      </span>
+      <div className="flex items-start gap-1.5">
+        <Loader2 className="w-3 h-3 shrink-0 mt-0.5 animate-spin" />
+        <span className="min-w-0">{status.message || "Saving…"}</span>
+      </div>
     ) : status.state === "error" ? (
-      <span className="flex items-start gap-1" style={{ color: "var(--red)" }} title={status.message}>
-        <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" /> <span className="line-clamp-3">{status.message}</span>
-      </span>
-    ) : user ? (
-      <span className="flex items-center gap-1">
-        <Check className="w-3 h-3" style={{ color: "var(--green)" }} /> Synced to your account
-      </span>
-    ) : (
-      <span className="flex items-center gap-1">
-        <HardDrive className="w-3 h-3" /> Saved in this browser
-      </span>
+      <div className="flex items-start gap-1.5" style={{ color: "var(--red)" }} title={status.message}>
+        <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" />
+        <span className="min-w-0 line-clamp-3">{status.message || "Could not save"}</span>
+      </div>
+    ) : user ? null : (
+      <div className="flex items-start gap-1.5">
+        <HardDrive className="w-3 h-3 shrink-0 mt-0.5" />
+        <span className="min-w-0">Saved in this browser</span>
+      </div>
     );
 
   return (
@@ -189,11 +190,21 @@ export function AccountPanel() {
 
       {sync.cloudAvailable &&
         (user ? (
-          <div className="flex items-center gap-1.5">
-            <Cloud className="w-3.5 h-3.5 shrink-0" style={{ color: "var(--accent)" }} />
-            <span className="truncate flex-1" style={{ color: "var(--text-primary)" }} title={user.email}>
+          <div className="flex items-center gap-2" title={synced ? "Signed in. Everything is synced to your account." : undefined}>
+            <span className="relative shrink-0" aria-hidden>
+              <Cloud className="w-3.5 h-3.5" style={{ color: "var(--accent)" }} />
+              {synced && (
+                <Check
+                  className="absolute -right-1 -bottom-1 w-2.5 h-2.5 rounded-full p-px"
+                  strokeWidth={4}
+                  style={{ color: "var(--bg-secondary)", background: "var(--green)" }}
+                />
+              )}
+            </span>
+            <span className="truncate flex-1 min-w-0" style={{ color: "var(--text-primary)" }} title={user.email}>
               {user.email ?? "Signed in"}
             </span>
+            {synced && <span className="sr-only">Synced to your account</span>}
             <button onClick={() => sync.signOut()} title="Sign out" style={{ color: "var(--text-muted)" }}>
               <LogOut className="w-3.5 h-3.5" />
             </button>
