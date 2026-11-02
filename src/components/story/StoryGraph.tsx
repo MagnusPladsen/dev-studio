@@ -98,7 +98,7 @@ function GraphView({ graph, showAssets, onToggleAssets, onOpen, menuProps, onClo
   const [focusKey, setFocusKey] = useState<string | null>(null);
   const layout = useGraphLayout(graph);
   const getCircles = useCallback(() => layout.simulation.nodes, [layout]);
-  const viewport = useGraphViewport(svgRef, getCircles);
+  const viewport = useGraphViewport(svgRef, getCircles, (size) => layout.fitAspect(size.height / size.width));
   const gestures = useGraphGestures({ svgRef, viewport, layout, onBackgroundTap: () => setFocusKey(null) });
   const highlight = useHighlight(graph, hoverKey, focusKey);
   const focusNode = (node: GraphNode): void => {

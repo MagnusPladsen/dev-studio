@@ -2,11 +2,13 @@
 
 import type { MenuTriggerProps } from "@/components/AssetContextMenu";
 import type { Camera } from "@/lib/graph-camera";
-import { isLabelVisible, type GraphEdge, type GraphNode, type SimNode } from "@/lib/story-graph";
+import { isLabelVisible, pickVisibleLabels, type GraphEdge, type GraphNode, type SimNode } from "@/lib/story-graph";
 import type { GraphGestures } from "./useGraphGestures";
 
 const DIMMED_OPACITY = 0.12;
 const LABEL_FONT_PX = 12;
+const LABEL_CHAR_WIDTH_PX = 6.5;
+const LABEL_MAX_CHARS = 28;
 
 export interface Highlight {
   activeKey: string | null;
@@ -23,6 +25,23 @@ interface NodeHandlers {
 
 function isEmphasised(key: string, highlight: Highlight): boolean {
   return key === highlight.activeKey || highlight.neighbours.has(key);
+}
+
+function labelText(title: string): string {
+  return title.length > LABEL_MAX_CHARS ? `${title.slice(0, LABEL_MAX_CHARS - 1)}…` : title;
+}
+
+/** Labels that fit without overlapping: small nodes' labels hide when zoomed out, then colliding ones drop out. */
+function visibleLabelKeys(nodes: GraphNode[], positions: SimNode[], camera: Camera, highlight: Highlight): Set<string> {
+  const boxes = nodes.flatMap((node, index) => {
+    const isEmphasisedNode = isEmphasised(node.key, highlight) || node.key === highlight.focusKey;
+    if (!isLabelVisible(node.radius, camera.scale, isEmphasisedNode)) return [];
+    const { x, y } = toScreen(positions[index], camera);
+    const radius = node.radius * camera.scale;
+    const width = labelText(node.title).length * LABEL_CHAR_WIDTH_PX;
+    return [{ key: node.key, x, y: y + radius + LABEL_FONT_PX / 2 + 4, width, height: LABEL_FONT_PX + 2, priority: node.radius, isEmphasised: isEmphasisedNode }];
+  });
+  return pickVisibleLabels(boxes);
 }
 
 function toScreen(position: SimNode, camera: Camera): { x: number; y: number } {
@@ -73,6 +92,7 @@ function nodeEventProps(node: GraphNode, index: number, handlers: NodeHandlers):
 
 interface NodeViewProps {
   node: GraphNode;
+  hasLabel: boolean;
   index: number;
   position: SimNode;
   camera: Camera;
@@ -80,10 +100,9 @@ interface NodeViewProps {
   handlers: NodeHandlers;
 }
 
-function NodeView({ node, index, position, camera, highlight, handlers }: NodeViewProps): React.JSX.Element {
+function NodeView({ node, hasLabel, index, position, camera, highlight, handlers }: NodeViewProps): React.JSX.Element {
   const { x, y } = toScreen(position, camera);
   const radius = node.radius * camera.scale;
-  const emphasised = isEmphasised(node.key, highlight) || node.key === highlight.focusKey;
   const isDimmed = highlight.activeKey !== null && !isEmphasised(node.key, highlight);
   const isStory = node.kind === "story";
   return (
@@ -100,7 +119,7 @@ function NodeView({ node, index, position, camera, highlight, handlers }: NodeVi
       <circle r={Math.max(radius, 12)} fill="transparent" />
       {node.key === highlight.focusKey && <circle r={radius + 5} fill="none" stroke="var(--accent)" strokeWidth={2} />}
       <circle r={radius} fill={isStory ? node.color : "var(--bg-primary)"} stroke={node.color} strokeWidth={isStory ? 0 : 2} />
-      {isLabelVisible(node.radius, camera.scale, emphasised) && (
+      {hasLabel && (
         <text
           y={radius + LABEL_FONT_PX + 2}
           textAnchor="middle"
@@ -112,7 +131,7 @@ function NodeView({ node, index, position, camera, highlight, handlers }: NodeVi
           paintOrder="stroke"
           className="select-none pointer-events-none"
         >
-          {node.title.length > 28 ? `${node.title.slice(0, 27)}…` : node.title}
+          {labelText(node.title)}
         </text>
       )}
     </g>
@@ -131,6 +150,7 @@ interface GraphSceneProps extends NodeHandlers {
 export function GraphScene({ svgRef, nodes, edges, positions, camera, highlight, ...handlers }: GraphSceneProps): React.JSX.Element {
   const byKey = new Map(nodes.map((node, index) => [node.key, index]));
   const activeColor = highlight.activeKey ? nodes[byKey.get(highlight.activeKey) ?? -1]?.color : undefined;
+  const labelKeys = visibleLabelKeys(nodes, positions, camera, highlight);
   return (
     <svg
       ref={svgRef}
@@ -147,7 +167,7 @@ export function GraphScene({ svgRef, nodes, edges, positions, camera, highlight,
         })}
       </g>
       {nodes.map((node, index) => (
-        <NodeView key={node.key} node={node} index={index} position={positions[index]} camera={camera} highlight={highlight} handlers={handlers} />
+        <NodeView key={node.key} node={node} hasLabel={labelKeys.has(node.key)} index={index} position={positions[index]} camera={camera} highlight={highlight} handlers={handlers} />
       ))}
     </svg>
   );

@@ -5,6 +5,7 @@ import {
   createSimulation,
   isLabelVisible,
   neighbourMap,
+  pickVisibleLabels,
   nodeRadius,
   runSimulation,
   searchNodes,
@@ -155,5 +156,37 @@ describe("force layout", () => {
     runSimulation(a, 300);
     runSimulation(b, 300);
     expect(a.nodes).toEqual(b.nodes);
+  });
+});
+
+describe("tall layouts", () => {
+  function spread(aspect: number): { width: number; height: number } {
+    const simulation = createSimulation(buildStoryGraph(input(true)));
+    simulation.aspect = aspect;
+    runSimulation(simulation, 5000);
+    const xs = simulation.nodes.map((node) => node.x);
+    const ys = simulation.nodes.map((node) => node.y);
+    return { width: Math.max(...xs) - Math.min(...xs), height: Math.max(...ys) - Math.min(...ys) };
+  }
+
+  it("should spread taller than wide when the view is tall", () => {
+    const { width, height } = spread(2);
+    expect(height / width).toBeGreaterThan(spread(1).height / spread(1).width);
+  });
+});
+
+describe("pickVisibleLabels", () => {
+  const label = (key: string, x: number, priority: number, isEmphasised = false) => ({ key, x, y: 0, width: 60, height: 14, priority, isEmphasised });
+
+  it("should keep the bigger node's label when two labels overlap", () => {
+    expect([...pickVisibleLabels([label("small", 10, 1), label("big", 0, 5)])]).toEqual(["big"]);
+  });
+
+  it("should keep both labels when they do not overlap", () => {
+    expect(pickVisibleLabels([label("a", 0, 1), label("b", 100, 1)]).size).toBe(2);
+  });
+
+  it("should keep a highlighted label over a bigger one when they overlap", () => {
+    expect([...pickVisibleLabels([label("big", 0, 5), label("hovered", 10, 1, true)])]).toEqual(["hovered"]);
   });
 });

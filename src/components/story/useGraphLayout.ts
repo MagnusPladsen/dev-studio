@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Point } from "@/lib/menu-position";
-import { createSimulation, reheat, runSimulation, tickSimulation, type Simulation, type StoryGraph } from "@/lib/story-graph";
+import { createSimulation, fitLayoutToAspect, reheat, runSimulation, tickSimulation, type Simulation, type StoryGraph } from "@/lib/story-graph";
 
 const SETTLE_TICKS = 600;
 const TICKS_PER_FRAME = 2;
@@ -57,12 +57,17 @@ class LayoutStore {
     const node = this.simulation?.nodes[index];
     if (node) node.isFixed = false;
   }
+
+  fitAspect(aspect: number): void {
+    if (this.simulation) fitLayoutToAspect(this.simulation, aspect, SETTLE_TICKS);
+  }
 }
 
 export interface GraphLayout {
   simulation: Simulation;
   drag(index: number, world: Point): void;
   release(index: number): void;
+  fitAspect(aspect: number): void;
 }
 
 export function useGraphLayout(graph: StoryGraph): GraphLayout {
@@ -73,7 +78,7 @@ export function useGraphLayout(graph: StoryGraph): GraphLayout {
   useEffect(() => store.attach(() => setFrame((frame) => frame + 1)), [store, simulation]);
 
   return useMemo(
-    () => ({ simulation, drag: (index, world) => store.drag(index, world), release: (index) => store.release(index) }),
+    () => ({ simulation, drag: (index, world) => store.drag(index, world), release: (index) => store.release(index), fitAspect: (aspect) => store.fitAspect(aspect) }),
     [store, simulation]
   );
 }

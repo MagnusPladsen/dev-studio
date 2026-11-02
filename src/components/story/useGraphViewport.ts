@@ -19,8 +19,15 @@ export interface GraphViewport {
 const WHEEL_SENSITIVITY = 0.0015;
 const FOCUS_SCALE = 1.4;
 
-/** Camera state for an element, fitted to the graph once its size is known; wheel zooms around the cursor. */
-export function useGraphViewport(elementRef: RefObject<SVGSVGElement | null>, getCircles: () => Circle[]): GraphViewport {
+/**
+ * Camera state for an element, fitted to the graph once its size is known (after `beforeFirstFit` has had a chance
+ * to reshape the layout for it); wheel zooms around the cursor.
+ */
+export function useGraphViewport(
+  elementRef: RefObject<SVGSVGElement | null>,
+  getCircles: () => Circle[],
+  beforeFirstFit: (size: Size) => void = () => undefined
+): GraphViewport {
   const [camera, setCamera] = useState<Camera>({ x: 0, y: 0, scale: 1 });
   const [size, setSize] = useState<Size>({ width: 0, height: 0 });
   const circlesRef = useRef(getCircles);
@@ -31,7 +38,10 @@ export function useGraphViewport(elementRef: RefObject<SVGSVGElement | null>, ge
     sizeRef.current = size;
   });
 
-  useResizeFit(elementRef, setSize, (next) => setCamera(fitCamera(circlesRef.current(), next)));
+  useResizeFit(elementRef, setSize, (next) => {
+    beforeFirstFit(next);
+    setCamera(fitCamera(circlesRef.current(), next));
+  });
   useWheelZoom(elementRef, setCamera);
 
   const zoomBy = useCallback((factor: number) => {

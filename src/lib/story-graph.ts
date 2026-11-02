@@ -138,6 +138,29 @@ export function isLabelVisible(radius: number, scale: number, isEmphasised: bool
   return isEmphasised || radius * scale >= LABEL_MIN_SCREEN_RADIUS;
 }
 
+export interface LabelBox {
+  key: string;
+  /** Centre of the label on screen. */
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  priority: number;
+  isEmphasised: boolean;
+}
+
+function overlaps(a: LabelBox, b: LabelBox): boolean {
+  return Math.abs(a.x - b.x) * 2 < a.width + b.width && Math.abs(a.y - b.y) * 2 < a.height + b.height;
+}
+
+/** Keeps labels that don't collide, placing highlighted ones first and then bigger nodes. */
+export function pickVisibleLabels(boxes: LabelBox[]): Set<string> {
+  const ordered = [...boxes].sort((a, b) => Number(b.isEmphasised) - Number(a.isEmphasised) || b.priority - a.priority);
+  const placed: LabelBox[] = [];
+  for (const box of ordered) if (!placed.some((other) => overlaps(box, other))) placed.push(box);
+  return new Set(placed.map((box) => box.key));
+}
+
 // ── force-directed layout ──
 
 export interface SimNode {
@@ -154,6 +177,8 @@ export interface Simulation {
   nodes: SimNode[];
   links: [number, number][];
   alpha: number;
+  /** View height ÷ width; above 1 the layout is pulled in sideways so it fills a tall phone screen. */
+  aspect: number;
 }
 
 export const LAYOUT = {
@@ -185,7 +210,7 @@ export function createSimulation(graph: StoryGraph, previous?: Simulation): Simu
   });
   const index = new Map(nodes.map((node, i) => [node.key, i]));
   const links = graph.edges.map((edge): [number, number] => [index.get(edge.from)!, index.get(edge.to)!]);
-  return { nodes, links, alpha: 1 };
+  return { nodes, links, alpha: 1, aspect: previous?.aspect ?? 1 };
 }
 
 function applyRepulsion(nodes: SimNode[], alpha: number): void {
@@ -224,10 +249,18 @@ function applySprings(simulation: Simulation): void {
   }
 }
 
-function integrate(nodes: SimNode[], alpha: number): void {
+const MAX_ASPECT = 2.5;
+
+function gravityFor(aspect: number): { x: number; y: number } {
+  const stretch = Math.min(MAX_ASPECT, Math.max(1, aspect));
+  return { x: LAYOUT.gravity * stretch ** 3, y: LAYOUT.gravity / stretch ** 2 };
+}
+
+function integrate(nodes: SimNode[], alpha: number, aspect: number): void {
+  const gravity = gravityFor(aspect);
   for (const node of nodes) {
-    node.vx -= node.x * LAYOUT.gravity * alpha;
-    node.vy -= node.y * LAYOUT.gravity * alpha;
+    node.vx -= node.x * gravity.x * alpha;
+    node.vy -= node.y * gravity.y * alpha;
     node.vx *= LAYOUT.velocityDecay;
     node.vy *= LAYOUT.velocityDecay;
     if (node.isFixed) {
@@ -245,7 +278,7 @@ export function tickSimulation(simulation: Simulation): boolean {
   if (simulation.alpha < LAYOUT.alphaMin) return false;
   applyRepulsion(simulation.nodes, simulation.alpha);
   applySprings(simulation);
-  integrate(simulation.nodes, simulation.alpha);
+  integrate(simulation.nodes, simulation.alpha, simulation.aspect);
   simulation.alpha *= LAYOUT.alphaDecay;
   return true;
 }
@@ -254,6 +287,15 @@ export function runSimulation(simulation: Simulation, maxTicks: number): number 
   let ticks = 0;
   while (ticks < maxTicks && tickSimulation(simulation)) ticks++;
   return ticks;
+}
+
+/** Re-settles the layout for a new view shape; does nothing for wide views or a shape it already has. */
+export function fitLayoutToAspect(simulation: Simulation, aspect: number, maxTicks: number): void {
+  const next = Math.max(1, aspect);
+  if (Math.abs(next - Math.max(1, simulation.aspect)) < 0.1) return;
+  simulation.aspect = next;
+  simulation.alpha = 1;
+  runSimulation(simulation, maxTicks);
 }
 
 export function reheat(simulation: Simulation, alpha = 0.3): void {
