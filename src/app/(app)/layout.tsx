@@ -20,6 +20,7 @@ import {
   LayoutDashboard,
   Menu,
   MoreHorizontal,
+  Pin,
   X,
 } from "lucide-react";
 import { useState, Suspense } from "react";
@@ -97,6 +98,25 @@ function ToolMenuButton({ name, onOpen }: { name: string; onOpen(anchor: Point, 
       style={{ color: "var(--text-primary)" }}
     >
       <MoreHorizontal className="w-3.5 h-3.5" />
+    </button>
+  );
+}
+
+/** Desktop-only pin at the right of a tool row: shows on hover or focus, and stays filled while the tool is pinned. */
+function ToolPinButton({ projectId, path, name, color }: { projectId: string; path: string; name: string; color: string }): React.JSX.Element {
+  const isPinned = isToolPinned(projectId, path);
+  const title = isPinned ? `Unpin ${name} from the top` : `Pin ${name} to the top`;
+  return (
+    <button
+      type="button"
+      title={title}
+      aria-label={title}
+      aria-pressed={isPinned}
+      onClick={() => toggleToolPin(projectId, path)}
+      className={`max-md:hidden absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded ${isPinned ? "" : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100"}`}
+      style={{ color: isPinned ? color : "var(--text-primary)" }}
+    >
+      <Pin className="w-3 h-3" fill={isPinned ? "currentColor" : "none"} />
     </button>
   );
 }
@@ -188,13 +208,14 @@ function AppSidebar({ children }: { children: React.ReactNode }) {
                     >
                       <tool.icon className="w-4 h-4" style={{ color: isActive ? tool.color : undefined }} />
                       {tool.name}
-                      {isNewTool(tool.path) && <NewBadge className="ml-auto max-md:mr-8" />}
+                      {isNewTool(tool.path) && <NewBadge className="ml-auto max-md:mr-8 md:mr-5" />}
                     </Link>
                   );
                   if (tool.path === "assets") return link;
                   return (
-                    <div key={tool.path} className="relative">
+                    <div key={tool.path} className="group relative">
                       {link}
+                      <ToolPinButton projectId={projectId} path={tool.path} name={tool.name} color={tool.color} />
                       <ToolMenuButton name={tool.name} onOpen={(anchor, opener) => openMenu(anchor, toolMenuEntries(projectId, tool.path), tool.name, opener)} />
                     </div>
                   );
