@@ -41,6 +41,7 @@ import { positionMenu, type MenuPlacement } from "@/lib/menu-position";
 import {
   CATEGORY_LABEL,
   COLUMN_COLORS,
+  CSV_BOM,
   DAY,
   PRIORITIES,
   PRIORITY_META,
@@ -50,6 +51,7 @@ import {
   TypeIcon,
   createDefaultBoard,
   createIssue,
+  csvCell,
   daysLeft,
   fieldStyle,
   formatDate,
@@ -168,16 +170,15 @@ export default function TaskBoardPage() {
   function exportCsv() {
     const col = (id: string) => board!.columns.find((c) => c.id === id)?.name ?? id;
     const sprint = (id: string | null) => (id ? board!.sprints.find((s) => s.id === id)?.name ?? "" : "Backlog");
-    const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
     const head = ["Key", "Title", "Type", "Priority", "Status", "Sprint", "Points", "Due", "Labels", "Archived", "Created", "Updated", "Description"];
     const rows = [...issues]
       .sort((a, b) => a.key.localeCompare(b.key, undefined, { numeric: true }))
       .map((i) =>
         [i.key, i.title, TYPE_META[i.type]?.label, PRIORITY_META[i.priority]?.label, col(i.status), sprint(i.sprintId), i.points ?? "", i.dueDate ?? "", i.labels.join(" "), i.archived ? "yes" : "no", i.createdAt, i.updatedAt, i.description]
-          .map(esc)
+          .map(csvCell)
           .join(",")
       );
-    download(`${board!.keyPrefix.toLowerCase()}-issues.csv`, [head.map(esc).join(","), ...rows].join("\n"), "text/csv");
+    download(`${board!.keyPrefix.toLowerCase()}-issues.csv`, CSV_BOM + [head.map(csvCell).join(","), ...rows].join("\n"), "text/csv");
   }
 
   return (
@@ -770,6 +771,8 @@ function IssueCard({
   const { assetTriggerProps } = useAssetMenu();
   const trigger = assetTriggerProps({ type: "issue", id: issue.id });
   const [menu, setMenu] = useState<MenuPlacement | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
   const related = useMemo(
     () => getRelated(projectId, "issue", issue.id),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -779,6 +782,21 @@ function IssueCard({
   const linkCount = related.length - noteCount;
   const overdue = isOverdue(issue);
   const done = !!issue.resolvedAt;
+
+  useEffect(() => {
+    if (!menu) return;
+    const close = (e: PointerEvent) => {
+      const target = e.target as Node;
+      if (!menuRef.current?.contains(target) && !menuButtonRef.current?.contains(target)) setMenu(null);
+    };
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && setMenu(null);
+    document.addEventListener("pointerdown", close);
+    document.addEventListener("keydown", esc);
+    return () => {
+      document.removeEventListener("pointerdown", close);
+      document.removeEventListener("keydown", esc);
+    };
+  }, [menu]);
 
   return (
     <div
@@ -858,7 +876,8 @@ function IssueCard({
           const size = { width: MOVE_MENU_WIDTH, height: MOVE_MENU_ROW_HEIGHT * rows + MOVE_MENU_PADDING };
           setMenu((open) => (open ? null : positionMenu({ x: rect.right - size.width, y: rect.bottom + 4 }, size, { width: innerWidth, height: innerHeight })));
         }}
-        className="absolute top-1.5 right-1.5 p-1 rounded-md md:opacity-0 md:group-hover:opacity-100 focus:opacity-100"
+        ref={menuButtonRef}
+        className="absolute top-1.5 right-1.5 p-1 rounded-md md:opacity-0 md:group-hover:opacity-100 focus:opacity-100 max-md:after:absolute max-md:after:-inset-[11px] max-md:after:content-['']"
         style={{ color: "var(--text-secondary)", background: "var(--bg-card)" }}
         aria-label={`Move ${issue.key}`}
         title="Move to…"
@@ -867,6 +886,7 @@ function IssueCard({
       </button>
       {menu && createPortal(
         <div
+          ref={menuRef}
           className="fixed z-50 w-44 p-1 rounded-lg shadow-xl overflow-y-auto"
           style={{ ...menu, background: "var(--bg-secondary)", border: "1px solid var(--border)" }}
           onClick={(e) => e.stopPropagation()}
@@ -962,6 +982,7 @@ function BacklogView({
   }
 
   function deleteSprint(s: Sprint) {
+    if (!confirm(`Delete "${s.name}"? Its issues go back to the backlog.`)) return;
     for (const i of issues.filter((x) => x.sprintId === s.id)) saveIssue(projectId, board, i, { sprintId: null });
     saveBoard(projectId, board, { sprints: board.sprints.filter((x) => x.id !== s.id) });
   }
@@ -1036,7 +1057,7 @@ function BacklogView({
                     aria-label="End date"
                   />
                   <span className="text-[11px] tabular-nums" style={{ color: "var(--text-muted)" }}>
-                    {list.length} issue{list.length === 1 ? "" : "s"} · {stats.unit === "points" ? `${stats.total} pts` : ""}
+                    {list.length} issue{list.length === 1 ? "" : "s"}{stats.unit === "points" ? ` · ${stats.total} pts` : ""}
                   </span>
                   <div className="ml-auto flex items-center gap-1.5">
                     {sprint.state === "active" ? (
