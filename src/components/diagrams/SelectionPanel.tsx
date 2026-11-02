@@ -4,9 +4,10 @@ import Link from "next/link";
 import { Check, ExternalLink, ImagePlus, Link2, Pencil, Rows3, Trash2, Boxes } from "lucide-react";
 import type { DiagramNode } from "@/types";
 import { ASSET_KINDS, ASSET_TYPES, assetHref, getAsset, listAssets } from "@/lib/assets";
-import { CARD_COLORS, NODE_LABELS, isFlowShape, nodeAsset } from "@/lib/diagrams/cards";
+import { CARD_COLORS, NODE_LABELS, hasShapeBody, nodeAsset } from "@/lib/diagrams/cards";
+import { ArrangeActions, type ArrangeHandlers } from "./ArrangeActions";
 
-interface SelectionPanelProps {
+interface SelectionPanelProps extends ArrangeHandlers {
   node: DiagramNode;
   projectId: string;
   onColor(color: string | undefined): void;
@@ -22,19 +23,19 @@ const BUTTON = "flex items-center gap-1.5 px-2 py-1 rounded text-xs";
 const BUTTON_STYLE: React.CSSProperties = { background: "var(--bg-primary)", color: "var(--text-primary)", border: "1px solid var(--border)" };
 
 function canLinkAsset(node: DiagramNode): boolean {
-  return isFlowShape(node.type) || node.type === "note" || node.type === "checklist";
+  return hasShapeBody(node.type) || node.type === "note" || node.type === "checklist";
 }
 
-function Swatches({ node, onColor }: Pick<SelectionPanelProps, "node" | "onColor">) {
+function Swatches({ nodes, onColor }: { nodes: DiagramNode[]; onColor(color: string | undefined): void }) {
   return (
-    <div className="flex flex-wrap gap-1.5" role="group" aria-label="Card colour">
+    <div className="flex flex-wrap gap-1.5 max-md:gap-2" role="group" aria-label="Card colour">
       {CARD_COLORS.map((swatch) => {
-        const isActive = node.color === swatch.value;
+        const isActive = nodes.every((node) => node.color === swatch.value);
         return (
           <button
             key={swatch.name}
             onClick={() => onColor(swatch.value)}
-            className="w-5 h-5 rounded-full flex items-center justify-center"
+            className="w-5 h-5 rounded-full flex items-center justify-center max-md:w-7 max-md:h-7"
             style={{ background: swatch.value ?? "var(--bg-primary)", border: `1px solid ${swatch.value ?? "var(--border-hover)"}` }}
             title={swatch.name}
             aria-label={`${swatch.name} colour`}
@@ -120,34 +121,66 @@ function TypeActions({ node, onStack, onReplaceImage, onChangeAsset, onEdit }: S
   return null;
 }
 
-/** Floating panel for the selected card: colour, linked asset and the card's own actions. */
-export function SelectionPanel(props: SelectionPanelProps) {
-  const { node, onEdit, onDelete } = props;
-  const canEditText = node.type !== "asset" && node.type !== "link";
+function PanelFrame({ children }: { children: React.ReactNode }) {
   return (
     <div
       data-card-control=""
       className="absolute top-3 right-3 z-10 w-64 p-3 rounded-xl border space-y-2.5 max-md:top-auto max-md:bottom-3 max-md:left-3 max-md:right-3 max-md:w-auto"
       style={{ background: "var(--bg-card)", borderColor: "var(--border)" }}
     >
+      {children}
+    </div>
+  );
+}
+
+function DeleteButton({ onDelete, label }: { onDelete(): void; label: string }) {
+  return (
+    <button onClick={onDelete} className="p-1 rounded max-md:p-2" style={{ color: "var(--red)" }} title="Delete (Del)" aria-label={label}>
+      <Trash2 className="w-3.5 h-3.5" />
+    </button>
+  );
+}
+
+/** Floating panel for the selected card: colour, linked asset, arranging and the card's own actions. */
+export function SelectionPanel(props: SelectionPanelProps) {
+  const { node, onEdit, onDelete } = props;
+  const canEditText = node.type !== "asset" && node.type !== "link" && node.type !== "drawing";
+  return (
+    <PanelFrame>
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs font-medium truncate" style={{ color: "var(--text-primary)" }}>
           {NODE_LABELS[node.type]}{node.label ? `: ${node.label.split("\n")[0]}` : ""}
         </span>
         <div className="flex items-center gap-0.5 shrink-0">
           {canEditText && (
-            <button onClick={onEdit} className="p-1 rounded" style={{ color: "var(--text-primary)" }} title="Edit text (double-click)" aria-label="Edit text">
+            <button onClick={onEdit} className="p-1 rounded max-md:p-2" style={{ color: "var(--text-primary)" }} title="Edit text (double-click)" aria-label="Edit text">
               <Pencil className="w-3.5 h-3.5" />
             </button>
           )}
-          <button onClick={onDelete} className="p-1 rounded" style={{ color: "var(--red)" }} title="Delete (Del)" aria-label="Delete card">
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
+          <DeleteButton onDelete={onDelete} label="Delete card" />
         </div>
       </div>
-      <Swatches {...props} />
+      <Swatches nodes={[node]} onColor={props.onColor} />
+      <ArrangeActions count={1} {...props} />
       <TypeActions {...props} />
       {canLinkAsset(node) && <AssetSelect {...props} />}
-    </div>
+    </PanelFrame>
+  );
+}
+
+/** Floating panel for several selected cards: recolour, duplicate, delete, arrange, align and distribute. */
+export function MultiSelectionPanel(props: ArrangeHandlers & { nodes: DiagramNode[]; onColor(color: string | undefined): void; onDelete(): void }) {
+  const { nodes, onColor, onDelete } = props;
+  return (
+    <PanelFrame>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs font-medium" style={{ color: "var(--text-primary)" }}>
+          {nodes.length} cards selected
+        </span>
+        <DeleteButton onDelete={onDelete} label="Delete selected cards" />
+      </div>
+      <Swatches nodes={nodes} onColor={onColor} />
+      <ArrangeActions count={nodes.length} {...props} />
+    </PanelFrame>
   );
 }

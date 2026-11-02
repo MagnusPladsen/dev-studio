@@ -9,6 +9,7 @@ import { ASSET_ICONS } from "@/components/asset-icons";
 import {
   borderColor,
   checklistItems,
+  isBasicShape,
   hostname,
   imageSrc,
   itemsFromLines,
@@ -18,6 +19,8 @@ import {
 } from "@/lib/diagrams/cards";
 import { embedFor, normalizeUrl, PROVIDER_NAMES } from "@/lib/diagrams/embeds";
 import { GROUP_HEADER } from "@/lib/diagrams/geometry";
+import { DRAWING_STROKE, drawingStroke, smoothPath } from "@/lib/diagrams/freehand";
+import { polygonPoints, shapeOutline } from "@/lib/diagrams/shapes";
 import { v4 as uuid } from "uuid";
 
 export interface BodyProps {
@@ -112,12 +115,14 @@ export function ShapeBody({ node, projectId, isEditing, onCommit, onCancel }: Bo
   const color = borderColor(node);
   const asset = nodeAsset(node);
   const isDeleted = asset && !getAsset(projectId, asset.type, asset.id);
+  const padding = node.type === "diamond" ? "px-[22%]" : node.type === "ellipse" ? "px-[12%]" : "px-3";
+  const clamp = isBasicShape(node.type) ? "line-clamp-[8]" : "line-clamp-3";
   return (
-    <div className="relative w-full h-full flex items-center justify-center px-3 text-center">
+    <div className={`relative w-full h-full flex items-center justify-center text-center ${padding}`}>
       <svg className="absolute inset-0 overflow-visible pointer-events-none" width="100%" height="100%" aria-hidden>
         <ShapeOutline node={node} color={color} />
       </svg>
-      <div className="relative w-full text-[13px] leading-4 line-clamp-3 break-words" style={{ color: "var(--text-primary)" }}>
+      <div className={`relative w-full text-[13px] leading-4 break-words ${clamp}`} style={{ color: "var(--text-primary)" }}>
         {isEditing ? (
           <TextEditor value={node.label} placeholder="Label" onCommit={(label) => onCommit({ label })} onCancel={onCancel} className="text-center" />
         ) : (
@@ -138,17 +143,23 @@ export function ShapeBody({ node, projectId, isEditing, onCommit, onCancel }: Bo
 }
 
 function ShapeOutline({ node, color }: { node: DiagramNode; color: string }) {
-  const { width: w, height: h } = node;
-  const common = { fill: "var(--bg-card)", stroke: color, strokeWidth: 1.5 };
-  if (node.type === "condition") {
-    return <polygon points={`${w / 2},-4 ${w + 4},${h / 2} ${w / 2},${h + 4} -4,${h / 2}`} {...common} />;
-  }
-  if (node.type === "event") {
-    const inset = 16;
-    return <polygon points={`${inset},0 ${w - inset},0 ${w},${h / 2} ${w - inset},${h} ${inset},${h} 0,${h / 2}`} {...common} />;
-  }
-  const radius = node.type === "state" ? 12 : 4;
-  return <rect x="0.75" y="0.75" width={w - 1.5} height={h - 1.5} rx={radius} {...common} />;
+  const outline = shapeOutline(node.type, { x: 0, y: 0, width: node.width, height: node.height });
+  const fill = node.color && isBasicShape(node.type) ? `${node.color}1f` : "var(--bg-card)";
+  const common = { fill, stroke: color, strokeWidth: isBasicShape(node.type) ? 2 : 1.5 };
+  if (outline.kind === "polygon") return <polygon points={polygonPoints(outline.points)} {...common} />;
+  if (outline.kind === "ellipse") return <ellipse cx={outline.cx} cy={outline.cy} rx={Math.max(0, outline.rx - 1)} ry={Math.max(0, outline.ry - 1)} {...common} />;
+  return <rect x="0.75" y="0.75" width={outline.width - 1.5} height={outline.height - 1.5} rx={outline.radius} {...common} />;
+}
+
+export function DrawingBody({ node }: BodyProps) {
+  const { points, box } = drawingStroke(node);
+  const path = smoothPath(points);
+  return (
+    <svg className="absolute inset-0 overflow-visible" width="100%" height="100%" viewBox={`0 0 ${box.width} ${box.height}`} preserveAspectRatio="none" aria-hidden>
+      <path d={path} fill="none" stroke="transparent" strokeWidth={16} vectorEffect="non-scaling-stroke" strokeLinecap="round" style={{ pointerEvents: "stroke" }} />
+      <path d={path} fill="none" stroke={borderColor(node)} strokeWidth={DRAWING_STROKE} vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
 }
 
 export function NoteBody({ node, isEditing, onCommit, onCancel }: BodyProps) {

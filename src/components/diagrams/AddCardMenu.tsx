@@ -11,12 +11,13 @@ import {
   Link2,
   ListChecks,
   Plus,
+  RectangleHorizontal,
   Square,
   SquareDashed,
   StickyNote,
   type LucideIcon,
 } from "lucide-react";
-import { BOARD_CARDS, FLOW_SHAPES, NODE_LABELS, SHAPE_COLORS, type NodeType } from "@/lib/diagrams/cards";
+import { BASIC_SHAPES, BOARD_CARDS, FLOW_SHAPES, NODE_LABELS, SHAPE_COLORS, type NodeType } from "@/lib/diagrams/cards";
 
 const ICONS: Partial<Record<NodeType, LucideIcon>> = {
   note: StickyNote,
@@ -29,6 +30,9 @@ const ICONS: Partial<Record<NodeType, LucideIcon>> = {
   action: Square,
   condition: Diamond,
   event: Hexagon,
+  rectangle: RectangleHorizontal,
+  ellipse: Circle,
+  diamond: Diamond,
 };
 
 const HINTS: Partial<Record<NodeType, string>> = {
@@ -38,6 +42,9 @@ const HINTS: Partial<Record<NodeType, string>> = {
   link: "YouTube, Spotify or any website",
   asset: "Any sprite, sound, story… in this project",
   group: "An area that holds cards",
+  rectangle: "Box with text, any size",
+  ellipse: "Circle or oval with text",
+  diamond: "Diamond with text",
 };
 
 function MenuItem({ type, onPick }: { type: NodeType; onPick(type: NodeType): void }) {
@@ -59,7 +66,7 @@ function MenuItem({ type, onPick }: { type: NodeType; onPick(type: NodeType): vo
   );
 }
 
-/** The toolbar's "Add" dropdown: board cards first, then flow-chart shapes. */
+/** The toolbar's "Add" dropdown: board cards first, then basic shapes, then flow-chart shapes. */
 export function AddCardMenu({ onPick }: { onPick(type: NodeType): void }) {
   const [isOpen, setIsOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -104,6 +111,9 @@ export function AddCardMenu({ onPick }: { onPick(type: NodeType): void }) {
         >
           <p className="px-3 pt-1 pb-0.5 text-[11px] uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>Board cards</p>
           {BOARD_CARDS.map((type) => <MenuItem key={type} type={type} onPick={pick} />)}
+          <div className="my-1 h-px" style={{ background: "var(--border)" }} />
+          <p className="px-3 pt-1 pb-0.5 text-[11px] uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>Shapes</p>
+          {BASIC_SHAPES.map((type) => <MenuItem key={type} type={type} onPick={pick} />)}
           <div className="my-1 h-px" style={{ background: "var(--border)" }} />
           <p className="px-3 pt-1 pb-0.5 text-[11px] uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>Flow chart</p>
           {FLOW_SHAPES.map((type) => <MenuItem key={type} type={type} onPick={pick} />)}

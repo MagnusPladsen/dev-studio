@@ -13,8 +13,6 @@ import { useParams } from "next/navigation";
 import {
   Plus,
   Trash2,
-  MousePointer,
-  Link2,
   ZoomIn,
   ZoomOut,
   Maximize,
@@ -36,7 +34,9 @@ import {
   defaultSize,
   isAutoHeight,
   isFlowShape,
+  minSize,
   NODE_LABELS,
+  SHAPE_COLORS,
   linkPreview,
   linkUrl,
   nodeAsset,
@@ -44,12 +44,28 @@ import {
 } from "@/lib/diagrams/cards";
 import { isImageUrl, normalizeUrl } from "@/lib/diagrams/embeds";
 import { boundsOf, idsInside, stackColumn, type Point, type Rect } from "@/lib/diagrams/geometry";
+import {
+  alignRects,
+  bringToFront,
+  distributeRects,
+  idsWithin,
+  rectBetween,
+  sendToBack,
+  toggleId,
+  type Alignment,
+  type Axis,
+} from "@/lib/diagrams/arrange";
+import { cloneCards, copyCards, parseCards, serializeCards, type CopiedCards } from "@/lib/diagrams/clipboard";
+import { drawingData, smoothPath, strokeFromPoints, DRAWING_STROKE, SIMPLIFY_TOLERANCE } from "@/lib/diagrams/freehand";
+import { renderDiagramSvg } from "@/lib/diagrams/render-svg";
+import { downloadBlob } from "@/lib/download";
 import { imageFilesFrom, readImageFile } from "@/lib/diagrams/image-file";
 import { renderDiagramPng, type AssetLook } from "@/lib/diagrams/render-png";
 import { DiagramCard } from "@/components/diagrams/DiagramCard";
 import { EdgeLayer } from "@/components/diagrams/EdgeLayer";
-import { SelectionPanel } from "@/components/diagrams/SelectionPanel";
+import { MultiSelectionPanel, SelectionPanel } from "@/components/diagrams/SelectionPanel";
 import { AddCardMenu } from "@/components/diagrams/AddCardMenu";
+import { ToolPicker, type BoardTool } from "@/components/diagrams/ToolPicker";
 
 function downloadFile(name: string, href: string) {
   const a = document.createElement("a");
@@ -58,10 +74,11 @@ function downloadFile(name: string, href: string) {
   a.click();
 }
 
-type Mode = "select" | "connect";
-
 type Interaction =
-  | { kind: "drag"; nodeId: string; start: Point; origins: Map<string, Point>; hasMoved: boolean }
+  // `releaseTo`: the selection to switch to when the card is let go without moving (a tap, not a drag).
+  | { kind: "drag"; start: Point; origins: Map<string, Point>; hasMoved: boolean; releaseTo: string[] | null }
+  | { kind: "box"; start: Point; base: string[] }
+  | { kind: "draw"; points: Point[] }
   | { kind: "pan"; start: Point; pan: Point }
   | { kind: "resize"; nodeId: string; start: Point; width: number; height: number }
   | { kind: "connect"; fromId: string }
@@ -72,6 +89,9 @@ const MAX_ZOOM = 3;
 const DOUBLE_TAP_MS = 320;
 const DRAG_THRESHOLD_PX = 3;
 const GRID = 30;
+const PASTE_OFFSET = 24;
+/** Screen pixels the pen must travel before another point is recorded. */
+const PEN_STEP_PX = 2;
 
 const clampZoom = (z: number) => Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z));
 
@@ -100,10 +120,10 @@ export default function DiagramsPage() {
   const [current, setCurrent] = useState<Diagram | null>(null);
   const [showList, setShowList] = useState(true);
 
-  const [mode, setMode] = useState<Mode>("select");
+  const [mode, setMode] = useState<BoardTool>("select");
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const [isInteracting, setIsInteracting] = useState(false);
   const [connectFrom, setConnectFrom] = useState<string | null>(null);
@@ -114,11 +134,15 @@ export default function DiagramsPage() {
   const [loadingPreviews, setLoadingPreviews] = useState<ReadonlySet<string>>(new Set());
   const [assetPicker, setAssetPicker] = useState<{ replaceId: string | null } | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [selectionBox, setSelectionBox] = useState<Rect | null>(null);
+  const [penDraft, setPenDraft] = useState<Point[] | null>(null);
+  const selectedNodeId = selectedIds.length === 1 ? selectedIds[0] : null;
 
   const interaction = useRef<Interaction | null>(null);
   const pointers = useRef(new Map<number, Point>());
   const lastTap = useRef({ key: "", time: 0 });
   const imageTarget = useRef<{ replaceId: string | null; at: Point | null }>({ replaceId: null, at: null });
+  const pasteCount = useRef(0);
 
   const { assetTriggerProps, pasteTriggerProps, openAssetMenu } = useAssetMenu();
   const pressedNode = useRef<{ node: DiagramNode; asset: AssetRef } | null>(null);
@@ -152,7 +176,7 @@ export default function DiagramsPage() {
     (v) => {
       if (!v) return;
       setCurrent((c) => (c ? { ...c, ...v, updatedAt: new Date().toISOString() } : c));
-      setSelectedNodeId(null);
+      setSelectedIds([]);
       setSelectedEdgeId(null);
     },
     current?.id
@@ -324,7 +348,7 @@ export default function DiagramsPage() {
 
   const stopEditing = useCallback(() => setEditingNodeId(null), []);
   const startEditing = useCallback((id: string) => {
-    setSelectedNodeId(id);
+    setSelectedIds([id]);
     setEditingNodeId(id);
   }, []);
 
@@ -348,8 +372,7 @@ export default function DiagramsPage() {
       ...size,
     };
     updateCurrent((d) => (type === "group" ? { ...d, nodes: [node, ...d.nodes] } : { ...d, nodes: [...d.nodes, node] }));
-    setSelectedNodeId(node.id);
-    setSelectedEdgeId(null);
+    selectNodes([node.id]);
     return node;
   }
 
@@ -420,19 +443,74 @@ export default function DiagramsPage() {
     else addNode("asset", undefined, { label: name, data: { asset: ref } });
   }
 
+  function selectNodes(ids: string[]) {
+    setSelectedIds(ids);
+    setSelectedEdgeId(null);
+  }
+
   function deleteSelection() {
-    if (selectedNodeId) {
-      updateCurrent((d) => ({
-        ...d,
-        nodes: d.nodes.filter((n) => n.id !== selectedNodeId),
-        edges: d.edges.filter((edge) => edge.from !== selectedNodeId && edge.to !== selectedNodeId),
-      }));
-      setSelectedNodeId(null);
+    if (!selectedIds.length && !selectedEdgeId) return;
+    const ids = new Set(selectedIds);
+    updateCurrent((d) => ({
+      ...d,
+      nodes: d.nodes.filter((n) => !ids.has(n.id)),
+      edges: d.edges.filter((edge) => !ids.has(edge.from) && !ids.has(edge.to) && edge.id !== selectedEdgeId),
+    }));
+    selectNodes([]);
+  }
+
+  function recolorSelection(color: string | undefined) {
+    const ids = new Set(selectedIds);
+    updateCurrent((d) => ({ ...d, nodes: d.nodes.map((n) => (ids.has(n.id) ? { ...n, color } : n)) }));
+  }
+
+  function pasteCards(cards: CopiedCards, offset: number) {
+    const pasted = cloneCards(cards, { x: offset, y: offset }, uuid);
+    updateCurrent((d) => ({ ...d, nodes: [...d.nodes, ...pasted.nodes], edges: [...d.edges, ...pasted.edges] }));
+    selectNodes(pasted.nodes.map((n) => n.id));
+  }
+
+  function duplicateSelection() {
+    if (current && selectedIds.length) pasteCards(copyCards(current, selectedIds), PASTE_OFFSET);
+  }
+
+  function arrangeSelection(direction: "front" | "back") {
+    const reorder = direction === "front" ? bringToFront : sendToBack;
+    updateCurrent((d) => ({ ...d, nodes: reorder(d.nodes, selectedIds) }));
+  }
+
+  function selectedRects() {
+    return (current?.nodes ?? []).filter((n) => selectedIds.includes(n.id)).map((n) => ({ id: n.id, ...rectOf(n) }));
+  }
+
+  /** Moves nodes to new positions; a moved group takes the cards inside it along. */
+  function moveNodesTo(positions: Map<string, Point>) {
+    const nodes = current?.nodes ?? [];
+    const moves = new Map(positions);
+    for (const [id, to] of positions) {
+      const group = nodes.find((n) => n.id === id && n.type === "group");
+      if (!group) continue;
+      for (const memberId of membersOf(group, nodes).filter((m) => !positions.has(m))) {
+        const member = nodes.find((n) => n.id === memberId)!;
+        moves.set(memberId, { x: member.x + to.x - group.x, y: member.y + to.y - group.y });
+      }
     }
-    if (selectedEdgeId) {
-      updateCurrent((d) => ({ ...d, edges: d.edges.filter((edge) => edge.id !== selectedEdgeId) }));
-      setSelectedEdgeId(null);
-    }
+    updateCurrent((d) => ({ ...d, nodes: d.nodes.map((n) => (moves.has(n.id) ? { ...n, ...moves.get(n.id)! } : n)) }));
+  }
+
+  function alignSelection(edge: Alignment) {
+    moveNodesTo(alignRects(selectedRects(), edge));
+  }
+
+  function distributeSelection(axis: Axis) {
+    moveNodesTo(distributeRects(selectedRects(), axis));
+  }
+
+  function changeTool(tool: BoardTool) {
+    setMode(tool);
+    setConnectFrom(null);
+    setConnectDraft(null);
+    if (tool === "draw" || tool === "connect") selectNodes([]);
   }
 
   function addEdge(from: string, to: string) {
@@ -483,6 +561,8 @@ export default function DiagramsPage() {
     const [a, b] = [...pointers.current.values()];
     const drag = interaction.current;
     if (drag?.kind === "drag" && drag.hasMoved) restorePositions(drag.origins);
+    setSelectionBox(null);
+    setPenDraft(null);
     longPress.cancel();
     const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
     interaction.current = { kind: "pinch", distance: Math.hypot(a.x - b.x, a.y - b.y) || 1, zoom: view.current.zoom, anchor: toBoard(mid.x, mid.y) };
@@ -500,21 +580,35 @@ export default function DiagramsPage() {
       } else setConnectFrom(nodeId);
       return;
     }
+    const isAdditive = e.shiftKey || mode === "area";
     // Start editing after the browser's own pointer-down focus change, or it would blur the new editor at once.
-    if (isDoubleTap(nodeId)) return void setTimeout(() => startEditing(nodeId));
-    setSelectedNodeId(nodeId);
-    setSelectedEdgeId(null);
-    const ids = node.type === "group" ? [nodeId, ...membersOf(node, current.nodes)] : [nodeId];
+    const canEdit = !isAdditive && node.type !== "drawing";
+    if (canEdit && isDoubleTap(nodeId)) return void setTimeout(() => startEditing(nodeId));
+    const selection = selectedIds.includes(nodeId) ? selectedIds : isAdditive ? [...selectedIds, nodeId] : [nodeId];
+    selectNodes(selection);
+    const ids = withGroupMembers(selection, current.nodes);
     const origins = new Map(current.nodes.filter((n) => ids.includes(n.id)).map((n) => [n.id, { x: n.x, y: n.y }]));
-    interaction.current = { kind: "drag", nodeId, start: point, origins, hasMoved: false };
+    interaction.current = { kind: "drag", start: point, origins, hasMoved: false, releaseTo: selectionOnTap(nodeId, isAdditive) };
     const asset = nodeAsset(node);
     pressedNode.current = asset ? { node, asset } : null;
     if (asset) longPress.down({ x: e.clientX, y: e.clientY, pointerType: e.pointerType });
   }
 
+  /** A tap on an already selected card: Shift (or the box tool) takes it out, otherwise it becomes the only one. */
+  function selectionOnTap(nodeId: string, isAdditive: boolean): string[] | null {
+    if (!selectedIds.includes(nodeId)) return null;
+    if (isAdditive) return toggleId(selectedIds, nodeId);
+    return selectedIds.length > 1 ? [nodeId] : null;
+  }
+
+  function withGroupMembers(ids: string[], nodes: DiagramNode[]): string[] {
+    const members = nodes.filter((n) => n.type === "group" && ids.includes(n.id)).flatMap((group) => membersOf(group, nodes));
+    return [...new Set([...ids, ...members])];
+  }
+
   function pressEdge(edgeId: string) {
     setSelectedEdgeId(edgeId);
-    setSelectedNodeId(null);
+    setSelectedIds([]);
     if (isDoubleTap(`edge:${edgeId}`)) setTimeout(() => setEditingEdgeId(edgeId));
   }
 
@@ -541,19 +635,53 @@ export default function DiagramsPage() {
     if (editingNodeId || editingEdgeId) (document.activeElement as HTMLElement | null)?.blur();
     e.currentTarget.setPointerCapture?.(e.pointerId);
     const point = toBoard(e.clientX, e.clientY);
+    if (mode === "draw") return startPen(point);
     const nodeId = closestData(e.target, "data-node-id");
     if (nodeId && closestData(e.target, "data-resize-handle") !== null) return startHandleDrag("resize", nodeId, point);
     if (nodeId && closestData(e.target, "data-connect-handle") !== null) return startHandleDrag("connect", nodeId, point);
     if (nodeId) return pressNode(nodeId, point, e);
     const edgeId = closestData(e.target, "data-edge-id");
     if (edgeId) return pressEdge(edgeId);
-    setSelectedNodeId(null);
-    setSelectedEdgeId(null);
     if (mode === "connect") {
       setConnectFrom(null);
       setConnectDraft(null);
     }
+    if (mode === "area" || e.shiftKey) return startBox(point, e.shiftKey ? selectedIds : []);
+    selectNodes([]);
     interaction.current = { kind: "pan", start: { x: e.clientX, y: e.clientY }, pan: view.current.pan };
+  }
+
+  function startBox(point: Point, base: string[]) {
+    selectNodes(base);
+    interaction.current = { kind: "box", start: point, base };
+    setSelectionBox({ ...point, width: 0, height: 0 });
+  }
+
+  function moveBox(box: Extract<Interaction, { kind: "box" }>, point: Point) {
+    const area = rectBetween(box.start, point);
+    const rects = (current?.nodes ?? []).map((n) => ({ id: n.id, ...rectOf(n) }));
+    setSelectionBox(area);
+    setSelectedIds([...new Set([...box.base, ...idsWithin(area, rects)])]);
+  }
+
+  function startPen(point: Point) {
+    interaction.current = { kind: "draw", points: [point] };
+    setPenDraft([point]);
+  }
+
+  function movePen(pen: Extract<Interaction, { kind: "draw" }>, point: Point) {
+    const last = pen.points[pen.points.length - 1];
+    if (Math.hypot(point.x - last.x, point.y - last.y) * view.current.zoom < PEN_STEP_PX) return;
+    pen.points.push(point);
+    setPenDraft([...pen.points]);
+  }
+
+  function finishPen(points: Point[]) {
+    const stroke = strokeFromPoints(points, SIMPLIFY_TOLERANCE / view.current.zoom);
+    const { x, y, width, height } = stroke;
+    const node: DiagramNode = { id: uuid(), type: "drawing", label: "", x, y, width, height, data: drawingData(stroke) };
+    updateCurrent((d) => ({ ...d, nodes: [...d.nodes, node] }));
+    setPenDraft(null);
   }
 
   function moveDrag(drag: Extract<Interaction, { kind: "drag" }>, point: Point) {
@@ -576,8 +704,9 @@ export default function DiagramsPage() {
   function moveResize(resize: Extract<Interaction, { kind: "resize" }>, point: Point) {
     const node = current?.nodes.find((n) => n.id === resize.nodeId);
     if (!node) return;
-    const width = Math.max(node.type === "group" ? 160 : 80, Math.round(resize.width + point.x - resize.start.x));
-    const height = isAutoHeight(node.type) ? node.height : Math.max(40, Math.round(resize.height + point.y - resize.start.y));
+    const min = minSize(node.type);
+    const width = Math.max(min.width, Math.round(resize.width + point.x - resize.start.x));
+    const height = isAutoHeight(node.type) ? node.height : Math.max(min.height, Math.round(resize.height + point.y - resize.start.y));
     updateNode(node.id, { width, height });
   }
 
@@ -604,6 +733,8 @@ export default function DiagramsPage() {
     else if (active.kind === "resize") moveResize(active, point);
     else if (active.kind === "connect") setConnectDraft({ fromId: active.fromId, to: point });
     else if (active.kind === "pinch") movePinch(active);
+    else if (active.kind === "box") moveBox(active, point);
+    else if (active.kind === "draw") movePen(active, point);
     else setPan({ x: active.pan.x + e.clientX - active.start.x, y: active.pan.y + e.clientY - active.start.y });
   }
 
@@ -616,6 +747,12 @@ export default function DiagramsPage() {
       if (targetId) addEdge(active.fromId, targetId);
     }
     if (active?.kind === "connect") setConnectDraft(null);
+    if (active?.kind === "box") setSelectionBox(null);
+    if (active?.kind === "draw") {
+      if (e.type === "pointercancel") setPenDraft(null);
+      else finishPen(active.points);
+    }
+    if (active?.kind === "drag" && !active.hasMoved && active.releaseTo) selectNodes(active.releaseTo);
     if (active?.kind === "pinch" && pointers.current.size > 0) return;
     interaction.current = null;
     setIsInteracting(false);
@@ -630,18 +767,45 @@ export default function DiagramsPage() {
     if (!hasPressFired.current) openAssetMenu({ x: e.clientX, y: e.clientY }, asset, null);
   }
 
+  function handleShortcut(e: React.KeyboardEvent): boolean {
+    if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return false;
+    const key = e.key.toLowerCase();
+    if (key === "d") duplicateSelection();
+    else if (key === "a") selectNodes(current?.nodes.map((n) => n.id) ?? []);
+    else return false;
+    e.preventDefault();
+    return true;
+  }
+
   function handleKeyDown(e: React.KeyboardEvent) {
     if (editingNodeId || editingEdgeId) return;
     if (isTextField(e.target)) return;
+    if (handleShortcut(e)) return;
     if (e.key === "Delete" || e.key === "Backspace") deleteSelection();
     if (e.key === "Escape") {
-      setConnectFrom(null);
-      setConnectDraft(null);
-      setMode("select");
-      setSelectedNodeId(null);
-      setSelectedEdgeId(null);
+      changeTool("select");
+      selectNodes([]);
     }
   }
+
+  // Copy or cut the selected cards as marked JSON on the system clipboard, so they paste into any board.
+  useEffect(() => {
+    if (showList) return;
+    const onCopy = (e: ClipboardEvent) => {
+      if (!current || !selectedIds.length || isTextField(document.activeElement)) return;
+      if (!(window.getSelection()?.isCollapsed ?? true)) return;
+      e.preventDefault();
+      e.clipboardData?.setData("text/plain", serializeCards(copyCards(current, selectedIds)));
+      pasteCount.current = 0;
+      if (e.type === "cut") deleteSelection();
+    };
+    window.addEventListener("copy", onCopy);
+    window.addEventListener("cut", onCopy);
+    return () => {
+      window.removeEventListener("copy", onCopy);
+      window.removeEventListener("cut", onCopy);
+    };
+  });
 
   // Paste an image, a link or text straight onto the open board.
   useEffect(() => {
@@ -650,6 +814,12 @@ export default function DiagramsPage() {
       if (isTextField(e.target) || isTextField(document.activeElement)) return;
       const files = imageFilesFrom(e.clipboardData);
       const text = e.clipboardData?.getData("text/plain") ?? "";
+      const cards = parseCards(text);
+      if (cards) {
+        e.preventDefault();
+        pasteCount.current += 1;
+        return pasteCards(cards, PASTE_OFFSET * pasteCount.current);
+      }
       if (!files.length && !text.trim()) return;
       e.preventDefault();
       if (files.length) void addImages(files, viewportCenter());
@@ -674,7 +844,7 @@ export default function DiagramsPage() {
   function loadDiagram(d: Diagram) {
     setCurrent(d);
     setShowList(false);
-    setSelectedNodeId(null);
+    setSelectedIds([]);
     setSelectedEdgeId(null);
     setEditingNodeId(null);
     setPan({ x: 0, y: 0 });
@@ -723,6 +893,12 @@ export default function DiagramsPage() {
     if (!current) return;
     const canvas = await renderDiagramPng({ diagram: current, rectOf, describeAsset: (node) => describeAsset(projectId, node) });
     downloadFile(`${current.name || "diagram"}.png`, canvas.toDataURL("image/png"));
+  }
+
+  function exportSvg() {
+    if (!current) return;
+    const svg = renderDiagramSvg({ diagram: current, rectOf, describeAsset: (node) => describeAsset(projectId, node) });
+    downloadBlob(`${current.name || "diagram"}.svg`, new Blob([svg], { type: "image/svg+xml" }));
   }
 
   function exportJson() {
@@ -825,6 +1001,13 @@ export default function DiagramsPage() {
   }
 
   const selectedNode = current?.nodes.find((n) => n.id === selectedNodeId) ?? null;
+  const selectedNodes = current?.nodes.filter((n) => selectedIds.includes(n.id)) ?? [];
+  const arrangeHandlers = {
+    onDuplicate: duplicateSelection,
+    onArrange: arrangeSelection,
+    onAlign: alignSelection,
+    onDistribute: distributeSelection,
+  };
   const groups = current?.nodes.filter((n) => n.type === "group") ?? [];
   const cards = current?.nodes.filter((n) => n.type !== "group") ?? [];
   const renderCard = (node: DiagramNode) => (
@@ -832,7 +1015,8 @@ export default function DiagramsPage() {
       key={node.id}
       node={node}
       projectId={projectId}
-      isSelected={node.id === selectedNodeId}
+      isSelected={selectedIds.includes(node.id)}
+      hasHandles={node.id === selectedNodeId}
       isEditing={node.id === editingNodeId}
       isConnectSource={node.id === connectFrom || node.id === connectDraft?.fromId}
       isLoading={loadingPreviews.has(node.id) && !linkPreview(node).title && Boolean(linkUrl(node))}
@@ -880,30 +1064,7 @@ export default function DiagramsPage() {
           )}
         </div>
         <div className="flex items-center gap-1 max-md:flex-wrap">
-          <button
-            onClick={() => { setMode("select"); setConnectFrom(null); setConnectDraft(null); }}
-            className="p-1.5 rounded text-xs"
-            style={{
-              background: mode === "select" ? "var(--bg-hover)" : "transparent",
-              color: mode === "select" ? "var(--text-primary)" : "var(--text-secondary)",
-            }}
-            title="Select & Move (Esc)"
-            aria-label="Select and move"
-          >
-            <MousePointer className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => setMode("connect")}
-            className="p-1.5 rounded text-xs"
-            style={{
-              background: mode === "connect" ? "var(--bg-hover)" : "transparent",
-              color: mode === "connect" ? "var(--text-primary)" : "var(--text-secondary)",
-            }}
-            title="Connect cards: click the first card, then the second"
-            aria-label="Connect cards"
-          >
-            <Link2 className="w-4 h-4" />
-          </button>
+          <ToolPicker tool={mode} onChange={changeTool} />
 
           <div className="w-px h-5 mx-1" style={{ background: "var(--border)" }} />
 
@@ -940,6 +1101,7 @@ export default function DiagramsPage() {
           <ExportMenu
             items={[
               { label: "PNG image", description: "The whole board as a picture", onClick: () => void exportPng() },
+              { label: "SVG image", description: "Sharp vector picture for docs and design tools", onClick: exportSvg },
               { label: "JSON", description: "Cards and lines, to re-import or use in code", onClick: exportJson },
             ]}
           />
@@ -951,7 +1113,7 @@ export default function DiagramsPage() {
         ref={viewportRef}
         className="flex-1 relative overflow-hidden select-none outline-none"
         style={{
-          cursor: mode === "connect" ? "crosshair" : isInteracting ? "grabbing" : "default",
+          cursor: mode === "connect" || mode === "draw" ? "crosshair" : isInteracting ? "grabbing" : "default",
           touchAction: "none",
           background: "var(--bg-primary)",
           backgroundImage: "linear-gradient(#1a1a28 1px, transparent 1px), linear-gradient(90deg, #1a1a28 1px, transparent 1px)",
@@ -984,12 +1146,31 @@ export default function DiagramsPage() {
             />
           )}
           {cards.map(renderCard)}
+          {penDraft && (
+            <svg className="absolute left-0 top-0 overflow-visible pointer-events-none" width="1" height="1" aria-hidden>
+              <path d={smoothPath(penDraft)} fill="none" stroke={SHAPE_COLORS.drawing} strokeWidth={DRAWING_STROKE} strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          )}
+          {selectionBox && (
+            <div
+              className="absolute pointer-events-none rounded-sm"
+              style={{
+                left: selectionBox.x,
+                top: selectionBox.y,
+                width: selectionBox.width,
+                height: selectionBox.height,
+                border: `${1 / zoom}px solid var(--accent)`,
+                background: "color-mix(in srgb, var(--accent) 10%, transparent)",
+              }}
+            />
+          )}
         </div>
 
         {selectedNode && !editingNodeId && (
           <SelectionPanel
             node={selectedNode}
             projectId={projectId}
+            {...arrangeHandlers}
             onColor={(color) => updateNode(selectedNode.id, { color })}
             onLinkAsset={(value) => setNodeAsset(selectedNode.id, value)}
             onStack={() => stackGroup(selectedNode.id)}
@@ -999,18 +1180,29 @@ export default function DiagramsPage() {
             onDelete={deleteSelection}
           />
         )}
+        {selectedNodes.length > 1 && !editingNodeId && (
+          <MultiSelectionPanel nodes={selectedNodes} {...arrangeHandlers} onColor={recolorSelection} onDelete={deleteSelection} />
+        )}
 
         {/* Empty board hint */}
         {current && current.nodes.length === 0 && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none p-6">
             <p className="text-sm text-center max-w-sm" style={{ color: "var(--text-secondary)" }}>
               Empty board. Use <b style={{ color: "var(--text-primary)" }}>Add</b> for notes, to-dos, images, links, asset cards
-              or flow-chart shapes, or paste and drop pictures and links straight onto the board. Double-click a card to edit it.
+              or shapes, sketch with the pen, or paste and drop pictures and links straight onto the board. Double-click a card to edit it.
             </p>
           </div>
         )}
 
         {/* Mode hint */}
+        {(mode === "draw" || (mode === "area" && !selectedIds.length)) && (
+          <div
+            className="absolute bottom-4 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-lg text-xs text-center pointer-events-none max-md:w-[90%]"
+            style={{ background: "var(--bg-card)", color: "var(--accent)", border: "1px solid var(--accent)" }}
+          >
+            {mode === "draw" ? "Draw: drag to sketch" : "Box select: drag around cards, tap cards to add or remove"} · Esc to stop
+          </div>
+        )}
         {mode === "connect" && (
           <div
             className="absolute bottom-4 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-lg text-xs text-center max-md:w-[90%]"
