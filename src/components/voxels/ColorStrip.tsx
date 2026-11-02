@@ -108,7 +108,7 @@ function PalettePicker({ projectId, palettes, initialPaletteId, onUsePalette }: 
         onClick={() => onUsePalette(pickedId)}
         className="px-2 py-1 rounded-md text-xs whitespace-nowrap"
         style={{ color: "var(--text-primary)", border: "1px solid var(--border)" }}
-        title="Swap the model's colours for this palette. Voxels keep the nearest colour."
+        title="Swap the model's colours for this palette. Cubes keep the nearest colour."
       >
         Use palette
       </button>

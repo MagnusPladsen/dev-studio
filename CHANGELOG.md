@@ -7,7 +7,7 @@ a self-hosted copy.
 ## [Unreleased]
 
 ### Tools
-- **Voxels:** 3D voxel model editor with add, erase, paint, eyedropper, fill and box tools, X/Y/Z mirror, grid sizes
+- **3D Pixel Art** (voxel art, first called Voxels): 3D model editor with add, erase, paint, eyedropper, fill and box tools, X/Y/Z mirror, grid sizes
   8 to 64, undo/redo and autosave
 - Sprite to voxels import from Pixel Art
 - Exports: .glb, .obj + .mtl, MagicaVoxel .vox and .png, at 1 voxel = 0.1 m, Y-up; free, no watermark
@@ -21,7 +21,7 @@ a self-hosted copy.
 
 ### Database
 - New Supabase migration `supabase/migrations/20261031090000_add_models_collection.sql` adds the `models`
-  collection; run it before using Voxels while signed in
+  collection; run it before using 3D Pixel Art while signed in
 
 ## [0.1.0-beta] - 2026-10-30
 

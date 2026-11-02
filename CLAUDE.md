@@ -65,7 +65,7 @@ errors and horizontal overflow on phones, and exercise the feature changed. Do t
 - Task Board: on touch screens cards move via a "Move to…" menu, not drag; undoing a deleted issue doesn't restore its links.
 - Dialogue condition nodes have a single exit (no "else" branch).
 - Cloud sign-in hasn't been tested end to end yet.
-- Voxels: OBJ `Kd` is written in linear colour, so OBJ colours look dark in Godot/Unity/three.js; use `.glb` for engines.
+- 3D Pixel Art (voxels, route `/voxels`): OBJ `Kd` is written in linear colour, so OBJ colours look dark in Godot/Unity/three.js; use `.glb` for engines.
 
 ## Next up (from competitor research, highest value first)
 

@@ -81,7 +81,7 @@ function typeExtras(ctx: AssetMenuContext): AssetMenuEntry[] {
     case "sprite":
       return [item("use-in-tilemap", "Use in Tilemap"), item("make-3d-model", "Make 3D model"), item("export-png", "Export PNG")];
     case "palette":
-      return [item("use-in-pixel-art", "Use in Pixel Art"), item("use-in-voxels", "Use in Voxels")];
+      return [item("use-in-pixel-art", "Use in Pixel Art"), item("use-in-voxels", "Use in 3D Pixel Art")];
     case "sound":
     case "music":
       return [item("toggle-preview", ctx.isPreviewing ? "Stop" : "Play")];

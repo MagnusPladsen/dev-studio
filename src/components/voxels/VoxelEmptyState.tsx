@@ -15,7 +15,7 @@ export function VoxelEmptyState({ hasModels, onNew, onFromSprite }: Props): Reac
     <div className="h-full overflow-y-auto flex items-center justify-center p-6 max-md:p-4">
       <div className="max-w-md w-full text-center">
         <Box className="w-12 h-12 mx-auto mb-3" style={{ color: "var(--accent)" }} />
-        <p style={{ color: "var(--text-secondary)" }}>Build chunky 3D props and characters, one voxel at a time.</p>
+        <p style={{ color: "var(--text-secondary)" }}>Pixel art with depth: stack coloured cubes into 3D props and characters.</p>
         <p className="text-xs mt-1 mb-4" style={{ color: "var(--text-muted)" }}>
           {hasModels ? "Pick a model from your list, or start a new one." : "Start an empty 16×16×16 model, or stand one of your sprites up in 3D."}
         </p>

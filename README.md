@@ -34,7 +34,7 @@ A free, open source game development toolkit. Create pixel art, music, sound eff
 | **Dialogue** | Branching conversations with choices, conditions and a play-through preview. JSON export |
 | **Palettes** | Shared colour palettes with PICO-8, Game Boy, NES and more presets |
 | **Sprite sheets** | Pack sprites and their animation frames into one PNG plus a JSON atlas |
-| **Voxels** | Build chunky 3D models with add, erase, paint, eyedropper, fill and box tools and X/Y/Z mirror. Turn a sprite into voxels. Export .glb, .obj + .mtl, MagicaVoxel .vox and .png. Free, no watermark |
+| **3D Pixel Art** | Pixel art with depth (voxel art): build 3D models with add, erase, paint, eyedropper, fill and box tools and X/Y/Z mirror. Turn a sprite into voxels. Export .glb, .obj + .mtl, MagicaVoxel .vox and .png. Free, no watermark |
 | **Notebook** | Ideas, to-do lists, design docs and bug lists, with clickable checklists and `[[links]]` |
 
 Everything saves automatically. New projects can start with **Pip's Quest**, a small sample game spread across every

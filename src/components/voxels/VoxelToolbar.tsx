@@ -161,7 +161,7 @@ export function VoxelToolbar(props: Props): React.JSX.Element {
         className="text-xs px-1.5 py-1 rounded-md outline-none shrink-0"
         style={{ background: "var(--bg-primary)", color: "var(--text-primary)", border: "1px solid var(--border)" }}
         aria-label="Grid size"
-        title="Grid size. Making it smaller crops voxels that no longer fit."
+        title="Grid size. Making it smaller crops cubes that no longer fit."
       >
         {GRID_SIZES.map((option) => (
           <option key={option} value={option}>

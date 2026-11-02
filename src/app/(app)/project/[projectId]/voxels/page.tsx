@@ -209,7 +209,7 @@ export default function VoxelsPage(): React.JSX.Element {
     if (!doc || side === doc.grid.size[0]) return;
     const resized = resizeGrid(doc.grid, [side, side, side]);
     const sizeLabel = `${side}×${side}×${side}`;
-    const lostLabel = `${resized.lost} voxel${resized.lost === 1 ? "" : "s"}`;
+    const lostLabel = `${resized.lost} cube${resized.lost === 1 ? "" : "s"}`;
     if (resized.lost > 0 && !confirm(`Making the grid ${sizeLabel} removes ${lostLabel} that no longer fit. Continue?`)) return;
     strokes.reset();
     updateDoc({ grid: resized.grid });

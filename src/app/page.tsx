@@ -59,7 +59,7 @@ function ToolCard({ icon: Icon, name, description }: { icon: React.ComponentType
 
 const tools = [
   { icon: Paintbrush, name: "Pixel Art Editor", description: "Draw sprites with layers, frames, and onion skinning. Create animations and export sprite sheets." },
-  { icon: Box, name: "Voxel Models", description: "Build chunky 3D props and characters with your palettes. Export to Blender, Godot and Unity." },
+  { icon: Box, name: "3D Pixel Art", description: "Pixel art with depth: stack coloured cubes into 3D models (voxel art). Export to Blender, Godot and Unity." },
   { icon: Music, name: "Music Composer", description: "Pattern-based music creation with multiple channels and instruments. Think BeepBox meets FL Studio." },
   { icon: Volume2, name: "SFX Generator", description: "Generate retro and modern sound effects with presets for explosions, lasers, pickups, and more." },
   { icon: Grid3X3, name: "Tilemap Editor", description: "Paint game levels using your own sprites. Multiple layers, auto-tiling, and collision maps." },
@@ -129,7 +129,7 @@ const linkingExamples = [
     kicker: "Diagrams & Boards",
     title: "Put real assets on your moodboard",
     description:
-      "Drop sprites, voxel models, palettes and music onto a board as cards, next to your notes, images and references. Each card shows the asset itself and opens it in its own tool, so the board stays in step as the game changes.",
+      "Drop sprites, 3D models, palettes and music onto a board as cards, next to your notes, images and references. Each card shows the asset itself and opens it in its own tool, so the board stays in step as the game changes.",
     points: ["Cards for any asset in the project", "Group, connect and label them", "Edit the asset and the card follows"],
   },
 ];

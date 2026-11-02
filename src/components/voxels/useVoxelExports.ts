@@ -10,7 +10,7 @@ import type { VoxelDoc } from "./useVoxelDocument";
 import type { VoxelViewportApi } from "./VoxelViewport";
 import { BLENDER_MENU_DESCRIPTION, BLENDER_URL } from "./BlenderCard";
 
-const EMPTY_DESCRIPTION = "Add some voxels first";
+const EMPTY_DESCRIPTION = "Add some cubes first";
 export const GLB_EXPORT_ERROR = "Couldn't export the .glb. Please try again.";
 
 function buildModelMesh(grid: VoxelGrid, colors: string[]): ReturnType<typeof buildMesh> {

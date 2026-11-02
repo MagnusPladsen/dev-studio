@@ -296,17 +296,17 @@ export const HELP: Record<HelpTopic, HelpContent> = {
     ],
   },
   voxels: {
-    title: "Voxels",
-    summary: "Build chunky 3D props and characters, one block at a time.",
+    title: "3D Pixel Art",
+    summary: "Pixel art with depth: stack coloured cubes into 3D models (also called voxel art).",
     canDo: [
-      "Add, erase and paint voxels, fill faces and draw boxes.",
+      "Add, erase and paint cubes, fill faces and draw boxes.",
       "Mirror edits across the X, Y or Z axis.",
       "Turn a sprite into a 3D model.",
       "Export .glb, OBJ + MTL, MagicaVoxel .vox or a PNG.",
     ],
     steps: [
       "Press New model, or make one from a sprite.",
-      "Pick a colour and the Add tool, then click to place voxels.",
+      "Pick a colour and the Add tool, then click to place cubes.",
       "Right-drag to turn the view, scroll to zoom.",
       "Export it for Blender, Godot, Unity or the web.",
     ],

@@ -21,7 +21,7 @@ export const ASSET_KINDS: Record<AssetType, AssetKind> = {
   spritesheet: { type: "spritesheet", collection: "spritesheets", label: "Sprite sheet", path: "sprites", color: "#38bdf8" },
   note: { type: "note", collection: "notes", label: "Note", path: "notebook", color: "#a3e635" },
   issue: { type: "issue", collection: "issues", label: "Issue", path: "board", color: "#e879f9" },
-  model: { type: "model", collection: "models", label: "Voxel model", path: "voxels", color: "#d4a373" },
+  model: { type: "model", collection: "models", label: "3D model", path: "voxels", color: "#d4a373" },
 };
 
 export const ASSET_TYPES = Object.keys(ASSET_KINDS) as AssetType[];
