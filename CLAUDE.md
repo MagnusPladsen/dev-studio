@@ -3,7 +3,7 @@
 # GameDev Studio
 
 Free, open source, browser-based game-dev toolkit (beta). Live at https://gamedev-studio.pladsen.dev, deployed by the
-owner through Vercel from `main`. Read `HANDOVER.md` for current status, open tasks and next steps.
+owner through Vercel from `main`.
 
 ## Commands
 
@@ -59,3 +59,17 @@ owner through Vercel from `main`. Read `HANDOVER.md` for current status, open ta
 vitest unit tests cover the voxel lib and the examples (`npm test`). UI changes are still verified by building, running `next start`, and driving the app with
 Playwright (desktop 1440×900 and phone 390×844): create a project with examples, open every tool, check for page
 errors and horizontal overflow on phones, and exercise the feature changed. Do the same before pushing UI work.
+
+## Known gaps
+
+- Task Board: on touch screens cards move via a "Move to…" menu, not drag; undoing a deleted issue doesn't restore its links.
+- Dialogue condition nodes have a single exit (no "else" branch).
+- Cloud sign-in hasn't been tested end to end yet.
+- Voxels: OBJ `Kd` is written in linear colour, so OBJ colours look dark in Godot/Unity/three.js; use `.glb` for engines.
+
+## Next up (from competitor research, highest value first)
+
+Pixel Art animation tags + per-frame durations · Tilemap auto-tiling and collision layer · one-click engine exports
+(Godot, Unity, Phaser, Tiled) · mirror / pixel-perfect / dither tools and Lospec palette import · Tilemap object layer
+· dialogue variables and localisation CSV · story timeline and world map · multi-pattern songs, envelopes, MIDI ·
+pixel font maker · read-only share links and a "play this level" preview.
