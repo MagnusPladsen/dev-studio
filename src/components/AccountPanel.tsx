@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Cloud, CloudOff, FolderOpen, FolderSync, HardDrive, Loader2, LogOut, Mail, AlertTriangle, Check, X } from "lucide-react";
 import { useSync } from "./SyncProvider";
+import { AccountPrivacy } from "./AccountPrivacy";
 
 function GithubMark({ className }: { className?: string }) {
   return (
@@ -249,6 +250,8 @@ export function AccountPanel() {
             Save to a local folder
           </button>
         ))}
+
+      <AccountPrivacy />
 
       <p className="leading-snug pt-1 [@media(max-height:500px)]:hidden" style={{ color: "var(--text-muted)" }}>
         Everything you make is yours: free downloads, no watermark, no attribution needed.

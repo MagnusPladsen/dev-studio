@@ -72,6 +72,8 @@ Every tool ships with small hand-made examples to edit, so what you export is yo
 | **A folder on your computer** | *Save to a local folder* writes every project as JSON files (Chrome/Edge). Great for self-hosting and for keeping projects in git |
 | **Export file** | *Export project* downloads one `.gamedev.json` you can import anywhere |
 
+Your data stays yours: the Account panel has *Export all* (every project as one file the projects list re-imports), *Delete account* (or *Clear data* without an account) and a link to the [privacy page](https://gamedev-studio.pladsen.dev/privacy). Vercel Analytics loads only after you click *Allow* in the consent banner.
+
 ## Desktop app
 
 Download GameDev Studio or Dev Studio for macOS (`.dmg`), Windows (`.exe`) or Linux (`.AppImage` / `.deb`) from the
