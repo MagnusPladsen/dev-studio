@@ -50,9 +50,15 @@ tools comes from `COPY.help`. `npm test` checks both objects have the same keys 
   otherwise the remote copy replaces the open asset (selection/view kept) and undo history restarts, so undo never
   reverts someone else's change. Canvas, Task Board, Notebook, Wiki/Story and Decision log do this; other editors
   are re-mounted on their open asset by `<LiveRefresh>`, which also shows the "deleted elsewhere" notice.
+- **Compare-and-swap saves**: rows carry a server `rev` (bumped by trigger). The cloud persister saves through the
+  `save_projects` / `save_assets` RPCs with the rev it last saw; on a conflict it fetches the server copy, merges
+  (`src/lib/sync/merge.ts`: per field, canvas elements by id, tags as sets, text by line; deletes win) and saves
+  again. Issue keys and ADR numbers are unique per project (DB index); a clash moves ours to the next free one.
+  `search_assets` RPC searches the `asset_search` table (kept by trigger). OAuth clients (the MCP) cannot delete.
 - **Supabase**: tables `projects` and `assets` (JSON bodies, row level security per user). Schema lives in
   `supabase/migrations/` and is applied by Supabase's GitHub integration. Adding a collection means a new migration
-  that widens `assets_collection_check`. Env: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+  that widens `assets_collection_check` (and, if its text should be searchable, a case in `asset_search_text`).
+  `supabase/db-tests/run.sh` applies every migration to Postgres 17 in Docker and runs SQL checks with two users. Env: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
 - **Assets & links**: `src/lib/assets.ts` (`ASSET_KINDS` registry: collection, label, tool path, colour) and
   `src/lib/links.ts` (`getRelated`, `addLink`, `removeLink`). Any asset can link to any other; story `[[wiki links]]`
   count too. `<LinkedAssets>` is the shared panel; `assetHref()` + `useOpenParam()` open an asset via `?open=<id>`.

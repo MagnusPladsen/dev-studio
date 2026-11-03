@@ -135,7 +135,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       const supabase = getSupabase()!;
       userIdRef.current = u.id;
       goLive(() => {});
-      let cursor: string | null = null;
+      let loaded: Awaited<ReturnType<typeof loadCloudSnapshot>>;
       try {
         if (localHasData()) {
           setStatus({ state: "saving", message: "Moving your local projects into your account…" });
@@ -143,9 +143,8 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
           clearLocalData();
         }
         setStatus({ state: "saving", message: "Loading your projects…" });
-        const loaded = await loadCloudSnapshot(supabase);
+        loaded = await loadCloudSnapshot(supabase);
         replaceCache(loaded.snapshot);
-        cursor = loaded.cursor;
       } catch (err) {
         userIdRef.current = null;
         enterLocal();
@@ -154,14 +153,23 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       }
       setUser({ id: u.id, email: u.email });
       let live: RemoteSync | null = null;
-      const persister = createCloudPersister(supabase, u.id, setStatus, (rows) => {
-        live?.written(rows).catch(() => {});
-      });
+      const persister = createCloudPersister(
+        supabase,
+        u.id,
+        setStatus,
+        (rows) => {
+          live?.written(rows).catch(() => {});
+        },
+        (changes) => applyRemote(changes, persister.dropProject)
+      );
+      persister.remember("projects", loaded.rows.projects);
+      persister.remember("assets", loaded.rows.assets);
       usePrimary(persister);
       live = createRemoteSync({
         userId: u.id,
         reader: createCloudReader(supabase),
-        cursor,
+        cursor: loaded.cursor,
+        onServerRow: (table, kind, row) => (kind === "delete" ? persister.forget(table, row.id) : persister.remember(table, [row])),
         apply: (changes) => applyRemote(changes, persister.dropProject),
         isBusy: persister.isBusy,
         locate: locateCached,
