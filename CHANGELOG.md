@@ -26,6 +26,14 @@ a self-hosted copy.
 - New example boards: "Pip's Quest Moodboard" and "Mossbrook Meadow Level Plan"
 - **Help:** a `?` button on every tool page explains what it does, with quick-start steps and tips
 
+### Desktop and releases
+- **Dev Studio desktop app** for macOS, Windows and Linux, with its own name, icon and installers
+  (`Dev-Studio-*`). It uses port 47616, so it runs next to GameDev Studio without sharing projects
+- Every merge to `main` now publishes a release with both apps' installers; the version is the last tag with the
+  patch bumped (`v0.1.1-beta`, `v0.1.2-beta`, …)
+- Homebrew: `brew install --cask magnuspladsen/tap/gamedev-studio` or `…/dev-studio`, updated by each release
+- The website's download buttons fetch the installers of the app you are on
+
 ### Database
 - New Supabase migration `supabase/migrations/20261031090000_add_models_collection.sql` adds the `models`
   collection; run it before using 3D Pixel Art while signed in

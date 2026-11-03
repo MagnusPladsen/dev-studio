@@ -2,19 +2,24 @@
 
 import { useSyncExternalStore } from "react";
 import { Download, ExternalLink } from "lucide-react";
+import { APP } from "@/lib/app-config";
 
 type Platform = "mac" | "windows" | "linux";
 
 const RELEASES_URL = "https://github.com/MagnusPladsen/dev-studio/releases";
 
-/** File names are fixed in desktop/package.json so these links always point at the newest release. */
+/** File names are fixed per app in desktop/electron-builder.ts so these links always point at the newest release. */
+const ASSET_PREFIX = APP.name.replaceAll(" ", "-");
+
 const DOWNLOADS: { platform: Platform; name: string; detail: string; file: string }[] = [
-  { platform: "mac", name: "macOS", detail: "Apple Silicon (M1 or newer)", file: "GameDev-Studio-mac-arm64.dmg" },
-  { platform: "mac", name: "macOS", detail: "Intel", file: "GameDev-Studio-mac-x64.dmg" },
-  { platform: "windows", name: "Windows", detail: "Windows 10 and 11, 64-bit", file: "GameDev-Studio-windows-x64.exe" },
-  { platform: "linux", name: "Linux", detail: "AppImage, any distro", file: "GameDev-Studio-linux-x64.AppImage" },
-  { platform: "linux", name: "Linux", detail: ".deb for Ubuntu and Debian", file: "GameDev-Studio-linux-x64.deb" },
+  { platform: "mac", name: "macOS", detail: "Apple Silicon (M1 or newer)", file: `${ASSET_PREFIX}-mac-arm64.dmg` },
+  { platform: "mac", name: "macOS", detail: "Intel", file: `${ASSET_PREFIX}-mac-x64.dmg` },
+  { platform: "windows", name: "Windows", detail: "Windows 10 and 11, 64-bit", file: `${ASSET_PREFIX}-windows-x64.exe` },
+  { platform: "linux", name: "Linux", detail: "AppImage, any distro", file: `${ASSET_PREFIX}-linux-x64.AppImage` },
+  { platform: "linux", name: "Linux", detail: ".deb for Ubuntu and Debian", file: `${ASSET_PREFIX}-linux-x64.deb` },
 ];
+
+const BREW_COMMAND = `brew install --cask magnuspladsen/tap/${APP.id}`;
 
 const downloadUrl = (file: string) => `${RELEASES_URL}/latest/download/${file}`;
 
@@ -73,6 +78,16 @@ export function DesktopDownload() {
           </li>
         ))}
       </ul>
+
+      <p className="text-xs mt-4" style={{ color: "var(--text-secondary)" }}>
+        On a Mac with Homebrew:
+      </p>
+      <code
+        className="block mt-1.5 px-3 py-2 rounded-lg border text-xs font-mono break-all select-all"
+        style={{ background: "var(--bg-secondary)", borderColor: "var(--border)", color: "var(--text-primary)" }}
+      >
+        {BREW_COMMAND}
+      </code>
 
       <p className="text-xs leading-relaxed mt-4" style={{ color: "var(--text-muted)" }}>
         The app isn&apos;t code-signed yet, so the first launch shows a warning. On a Mac, open System Settings → Privacy

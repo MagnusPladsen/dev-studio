@@ -21,32 +21,5 @@
     "electron": "44.9.3",
     "electron-builder": "26.17.0"
   },
-  "build": {
-    "appId": "dev.pladsen.gamedev-studio",
-    "productName": "GameDev Studio",
-    "directories": {
-      "output": "dist"
-    },
-    "files": ["main.mjs", "package.json"],
-    "afterPack": "scripts/after-pack.mjs",
-    "mac": {
-      "category": "public.app-category.developer-tools",
-      "target": "dmg",
-      "identity": "-",
-      "artifactName": "GameDev-Studio-mac-${arch}.${ext}"
-    },
-    "win": {
-      "target": "nsis",
-      "artifactName": "GameDev-Studio-windows-x64.${ext}"
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true
-    },
-    "linux": {
-      "target": ["AppImage", "deb"],
-      "category": "Development",
-      "artifactName": "GameDev-Studio-linux-x64.${ext}"
-    }
-  }
+  "studioPort": 47615
 }

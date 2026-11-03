@@ -74,27 +74,56 @@ Every tool ships with small hand-made examples to edit, so what you export is yo
 
 ## Desktop app
 
-Download GameDev Studio for macOS (`.dmg`), Windows (`.exe`) or Linux (`.AppImage` / `.deb`) from the
-[latest release](https://github.com/MagnusPladsen/dev-studio/releases/latest). It works offline and needs no
-account. Projects are saved inside the app, or use *Save to a local folder* to keep them as JSON files on disk.
-
-The builds aren't code-signed yet, so the first launch shows a warning: on macOS open System Settings →
-Privacy & Security → *Open Anyway*; on Windows click *More info* → *Run anyway*.
-
-The app (in `desktop/`) is Electron running the studio's own Next.js server on `127.0.0.1:47615`. To build it
-yourself:
+Download GameDev Studio or Dev Studio for macOS (`.dmg`), Windows (`.exe`) or Linux (`.AppImage` / `.deb`) from the
+[latest release](https://github.com/MagnusPladsen/dev-studio/releases/latest), or on a Mac with Homebrew:
 
 ```bash
-DESKTOP_BUILD=1 npm run build
+brew install --cask magnuspladsen/tap/gamedev-studio
+brew install --cask magnuspladsen/tap/dev-studio
+```
+
+They work offline and need no account. Projects are saved inside the app, or use *Save to a local folder* to keep
+them as JSON files on disk.
+
+The builds aren't code-signed yet, so the first launch shows a warning: on macOS open System Settings →
+Privacy & Security → *Open Anyway* (or run `xattr -dr com.apple.quarantine "/Applications/Dev Studio.app"`); on
+Windows click *More info* → *Run anyway*.
+
+The app (in `desktop/`) is Electron running the studio's own Next.js server on `127.0.0.1` (port 47615 for
+GameDev Studio, 47616 for Dev Studio, so both can run side by side). `NEXT_PUBLIC_APP` picks the app for both
+builds. To build it yourself:
+
+```bash
+DESKTOP_BUILD=1 npm run build        # NEXT_PUBLIC_APP=dev-studio for Dev Studio, on this and electron-builder
 cd desktop
 npm install
 npm run prepare-server
 npm start          # run it, or: npx electron-builder --mac / --win / --linux
 ```
 
-**Releasing:** push a tag such as `v0.2.0`. The *Desktop release* workflow builds all three platforms and attaches
-the installers to a draft release. Publish it as a normal release (not a pre-release): the download links on the
-website point at `releases/latest`, which skips pre-releases.
+## Releases
+
+Every merge to `main` (except changes to Markdown files only) is a release. The *Desktop release* workflow
+(`.github/workflows/release.yml`) bumps the patch of the latest `v*` tag (`v0.1.0-beta` → `v0.1.1-beta`), builds
+both apps for every platform, then tags the merge commit and publishes one GitHub Release titled with the version,
+with generated notes. Merges are released one at a time, so two quick merges never share a version.
+
+Each release holds both apps' installers:
+
+| | GameDev Studio | Dev Studio |
+|---|---|---|
+| macOS Apple Silicon | `GameDev-Studio-mac-arm64.dmg` | `Dev-Studio-mac-arm64.dmg` |
+| macOS Intel | `GameDev-Studio-mac-x64.dmg` | `Dev-Studio-mac-x64.dmg` |
+| Windows | `GameDev-Studio-windows-x64.exe` | `Dev-Studio-windows-x64.exe` |
+| Linux | `GameDev-Studio-linux-x64.AppImage` / `.deb` | `Dev-Studio-linux-x64.AppImage` / `.deb` |
+
+The file names never change, so `releases/latest/download/<file>` always gets the newest build. Releases are not
+marked as pre-releases, because `releases/latest` skips those.
+
+The last job points the `gamedev-studio` and `dev-studio` casks in
+[MagnusPladsen/homebrew-tap](https://github.com/MagnusPladsen/homebrew-tap) at the new dmgs. It needs a
+`HOMEBREW_TAP_TOKEN` secret (a fine-grained token with *Contents: read and write* on the tap repo); without it the
+job only logs a warning. Running the workflow by hand only builds, with the installers attached to the run.
 
 ## Run it yourself
 

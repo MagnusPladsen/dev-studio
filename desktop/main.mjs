@@ -1,9 +1,11 @@
 import { app, BrowserWindow, dialog, shell, utilityProcess } from "electron";
 import net from "node:net";
 import path from "node:path";
+import packageJson from "./package.json" with { type: "json" };
 
-// Fixed on purpose: browser storage belongs to the origin, so a different port would hide every saved project.
-const PORT = 47615;
+// Fixed per app on purpose: browser storage belongs to the origin, so a different port would hide every saved project.
+const PORT = packageJson.studioPort;
+const APP_NAME = packageJson.productName;
 const ORIGIN = `http://127.0.0.1:${PORT}`;
 const SERVER_START_TIMEOUT_MS = 30_000;
 
@@ -40,12 +42,12 @@ function startServer() {
   server = utilityProcess.fork(script, [], {
     cwd: path.dirname(script),
     env: { ...process.env, NODE_ENV: "production", PORT: String(PORT), HOSTNAME: "127.0.0.1" },
-    serviceName: "GameDev Studio server",
+    serviceName: `${APP_NAME} server`,
   });
   server.once("exit", (code) => {
     server = undefined;
     if (!app.isQuitting) {
-      dialog.showErrorBox("GameDev Studio stopped", `The studio server exited (code ${code}). Please restart the app.`);
+      dialog.showErrorBox(`${APP_NAME} stopped`, `The studio server exited (code ${code}). Please restart the app.`);
       app.quit();
     }
   });
@@ -76,7 +78,7 @@ function createWindow() {
     minHeight: 600,
     backgroundColor: "#0a0a0f",
     autoHideMenuBar: true,
-    title: "GameDev Studio",
+    title: APP_NAME,
   });
   mainWindow.loadURL(`${ORIGIN}/projects`);
   mainWindow.on("closed", () => {
@@ -87,8 +89,8 @@ function createWindow() {
 async function launch() {
   if (await isPortOpen()) {
     dialog.showErrorBox(
-      "GameDev Studio can't start",
-      `Another program is using port ${PORT}, which GameDev Studio needs. Close it and open GameDev Studio again.`,
+      `${APP_NAME} can't start`,
+      `Another program is using port ${PORT}, which ${APP_NAME} needs. Close it and open ${APP_NAME} again.`,
     );
     app.quit();
     return;
@@ -97,7 +99,7 @@ async function launch() {
   try {
     await waitForServer();
   } catch (error) {
-    dialog.showErrorBox("GameDev Studio can't start", error.message);
+    dialog.showErrorBox(`${APP_NAME} can't start`, error.message);
     app.quit();
     return;
   }
