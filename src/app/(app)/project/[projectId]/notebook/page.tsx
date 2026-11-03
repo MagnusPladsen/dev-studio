@@ -24,6 +24,7 @@ import { storage } from "@/lib/storage";
 import { assetHref } from "@/lib/assets";
 import { registerAutosaveFlush } from "@/lib/autosave-registry";
 import { useOpenParam, useTrackOpenAsset, useStorageVersion } from "@/hooks/useStorage";
+import { useRemoteChanges } from "@/hooks/useRemoteChanges";
 import { useHistory } from "@/hooks/useHistory";
 import { LinkedAssets } from "@/components/LinkedAssets";
 import { UndoRedoButtons } from "@/components/UndoRedoButtons";
@@ -209,8 +210,18 @@ export default function NotebookPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, [flush]);
 
+  // Changes from another tab or device replace the open note unless it has unsaved edits (see useRemoteChanges).
+  const remoteRevision = useRemoteChanges(["notes"], projectId, () => {
+    const open = draftRef.current;
+    const stored = open ? storage.getById("notes", open.id, projectId) : undefined;
+    if (!open || !stored || timerRef.current || open !== savedRef.current) return false;
+    savedRef.current = stored;
+    setDraft(stored);
+    return true;
+  });
+
   // ── history (undo/redo) ──
-  const history = useHistory<Note | null>(draft, (v) => setDraft(v), draft?.id);
+  const history = useHistory<Note | null>(draft, (v) => setDraft(v), draft ? `${draft.id}:${remoteRevision}` : undefined);
 
   // ── selection ──
   const select = useCallback(

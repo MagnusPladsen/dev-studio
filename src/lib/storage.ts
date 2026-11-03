@@ -69,6 +69,8 @@ export type ChangeEvent =
 export interface Persister {
   name: string;
   onChange(event: ChangeEvent, snapshot: Snapshot): void;
+  /** Also mirror changes that arrived from elsewhere (another tab or device). Off for the source they came from. */
+  mirrorsRemote?: boolean;
 }
 
 /** key = cacheKey(collection, projectId) */
@@ -98,10 +100,24 @@ export function itemTime(item: Item): number {
 const cache: Snapshot = new Map();
 const persisters = new Set<Persister>();
 const listeners = new Set<() => void>();
+const remoteListeners = new Set<(changes: ChangeEvent[]) => void>();
+/** Bumped per cache key, so a hook can re-render only for the collection it shows. */
+const keyVersions = new Map<string, number>();
 let version = 0;
+
+function touchKey(key: string) {
+  keyVersions.set(key, (keyVersions.get(key) ?? 0) + 1);
+}
+
+function touchEvent(event: ChangeEvent) {
+  if (event.op !== "deleteProject") return touchKey(cacheKey(event.collection, event.projectId));
+  touchKey(cacheKey("projects"));
+  for (const col of PROJECT_COLLECTIONS) touchKey(cacheKey(col, event.projectId));
+}
 
 function emit(event: ChangeEvent) {
   version++;
+  touchEvent(event);
   for (const p of persisters) {
     try {
       p.onChange(event, cache);
@@ -157,6 +173,17 @@ export const storage = {
 
   version(): number {
     return version;
+  },
+
+  /** A counter that changes only when this collection (of this project) changes. */
+  versionOf(collection: CollectionName, projectId?: string): number {
+    return keyVersions.get(cacheKey(collection, projectId)) ?? 0;
+  },
+
+  /** Hears changes that came from another tab, device or the MCP server, after they are in the cache. */
+  onRemoteChange(listener: (changes: ChangeEvent[]) => void): () => void {
+    remoteListeners.add(listener);
+    return () => remoteListeners.delete(listener);
   },
 
   exportProject(projectId: string): string {
@@ -222,6 +249,67 @@ export function mergeIntoCache(snapshot: Snapshot): ChangeEvent[] {
     for (const l of listeners) l();
   }
   return changes;
+}
+
+function applyRemoteChange(change: ChangeEvent): boolean {
+  if (change.op === "deleteProject") {
+    const key = cacheKey("projects");
+    const projects = cache.get(key) ?? [];
+    const hasData = PROJECT_COLLECTIONS.some((col) => cache.has(cacheKey(col, change.projectId)));
+    if (!hasData && !projects.some((p) => p.id === change.projectId)) return false;
+    cache.set(key, projects.filter((p) => p.id !== change.projectId));
+    for (const col of PROJECT_COLLECTIONS) cache.delete(cacheKey(col, change.projectId));
+    return true;
+  }
+  const key = cacheKey(change.collection, change.projectId);
+  const items = cache.get(key) ?? [];
+  if (change.op === "delete") {
+    if (!items.some((i) => i.id === change.id)) return false;
+    cache.set(key, items.filter((i) => i.id !== change.id));
+    return true;
+  }
+  const index = items.findIndex((i) => i.id === change.item.id);
+  if (index >= 0 && JSON.stringify(items[index]) === JSON.stringify(change.item)) return false;
+  const next = [...items];
+  if (index >= 0) next[index] = change.item;
+  else next.push(change.item);
+  cache.set(key, next);
+  return true;
+}
+
+/**
+ * Put changes made elsewhere (another tab, device or the MCP server) into the cache. They are not
+ * sent back to where they came from: only persisters with `mirrorsRemote` hear about them.
+ * Returns the changes that actually altered the cache.
+ */
+export function applyRemoteChanges(changes: ChangeEvent[]): ChangeEvent[] {
+  const applied = changes.filter(applyRemoteChange);
+  if (!applied.length) return applied;
+  version++;
+  for (const change of applied) {
+    touchEvent(change);
+    for (const p of persisters) {
+      if (!p.mirrorsRemote) continue;
+      try {
+        p.onChange(change, cache);
+      } catch (err) {
+        console.error(`[storage] ${p.name} failed`, err);
+      }
+    }
+  }
+  for (const l of listeners) l();
+  for (const l of remoteListeners) l(applied);
+  return applied;
+}
+
+/** Where a cached project item lives, for remote deletes that only carry its id. */
+export function locateCached(id: string): { collection: ProjectCollection; projectId: string } | null {
+  for (const [key, items] of cache) {
+    const parsed = parseCacheKey(key);
+    if (!parsed?.projectId || !items.some((i) => i.id === id)) continue;
+    return { collection: parsed.collection as ProjectCollection, projectId: parsed.projectId };
+  }
+  return null;
 }
 
 export function getSnapshot(): Snapshot {

@@ -67,8 +67,8 @@ Every tool ships with small hand-made examples to edit, so what you export is yo
 
 | Mode | How |
 | --- | --- |
-| **This browser** (default) | No account needed. Saved in the browser's local storage |
-| **Your account** | Sign in with GitHub or an email link to sync across devices. The first time you sign in, projects already in the browser are moved into your account |
+| **This browser** (default) | No account needed. Saved in the browser's local storage. Other tabs of the same browser update live |
+| **Your account** | Sign in with GitHub or an email link to sync across devices. Changes from your other tabs and devices show up live. The first time you sign in, projects already in the browser are moved into your account |
 | **A folder on your computer** | *Save to a local folder* writes every project as JSON files (Chrome/Edge). Great for self-hosting and for keeping projects in git |
 | **Export file** | *Export project* downloads one `.gamedev.json` you can import anywhere |
 
@@ -163,11 +163,23 @@ projects on disk. (Use `npm run dev` instead of build + start if you want to cha
 
 Each user can only read and write their own rows (row level security).
 
+Live updates use Supabase Realtime (Postgres Changes on `projects` and `assets`, enabled by the
+`*_enable_realtime.sql` migration). Check that Realtime is enabled for the project (**Project Settings → Realtime**)
+and that both tables show under **Database → Publications → supabase_realtime**.
+
 ### Deploying both apps
 
 Create two Vercel projects from this repo with the same Supabase env vars. On the Dev Studio project, also set
 `NEXT_PUBLIC_APP=dev-studio`. Add both domains' `/auth/callback` URLs to Supabase's redirect URLs. Both apps share
 the same tables; each project row records which app it belongs to.
+
+**Realtime quota and cost.** Every open tab of a signed-in user keeps one Realtime connection and receives one
+message per saved change (an edit autosaves after a short pause, so typing is one message per pause, not per key).
+Supabase's free plan includes 200 concurrent connections and 2 million Realtime messages a month; Pro includes
+500 connections and 5 million messages, then bills per extra 1,000 connections and per extra million messages
+(see [supabase.com/pricing](https://supabase.com/pricing) for current numbers). Postgres Changes also checks row
+level security once per change per subscriber on the database, so at many concurrent users Supabase recommends
+moving to Broadcast. When the quota runs out, the app keeps saving and catches up when a tab reconnects or wakes up.
 
 ## Tech
 

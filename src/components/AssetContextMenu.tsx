@@ -182,14 +182,14 @@ function toMenuEntries(entries: AssetMenuEntry[], run: (action: AssetActionId, a
   });
 }
 
-function urlWithoutOpen(pathname: string): string {
+export function urlWithoutOpen(pathname: string): string {
   const params = new URLSearchParams(window.location.search);
   params.delete("open");
   const query = params.toString();
   return query ? `${pathname}?${query}` : pathname;
 }
 
-function urlWithOpen(pathname: string, id: string): string {
+export function urlWithOpen(pathname: string, id: string): string {
   const params = new URLSearchParams(window.location.search);
   params.set("open", id);
   return `${pathname}?${params.toString()}`;
@@ -593,7 +593,7 @@ function usePickerState(): {
 }
 
 /** Re-mounts the editor only after a pending `router.replace` has landed, so it reads the new `?open=`. */
-function useNavigateThenReload(openId: string | null, reloadView: () => void): MenuServices["navigateThenReload"] {
+export function useNavigateThenReload(openId: string | null, reloadView: () => void): MenuServices["navigateThenReload"] {
   const router = useRouter();
   const pendingOpen = useRef<{ open: string | null } | null>(null);
   useEffect(() => {

@@ -24,6 +24,7 @@ import {
   type DecisionField,
 } from "@/lib/decisions";
 import { useOpenParam, useTrackOpenAsset, useStorageVersion } from "@/hooks/useStorage";
+import { useRemoteChanges } from "@/hooks/useRemoteChanges";
 import { useHistory } from "@/hooks/useHistory";
 import { useAssetMenu } from "@/components/AssetContextMenu";
 import { LinkedAssets } from "@/components/LinkedAssets";
@@ -144,7 +145,14 @@ export default function DecisionLogPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const wikiTargets = useMemo(() => wikiTargetIndex(projectId), [projectId, version]);
 
-  const history = useHistory<Decision | null>(draft, (v) => setDraft(v), draft?.id);
+  // Changes from another tab or device replace the open decision unless it has unsaved edits (see useRemoteChanges).
+  const remoteRevision = useRemoteChanges(["decisions"], projectId, () => {
+    const stored = draft ? storage.getById("decisions", draft.id, projectId) : undefined;
+    if (!stored || hasPending()) return false;
+    load(stored);
+    return true;
+  });
+  const history = useHistory<Decision | null>(draft, (v) => setDraft(v), draft ? `${draft.id}:${remoteRevision}` : undefined);
   const rootRef = useRef<HTMLDivElement>(null);
 
   const select = useCallback(

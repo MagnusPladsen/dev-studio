@@ -28,6 +28,7 @@ import { useState, Suspense } from "react";
 import { SyncProvider, useSync } from "@/components/SyncProvider";
 import { ToastProvider } from "@/components/Toast";
 import { AssetContextMenuProvider, useAssetMenu } from "@/components/AssetContextMenu";
+import { LiveRefresh } from "@/components/LiveRefresh";
 import type { ContextMenuEntry } from "@/components/ContextMenu";
 import { anchorPoint, type Point } from "@/lib/menu-position";
 import { SidebarPins } from "@/components/SidebarPins";
@@ -308,6 +309,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <SyncProvider>
         <ToastProvider>
           <AssetContextMenuProvider>
+            <LiveRefresh />
             <AppSidebar>{children}</AppSidebar>
           </AssetContextMenuProvider>
         </ToastProvider>

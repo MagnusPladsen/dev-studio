@@ -125,6 +125,8 @@ export function createFolderPersister(root: FolderHandle, onError: (message: str
 
   return {
     name: "folder",
+    // the folder is a mirror of the cache, so it takes changes from other tabs and devices too
+    mirrorsRemote: true,
     onChange(event: ChangeEvent, snap: Snapshot) {
       latest = snap;
       if (event.op === "deleteProject") {
