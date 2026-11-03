@@ -9,7 +9,7 @@ describe("app config", () => {
   });
 
   it("gives Dev Studio only the planning tools", () => {
-    expect(appConfigFor("dev-studio").assetTypes).toEqual(["issue", "diagram", "story", "note"]);
+    expect(appConfigFor("dev-studio").assetTypes).toEqual(["issue", "diagram", "story", "note", "decision"]);
   });
 
   it("treats projects without an app as GameDev Studio projects", () => {

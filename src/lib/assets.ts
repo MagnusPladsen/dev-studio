@@ -1,6 +1,7 @@
 import type { AssetType } from "@/types";
 import { storage, type ProjectCollection } from "./storage";
 import { APP, isDevStudio } from "./app-config";
+import { decisionCode } from "./decisions";
 
 export interface AssetKind {
   type: AssetType;
@@ -23,6 +24,7 @@ export const ASSET_KINDS: Record<AssetType, AssetKind> = {
   note: { type: "note", collection: "notes", label: "Note", path: "notebook", color: "#a3e635" },
   issue: { type: "issue", collection: "issues", label: "Issue", path: "board", color: "#e879f9" },
   model: { type: "model", collection: "models", label: "3D model", path: "voxels", color: "#d4a373" },
+  decision: { type: "decision", collection: "decisions", label: "Decision", path: "decisions", color: "#818cf8" },
 };
 
 /** The asset types this app offers (see `APP.assetTypes`). */
@@ -49,14 +51,21 @@ type AnyAsset = {
   thumbnail?: string;
 };
 
+function summaryName(type: AssetType, a: AnyAsset & { key?: string; number?: number }): string {
+  if (type === "issue" && a.key) return `${a.key} ${a.title ?? ""}`.trim();
+  if (type === "decision" && a.number) return `${decisionCode(a.number)} ${a.title ?? ""}`.trim();
+  return a.name || a.title || "Untitled";
+}
+
 export function summarize(type: AssetType, raw: unknown): AssetSummary {
-  const a = raw as AnyAsset & { key?: string; description?: string };
+  const a = raw as AnyAsset & { key?: string; number?: number; description?: string; decision?: string };
+  const text = a.content ?? a.description ?? a.decision;
   return {
     type,
     id: a.id,
-    name: type === "issue" && a.key ? `${a.key} ${a.title ?? ""}`.trim() : a.name || a.title || "Untitled",
+    name: summaryName(type, a),
     thumbnail: type === "sprite" ? a.frames?.[0]?.pixels : type === "model" ? a.thumbnail : undefined,
-    excerpt: (a.content ?? a.description) ? (a.content ?? a.description)!.replace(/[#*_>`\[\]]/g, "").slice(0, 160) : undefined,
+    excerpt: text ? text.replace(/[#*_>`\[\]]/g, "").slice(0, 160) : undefined,
     updatedAt: a.updatedAt ?? a.createdAt,
   };
 }

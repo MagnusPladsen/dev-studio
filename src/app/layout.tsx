@@ -35,8 +35,8 @@ const METADATA: Record<AppId, Metadata> = {
   "dev-studio": {
     title: "Dev Studio (Beta) - Free Open Source Project Planning Toolkit",
     description:
-      "Plan software projects with a task board, a canvas for diagrams and moodboards, a linked wiki and a notebook — all connected in one free, open source app. No sign-up needed.",
-    keywords: ["task board", "kanban", "sprint planning", "whiteboard", "diagrams", "wiki", "notes", "open source", "free"],
+      "Plan software projects with a task board, a canvas for diagrams and moodboards, a linked wiki, a notebook and a decision log — all connected in one free, open source app. No sign-up needed.",
+    keywords: ["task board", "kanban", "sprint planning", "whiteboard", "diagrams", "wiki", "notes", "decision log", "ADR", "open source", "free"],
   },
 };
 

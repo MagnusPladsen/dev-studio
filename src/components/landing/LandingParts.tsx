@@ -99,7 +99,7 @@ const OTHER_APP_PITCH = isDevStudio
     }
   : {
       question: "Planning something that isn't a game?",
-      pitch: "Dev Studio is the Task Board, Canvas, Wiki and Notebook on their own, made for any software project. Same account, same free tools.",
+      pitch: "Dev Studio is the Task Board, Canvas, Wiki, Notebook and Decision log on their own, made for any software project. Same account, same free tools.",
     };
 
 /** "Have you tried the other studio?" card, in the other app's own colour. */

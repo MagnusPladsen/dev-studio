@@ -31,5 +31,6 @@ export const EXAMPLE_SLUGS = {
   dialogues: ["merchant", "elder-quest", "gate-guard"],
   stories: ["hero", "village", "sword", "elder", "forest", "shadow-king", "quest-sword", "lore-fall"],
   notes: ["welcome", "design-doc", "todo", "bugs"],
+  decisions: ["adr-pixel-scale", "adr-checkpoint-saves", "adr-autosave"],
   issues: ["i-movement", "i-jump-feel", "i-slime-ai", "i-meadow-level", "i-title-music", "i-coin-sfx", "i-jump-bug", "i-dialogue-ui", "i-sword-sprite", "i-save-system"],
 } as const;

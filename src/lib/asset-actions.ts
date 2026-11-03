@@ -3,6 +3,7 @@ import type {
   AssetRef,
   AssetType,
   Diagram,
+  Decision,
   DiagramNode,
   DialogueTree,
   Issue,
@@ -21,6 +22,7 @@ import { ASSET_KINDS, assetHref, summarize, type AssetSummary } from "./assets";
 import { addLink } from "./links";
 import { removeAssetPin } from "./pins";
 import { storage, type CollectionName } from "./storage";
+import { decisionToMarkdown, nextDecisionNumber } from "./decisions";
 
 export type StoredAsset =
   | Sprite
@@ -34,13 +36,14 @@ export type StoredAsset =
   | SpriteSheet
   | Note
   | Issue
-  | VoxelModel;
+  | VoxelModel
+  | Decision;
 
 export type ClonePlacement = "in-place" | "backlog";
 
 export type ClipboardPayload = { kind: "text"; text: string } | { kind: "png"; dataUrl: string };
 
-const TITLED_TYPES: AssetType[] = ["story", "note", "issue"];
+const TITLED_TYPES: AssetType[] = ["story", "note", "issue", "decision"];
 const DIAGRAM_NODE_WIDTH = 220;
 const DIAGRAM_NODE_HEIGHT = 64;
 const DIAGRAM_NODE_GAP = 40;
@@ -97,6 +100,13 @@ function issueClone(clone: Issue, projectId: string, placement: ClonePlacement):
   };
 }
 
+/** A copied decision gets the next number in its project and starts as a fresh proposal. */
+function decisionClone(clone: Decision, projectId: string): void {
+  clone.number = nextDecisionNumber(storage.getAll("decisions", projectId));
+  clone.status = "proposed";
+  delete clone.supersededBy;
+}
+
 export function cloneAsset(
   type: AssetType,
   item: StoredAsset,
@@ -111,6 +121,7 @@ export function cloneAsset(
   const nameField = TITLED_TYPES.includes(type) ? "title" : "name";
   Object.assign(copy, { [nameField]: uniqueName(getAssetName(type, item), takenNames(type, targetProjectId)) });
   if (type === "story") (copy as StoryEntry).links = [];
+  if (type === "decision") decisionClone(copy as Decision, targetProjectId);
   return type === "issue" ? issueClone(copy as Issue, targetProjectId, placement) : copy;
 }
 
@@ -266,6 +277,8 @@ export function systemClipboardPayload(type: AssetType, item: StoredAsset): Clip
       return { kind: "text", text: dialogueText(item as DialogueTree) };
     case "issue":
       return { kind: "text", text: `${(item as Issue).key} ${(item as Issue).title}` };
+    case "decision":
+      return { kind: "text", text: decisionToMarkdown(item as Decision, storage.getAll("decisions", (item as Decision).projectId)) };
     default:
       return { kind: "text", text: getAssetName(type, item) };
   }

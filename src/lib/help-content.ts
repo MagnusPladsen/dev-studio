@@ -1,9 +1,10 @@
-import { ArrowLeftRight, Film, SquareDashed, ArrowRight, Box, CalendarRange, CirclePlay, Columns3, Copy, Download, FileCode, FileText, FlipHorizontal2, FolderOpen, Gauge, Grid3X3, Image, Layers, LayoutGrid, LayoutTemplate, Link2, List, ListChecks, ListTodo, Maximize2, MessageSquare, MousePointer2, Music, Network, NotebookPen, PaintBucket, Paintbrush, Palette, Pencil, Piano, Pipette, Play, Rows3, Ruler, Scaling, Search, Shapes, Shuffle, SlidersHorizontal, Sparkles, SquareCheck, StickyNote, VolumeX, WandSparkles, Waypoints, type LucideIcon } from "lucide-react";
+import { ArrowLeftRight, Film, SquareDashed, ArrowRight, Box, CalendarRange, CirclePlay, Columns3, Copy, Download, GitPullRequestArrow, Hash, FileCode, FileText, FlipHorizontal2, FolderOpen, Gauge, Grid3X3, Image, Layers, LayoutGrid, LayoutTemplate, Link2, List, ListChecks, ListTodo, Maximize2, MessageSquare, MousePointer2, Music, Network, NotebookPen, PaintBucket, Paintbrush, Palette, Pencil, Piano, Pipette, Play, Rows3, Ruler, Scaling, Search, Shapes, Shuffle, SlidersHorizontal, Sparkles, SquareCheck, StickyNote, VolumeX, WandSparkles, Waypoints, type LucideIcon } from "lucide-react";
 import { isDevStudio } from "./app-config";
 
 export type HelpTopic =
   | "assets"
   | "board"
+  | "decisions"
   | "diagrams"
   | "dialogue"
   | "music"
@@ -150,6 +151,31 @@ export const HELP: Record<HelpTopic, HelpContent> = {
       "Click a note again to remove it, or start a drag on a note to erase along the way.",
       "Ctrl/⌘ + scroll zooms time; add Shift to zoom pitch.",
       UNDO_TIP,
+    ],
+  },
+  decisions: {
+    title: "Decision log",
+    summary: isDevStudio
+      ? "Record why the project is built the way it is, one decision at a time."
+      : "Record why your game works the way it does, one decision at a time.",
+    canDo: [
+      { icon: Hash, text: "Number every decision (ADR-001, ADR-002…) with a status and a date." },
+      { icon: FileText, text: "Write the context, options, decision and consequences in Markdown." },
+      { icon: GitPullRequestArrow, text: "Supersede a decision: the new one links back to the one it replaces." },
+      { icon: Link2, text: "Link decisions to issues, wiki pages, notes and canvases." },
+      { icon: Download, text: "Export one decision or the whole log as Markdown, or everything as JSON." },
+    ],
+    steps: [
+      "Press New decision and give it a title.",
+      "Fill in the context and the options you looked at.",
+      "Write the decision, then set its status to Accepted.",
+      "When it changes later, press Supersede to write the new one.",
+    ],
+    tips: [
+      "Filter the list by status, or search across every field and tag.",
+      `Write [[Title]] in a field to link a note or ${isDevStudio ? "wiki page" : "story entry"}.`,
+      UNDO_TIP,
+      MENU_TIP,
     ],
   },
   notebook: {

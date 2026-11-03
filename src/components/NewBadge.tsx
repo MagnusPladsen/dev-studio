@@ -1,5 +1,5 @@
 /** Tool paths (`ASSET_KINDS[type].path`) that are new enough to point out in the sidebar and on the dashboard. */
-const NEW_TOOL_PATHS: ReadonlySet<string> = new Set(["voxels", "board"]);
+const NEW_TOOL_PATHS: ReadonlySet<string> = new Set(["voxels", "board", "decisions"]);
 
 export function isNewTool(path: string): boolean {
   return NEW_TOOL_PATHS.has(path);

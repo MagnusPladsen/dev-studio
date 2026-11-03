@@ -14,6 +14,7 @@ import type {
   Board,
   Issue,
   VoxelModel,
+  Decision,
 } from "@/types";
 import { APP } from "./app-config";
 
@@ -33,6 +34,7 @@ export type StorableTypes = {
   boards: Board;
   issues: Issue;
   models: VoxelModel;
+  decisions: Decision;
 };
 
 export type CollectionName = keyof StorableTypes;
@@ -52,6 +54,7 @@ export const PROJECT_COLLECTIONS: ProjectCollection[] = [
   "boards",
   "issues",
   "models",
+  "decisions",
   "links",
 ];
 

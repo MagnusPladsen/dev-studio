@@ -39,6 +39,7 @@ const SYSTEM_COPY_LABELS: Partial<Record<AssetType, string>> = {
   story: "Copy text",
   dialogue: "Copy text",
   issue: "Copy key and title",
+  decision: "Copy as Markdown",
 };
 
 export function systemCopyLabel(type: AssetType): string | null {

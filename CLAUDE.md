@@ -15,7 +15,7 @@ owner through Vercel from `main`.
 
 ## Two apps
 
-The same code builds **GameDev Studio** (all tools) and **Dev Studio** (Task Board, Canvas, Wiki, Notebook), picked at
+The same code builds **GameDev Studio** (all tools) and **Dev Studio** (Task Board, Canvas, Wiki, Notebook, Decision log), picked at
 build time by `NEXT_PUBLIC_APP` (`dev-studio` or unset). `src/lib/app-config.ts` holds each app's name, initials, URL,
 brand `accent` (purple / teal: root layout sets `--accent`, `src/app/icon.tsx` + `apple-icon.tsx` draw the favicon) and
 `assetTypes`; `ASSET_TYPES` and the sidebar only show those, and `src/proxy.ts` redirects other tool routes to the

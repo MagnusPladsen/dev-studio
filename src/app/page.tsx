@@ -21,6 +21,7 @@ import {
   Download,
   Globe,
   NotebookPen,
+  Scale,
   SquareKanban,
   WifiOff,
   ShieldCheck,
@@ -47,6 +48,7 @@ const tools = [
   { icon: Package, name: "Sprite Sheet Packer", description: "Combine multiple sprites into optimized sprite sheets ready for any game engine." },
   { icon: SquareKanban, name: "Task Board", description: "Plan sprints like Jira: To Do, In Progress, Testing, Done. Issues link to the assets they're about." },
   { icon: NotebookPen, name: "Notebook", description: "Ideas, to-do lists, design docs and bug lists, with checklists and links to any asset." },
+  { icon: Scale, name: "Decision log", description: "Write down why your game works the way it does: numbered decisions with context, options and status. Export to Markdown." },
 ];
 
 const heroLinks: { type: AssetType; name: string }[] = [
