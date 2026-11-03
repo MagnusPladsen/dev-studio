@@ -1,28 +1,66 @@
 name: Desktop release
 
-# Pushing a v* tag builds the desktop app for macOS, Windows and Linux and attaches the installers to a
-# draft GitHub Release for the owner to review and publish. Running it by hand only builds (artifacts on the run).
+# Every merge to main releases both desktop apps (GameDev Studio and Dev Studio) for macOS, Windows and Linux:
+# the patch of the latest v* tag goes up by one (v0.1.0-beta -> v0.1.1-beta) and one published GitHub Release
+# holds every installer. The Homebrew casks in MagnusPladsen/homebrew-tap are then pointed at the new dmgs.
+# Running it by hand only builds (installers stay on the run as artifacts).
 on:
   push:
-    tags: ["v*"]
+    branches: [main]
+    paths-ignore: ["**.md"]
   workflow_dispatch:
 
 permissions:
   contents: write
 
+# Releases run one at a time so back-to-back merges never pick the same version. Hand-run builds don't queue.
+concurrency:
+  group: ${{ github.event_name == 'push' && 'desktop-release' || format('desktop-build-{0}', github.run_id) }}
+  cancel-in-progress: false
+
 jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.next.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: next
+        name: Bump the patch of the latest v* tag
+        run: |
+          latest=$(git tag --list 'v*' --sort=-v:refname | head -n 1)
+          if [ -z "$latest" ]; then
+            version="0.1.0-beta"
+          elif [ "$(git rev-list -n 1 "$latest")" = "$GITHUB_SHA" ]; then
+            # A re-run of a release whose tag already exists keeps that version.
+            version="${latest#v}"
+          elif [[ "$latest" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)(-.+)?$ ]]; then
+            version="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.$((BASH_REMATCH[3] + 1))${BASH_REMATCH[4]}"
+          else
+            echo "::error::Latest tag $latest is not vMAJOR.MINOR.PATCH[-suffix]"
+            exit 1
+          fi
+          echo "Latest tag: ${latest:-none}, next version: $version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
   build:
+    needs: version
     strategy:
       fail-fast: false
       matrix:
-        include:
+        app: [gamedev-studio, dev-studio]
+        platform:
           - os: macos-latest
             targets: --mac dmg --arm64 --x64
           - os: windows-latest
             targets: --win nsis --x64
           - os: ubuntu-latest
             targets: --linux AppImage deb --x64
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.platform.os }}
+    env:
+      NEXT_PUBLIC_APP: ${{ matrix.app }}
     defaults:
       run:
         shell: bash
@@ -41,17 +79,16 @@ jobs:
           DESKTOP_BUILD: "1"
       - run: npm ci
         working-directory: desktop
-      - name: Use the tag as the app version
-        if: startsWith(github.ref, 'refs/tags/v')
+      - name: Set the app version
         working-directory: desktop
-        run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version --allow-same-version
+        run: npm version "${{ needs.version.outputs.version }}" --no-git-tag-version --allow-same-version
       - run: npm run prepare-server
         working-directory: desktop
-      - run: npx electron-builder ${{ matrix.targets }} --publish never
+      - run: npx electron-builder ${{ matrix.platform.targets }} --publish never
         working-directory: desktop
       - uses: actions/upload-artifact@v4
         with:
-          name: installers-${{ matrix.os }}
+          name: installers-${{ matrix.app }}-${{ matrix.platform.os }}
           path: |
             desktop/dist/*.dmg
             desktop/dist/*.exe
@@ -60,8 +97,8 @@ jobs:
           if-no-files-found: error
 
   release:
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: build
+    if: github.event_name == 'push'
+    needs: [version, build]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -69,9 +106,78 @@ jobs:
           pattern: installers-*
           merge-multiple: true
           path: installers
-      # Not marked as a pre-release: the landing page links to releases/latest, which skips pre-releases.
-      - run: >
-          gh release create "$GITHUB_REF_NAME" installers/*
-          --repo "$GITHUB_REPOSITORY" --draft --generate-notes --title "GameDev Studio $GITHUB_REF_NAME"
+      # Not marked as a pre-release: the website links to releases/latest, which skips pre-releases.
+      - name: Tag and publish the release
+        run: |
+          tag="v$VERSION"
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release upload "$tag" installers/* --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$tag" installers/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+              --title "$tag" --generate-notes --latest
+          fi
         env:
           GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.version.outputs.version }}
+
+  homebrew:
+    needs: [version, release]
+    runs-on: ubuntu-latest
+    env:
+      TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - id: token
+        name: Check for the tap token
+        run: |
+          if [ -z "$TAP_TOKEN" ]; then
+            echo "::warning::HOMEBREW_TAP_TOKEN is not set, so the Homebrew casks were not updated to v$VERSION."
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.token.outputs.present == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          pattern: installers-*-macos-latest
+          merge-multiple: true
+          path: installers
+      - if: steps.token.outputs.present == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: MagnusPladsen/homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: tap
+      - if: steps.token.outputs.present == 'true'
+        name: Point both casks at the new dmgs
+        run: |
+          update_cask() {
+            local cask="tap/Casks/$1.rb" prefix="$2"
+            local arm intel
+            arm=$(sha256sum "installers/$prefix-mac-arm64.dmg" | cut -d ' ' -f 1)
+            intel=$(sha256sum "installers/$prefix-mac-x64.dmg" | cut -d ' ' -f 1)
+            sed -i -E \
+              -e "s/^(  version )\"[^\"]*\"/\1\"$VERSION\"/" \
+              -e "s/(sha256 arm: +)\"[0-9a-f]{64}\"/\1\"$arm\"/" \
+              -e "s/(intel: +)\"[0-9a-f]{64}\"/\1\"$intel\"/" \
+              "$cask"
+            if ! grep -q "version \"$VERSION\"" "$cask" || ! grep -q "$arm" "$cask" || ! grep -q "$intel" "$cask"; then
+              echo "::error::Could not update $cask"
+              exit 1
+            fi
+          }
+          update_cask gamedev-studio GameDev-Studio
+          update_cask dev-studio Dev-Studio
+      - if: steps.token.outputs.present == 'true'
+        name: Push the casks
+        working-directory: tap
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Casks/gamedev-studio.rb Casks/dev-studio.rb
+          if git diff --cached --quiet; then
+            echo "Casks already point at v$VERSION."
+          else
+            git commit -m "Update gamedev-studio and dev-studio to $VERSION"
+            git push
+          fi
