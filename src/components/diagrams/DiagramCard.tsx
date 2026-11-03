@@ -2,7 +2,7 @@
 
 import { memo, useEffect, useRef } from "react";
 import type { DiagramNode } from "@/types";
-import { hasShapeBody, isAutoHeight } from "@/lib/diagrams/cards";
+import { getShape, type BodyKind } from "@/lib/canvas-shapes";
 import {
   AssetBody,
   ChecklistBody,
@@ -30,24 +30,29 @@ interface DiagramCardProps {
   onPickImage(id: string): void;
 }
 
+const BODIES: Record<BodyKind, (props: BodyProps) => React.ReactNode> = {
+  shape: ShapeBody,
+  drawing: DrawingBody,
+  checklist: ChecklistBody,
+  image: ImageBody,
+  link: LinkBody,
+  asset: AssetBody,
+  group: GroupBody,
+  note: NoteBody,
+};
+
 function Body(props: BodyProps) {
-  const { type } = props.node;
-  if (hasShapeBody(type)) return <ShapeBody {...props} />;
-  if (type === "drawing") return <DrawingBody {...props} />;
-  if (type === "checklist") return <ChecklistBody {...props} />;
-  if (type === "image") return <ImageBody {...props} />;
-  if (type === "link") return <LinkBody {...props} />;
-  if (type === "asset") return <AssetBody {...props} />;
-  if (type === "group") return <GroupBody {...props} />;
-  return <NoteBody {...props} />;
+  const Component = BODIES[getShape(props.node.type).body];
+  return <Component {...props} />;
 }
 
 /** One card on the board. The page finds it from pointer events through `data-node-id`. */
 export const DiagramCard = memo(function DiagramCard(props: DiagramCardProps) {
   const { node, isSelected, hasHandles, isEditing, isConnectSource, onMeasure } = props;
-  const isDrawing = node.type === "drawing";
+  const shape = getShape(node.type);
+  const isDrawing = shape.body === "drawing";
   const ref = useRef<HTMLDivElement>(null);
-  const isAuto = isAutoHeight(node.type);
+  const isAuto = shape.isAutoHeight;
 
   useEffect(() => {
     const element = ref.current;

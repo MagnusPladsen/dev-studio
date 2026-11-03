@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { Diagram, DiagramNode } from "@/types";
 import { LINK_THUMB, SONG_COVER } from "./cards";
 import { PROVIDER_COLORS } from "./embeds";
-import { escapeXml, renderDiagramSvg, wrapByWidth } from "./render-svg";
+import { renderDiagramSvg } from "./render-svg";
+import { escapeXml, wrapByWidth } from "./svg-cards";
 
 const node = (extra: Partial<DiagramNode>): DiagramNode => ({ id: "n", type: "note", x: 0, y: 0, width: 200, height: 80, label: "", ...extra });
 const diagram = (nodes: DiagramNode[], edges: Diagram["edges"] = []): Diagram => ({

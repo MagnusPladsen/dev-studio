@@ -16,43 +16,6 @@ export interface LinkPreview {
   siteName?: string;
 }
 
-// Literal colors: these are also used by the PNG export, which can't resolve CSS variables.
-export const SHAPE_COLORS: Record<NodeType, string> = {
-  state: "#60a5fa",
-  action: "#34d399",
-  condition: "#fbbf24",
-  event: "#f472b6",
-  note: "#666680",
-  custom: "#7c5cfc",
-  checklist: "#666680",
-  image: "#666680",
-  link: "#666680",
-  asset: "#666680",
-  group: "#666680",
-  rectangle: "#a0a0b8",
-  ellipse: "#a0a0b8",
-  diamond: "#a0a0b8",
-  drawing: "#e4e4ee",
-};
-
-export const NODE_LABELS: Record<NodeType, string> = {
-  state: "State",
-  action: "Action",
-  condition: "Condition",
-  event: "Event",
-  note: "Note",
-  custom: "Custom",
-  checklist: "To-do list",
-  image: "Image",
-  link: "Link",
-  asset: "Studio asset",
-  group: "Group",
-  rectangle: "Rectangle",
-  ellipse: "Ellipse",
-  diamond: "Diamond",
-  drawing: "Drawing",
-};
-
 /** Swatches offered for any card; `undefined` means the card's default look. */
 export const CARD_COLORS = [
   { name: "Default", value: undefined },
@@ -65,63 +28,6 @@ export const CARD_COLORS = [
   { name: "Purple", value: "#a78bfa" },
   { name: "Pink", value: "#f472b6" },
 ] as const;
-
-export const FLOW_SHAPES: NodeType[] = ["state", "action", "condition", "event"];
-export const BOARD_CARDS: NodeType[] = ["note", "checklist", "image", "link", "asset", "group"];
-export const BASIC_SHAPES: NodeType[] = ["rectangle", "ellipse", "diamond"];
-
-/** Cards whose height follows their content; the stored height is only a starting size. */
-const AUTO_HEIGHT: ReadonlySet<NodeType> = new Set(["note", "checklist", "image", "link", "asset"]);
-
-export function isAutoHeight(type: NodeType): boolean {
-  return AUTO_HEIGHT.has(type);
-}
-
-export function isFlowShape(type: NodeType): boolean {
-  return FLOW_SHAPES.includes(type) || type === "custom";
-}
-
-export function isBasicShape(type: NodeType): boolean {
-  return BASIC_SHAPES.includes(type);
-}
-
-/** Cards drawn as an outline with a centred label: flow-chart shapes and basic shapes. */
-export function hasShapeBody(type: NodeType): boolean {
-  return isFlowShape(type) || isBasicShape(type);
-}
-
-/** The smallest a card may be resized to; drawings may shrink to a few pixels. */
-export function minSize(type: NodeType): { width: number; height: number } {
-  if (type === "drawing") return { width: 8, height: 8 };
-  return { width: type === "group" ? 160 : 80, height: 40 };
-}
-
-export function borderColor(node: DiagramNode): string {
-  return node.color ?? SHAPE_COLORS[node.type];
-}
-
-const DEFAULT_SIZES: Record<NodeType, [number, number]> = {
-  state: [140, 56],
-  action: [140, 56],
-  condition: [140, 56],
-  event: [140, 56],
-  note: [220, 96],
-  custom: [140, 56],
-  checklist: [240, 120],
-  image: [260, 180],
-  link: [280, 96],
-  asset: [220, 64],
-  group: [420, 320],
-  rectangle: [160, 100],
-  ellipse: [160, 100],
-  diamond: [160, 110],
-  drawing: [100, 100],
-};
-
-export function defaultSize(type: NodeType): { width: number; height: number } {
-  const [width, height] = DEFAULT_SIZES[type];
-  return { width, height };
-}
 
 /** Side of the square cover art on a song card, and of the small thumbnail on a plain link card. */
 export const SONG_COVER = 64;

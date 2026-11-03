@@ -1,66 +1,30 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import {
-  Boxes,
-  ChevronDown,
-  Circle,
-  Diamond,
-  Hexagon,
-  Image as ImageIcon,
-  Link2,
-  ListChecks,
-  Plus,
-  RectangleHorizontal,
-  Square,
-  SquareDashed,
-  StickyNote,
-  type LucideIcon,
-} from "lucide-react";
-import { BASIC_SHAPES, BOARD_CARDS, FLOW_SHAPES, NODE_LABELS, SHAPE_COLORS, type NodeType } from "@/lib/diagrams/cards";
+import { ChevronDown, Plus } from "lucide-react";
+import { shapesInSection, type LibrarySection, type ShapeDefinition } from "@/lib/canvas-shapes";
+import type { NodeType } from "@/lib/diagrams/cards";
 
-const ICONS: Partial<Record<NodeType, LucideIcon>> = {
-  note: StickyNote,
-  checklist: ListChecks,
-  image: ImageIcon,
-  link: Link2,
-  asset: Boxes,
-  group: SquareDashed,
-  state: Circle,
-  action: Square,
-  condition: Diamond,
-  event: Hexagon,
-  rectangle: RectangleHorizontal,
-  ellipse: Circle,
-  diamond: Diamond,
-};
+const SECTIONS: { section: LibrarySection; title: string }[] = [
+  { section: "board", title: "Board cards" },
+  { section: "shapes", title: "Shapes" },
+  { section: "flow", title: "Flow chart" },
+];
 
-const HINTS: Partial<Record<NodeType, string>> = {
-  note: "Text that wraps and grows",
-  checklist: "Tasks you can tick off",
-  image: "Upload, paste or drop a picture",
-  link: "YouTube, Spotify or any website",
-  asset: "Any sprite, sound, story… in this project",
-  group: "An area that holds cards",
-  rectangle: "Box with text, any size",
-  ellipse: "Circle or oval with text",
-  diamond: "Diamond with text",
-};
-
-function MenuItem({ type, onPick }: { type: NodeType; onPick(type: NodeType): void }) {
-  const Icon = ICONS[type] ?? Square;
-  const isShape = FLOW_SHAPES.includes(type);
+function MenuItem({ shape, onPick }: { shape: ShapeDefinition; onPick(type: NodeType): void }) {
+  const Icon = shape.icon;
+  const hint = shape.library?.hint;
   return (
     <button
       role="menuitem"
-      onClick={() => onPick(type)}
+      onClick={() => onPick(shape.type)}
       className="flex items-start gap-2.5 w-full px-3 py-1.5 text-sm text-left hover:bg-[var(--bg-hover)]"
       style={{ color: "var(--text-primary)" }}
     >
-      <Icon className="w-4 h-4 mt-0.5 shrink-0" style={{ color: isShape ? SHAPE_COLORS[type] : "var(--accent)" }} />
+      <Icon className="w-4 h-4 mt-0.5 shrink-0" style={{ color: shape.library?.section === "flow" ? shape.color : "var(--accent)" }} />
       <span className="min-w-0">
-        {NODE_LABELS[type]}
-        {HINTS[type] && <span className="block text-[11px] leading-4" style={{ color: "var(--text-muted)" }}>{HINTS[type]}</span>}
+        {shape.label}
+        {hint && <span className="block text-[11px] leading-4" style={{ color: "var(--text-muted)" }}>{hint}</span>}
       </span>
     </button>
   );
@@ -109,14 +73,13 @@ export function AddCardMenu({ onPick }: { onPick(type: NodeType): void }) {
           className="absolute top-full mt-1 py-1 rounded-lg border z-30 w-60 max-h-[70vh] overflow-y-auto right-0 md:left-0 md:right-auto"
           style={{ background: "var(--bg-card)", borderColor: "var(--border)" }}
         >
-          <p className="px-3 pt-1 pb-0.5 text-[11px] uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>Board cards</p>
-          {BOARD_CARDS.map((type) => <MenuItem key={type} type={type} onPick={pick} />)}
-          <div className="my-1 h-px" style={{ background: "var(--border)" }} />
-          <p className="px-3 pt-1 pb-0.5 text-[11px] uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>Shapes</p>
-          {BASIC_SHAPES.map((type) => <MenuItem key={type} type={type} onPick={pick} />)}
-          <div className="my-1 h-px" style={{ background: "var(--border)" }} />
-          <p className="px-3 pt-1 pb-0.5 text-[11px] uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>Flow chart</p>
-          {FLOW_SHAPES.map((type) => <MenuItem key={type} type={type} onPick={pick} />)}
+          {SECTIONS.map(({ section, title }, index) => (
+            <div key={section}>
+              {index > 0 && <div className="my-1 h-px" style={{ background: "var(--border)" }} />}
+              <p className="px-3 pt-1 pb-0.5 text-[11px] uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>{title}</p>
+              {shapesInSection(section).map((shape) => <MenuItem key={shape.type} shape={shape} onPick={pick} />)}
+            </div>
+          ))}
         </div>
       )}
     </div>

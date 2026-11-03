@@ -2,47 +2,23 @@
 
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useHistory, isTextField } from "@/hooks/useHistory";
-import { UndoRedoButtons } from "@/components/UndoRedoButtons";
 import { useAutosave } from "@/hooks/useAutosave";
-import { SaveIndicator } from "@/components/SaveIndicator";
-import { ExportMenu } from "@/components/ExportMenu";
-import { ExamplesBar } from "@/components/ExamplesBar";
-import { HelpButton } from "@/components/HelpButton";
+import { useBoardView, clampZoom } from "@/hooks/useBoardView";
+import { useBoardClipboard } from "@/hooks/useBoardClipboard";
 import { useToast } from "@/components/Toast";
 import { useParams } from "next/navigation";
-import {
-  Plus,
-  Trash2,
-  ZoomIn,
-  ZoomOut,
-  Maximize,
-  ArrowRight,
-  GitBranch,
-} from "lucide-react";
 import { v4 as uuid } from "uuid";
 import { storage } from "@/lib/storage";
 import type { Diagram, DiagramNode, AssetRef } from "@/types";
 import { useOpenParam, useTrackOpenAsset } from "@/hooks/useStorage";
-import { LinkedAssets } from "@/components/LinkedAssets";
 import { useAssetMenu } from "@/components/AssetContextMenu";
-import { AssetMenuButton, AssetPinButton, PasteButton } from "@/components/AssetMenuButton";
 import { AssetPickerModal } from "@/components/AssetPickerModal";
 import { createLongPress } from "@/lib/long-press";
 import type { Point as MenuPoint } from "@/lib/menu-position";
 import { ASSET_KINDS, getAsset } from "@/lib/assets";
-import {
-  defaultSize,
-  isAutoHeight,
-  isFlowShape,
-  minSize,
-  NODE_LABELS,
-  SHAPE_COLORS,
-  linkCardSize,
-  linkPreview,
-  linkUrl,
-  nodeAsset,
-  type NodeType,
-} from "@/lib/diagrams/cards";
+import { linkCardSize, linkPreview, linkUrl, nodeAsset, type NodeType } from "@/lib/diagrams/cards";
+import { getShape } from "@/lib/canvas-shapes";
+import { createNode, insertNode } from "@/lib/canvas-shapes/create";
 import { imageUrlFor, normalizeUrl } from "@/lib/diagrams/embeds";
 import { boundsOf, idsInside, stackColumn, type Point, type Rect } from "@/lib/diagrams/geometry";
 import {
@@ -56,25 +32,18 @@ import {
   type Alignment,
   type Axis,
 } from "@/lib/diagrams/arrange";
-import { cloneCards, copyCards, parseCards, serializeCards, type CopiedCards } from "@/lib/diagrams/clipboard";
+import { cloneCards, copyCards, serializeCards, type CopiedCards } from "@/lib/diagrams/clipboard";
 import { drawingData, smoothPath, strokeFromPoints, DRAWING_STROKE, SIMPLIFY_TOLERANCE } from "@/lib/diagrams/freehand";
-import { renderDiagramSvg } from "@/lib/diagrams/render-svg";
-import { downloadBlob } from "@/lib/download";
+import { exportJson, exportPng, exportSvg } from "@/lib/diagrams/export-files";
 import { imageFilesFrom, readImageFile } from "@/lib/diagrams/image-file";
-import { renderDiagramPng, type AssetLook } from "@/lib/diagrams/render-png";
+import type { AssetLook, RenderInput } from "@/lib/diagrams/render-png";
 import { DiagramCard } from "@/components/diagrams/DiagramCard";
 import { EdgeLayer } from "@/components/diagrams/EdgeLayer";
 import { MultiSelectionPanel, SelectionPanel } from "@/components/diagrams/SelectionPanel";
-import { AddCardMenu } from "@/components/diagrams/AddCardMenu";
-import { ToolPicker, type BoardTool } from "@/components/diagrams/ToolPicker";
-import { APP } from "@/lib/app-config";
-
-function downloadFile(name: string, href: string) {
-  const a = document.createElement("a");
-  a.href = href;
-  a.download = name;
-  a.click();
-}
+import { CanvasList } from "@/components/diagrams/CanvasList";
+import { CanvasToolbar } from "@/components/diagrams/CanvasToolbar";
+import { BoardHints } from "@/components/diagrams/BoardHints";
+import type { BoardTool } from "@/components/diagrams/ToolPicker";
 
 type Interaction =
   // `releaseTo`: the selection to switch to when the card is let go without moving (a tap, not a drag).
@@ -86,16 +55,12 @@ type Interaction =
   | { kind: "connect"; fromId: string }
   | { kind: "pinch"; distance: number; zoom: number; anchor: Point };
 
-const MIN_ZOOM = 0.2;
-const MAX_ZOOM = 3;
 const DOUBLE_TAP_MS = 320;
 const DRAG_THRESHOLD_PX = 3;
 const GRID = 30;
 const PASTE_OFFSET = 24;
 /** Screen pixels the pen must travel before another point is recorded. */
 const PEN_STEP_PX = 2;
-
-const clampZoom = (z: number) => Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z));
 
 function closestData(target: EventTarget | null, attribute: string): string | null {
   const element = target instanceof Element ? target.closest(`[${attribute}]`) : null;
@@ -123,8 +88,7 @@ export default function DiagramsPage() {
   const [showList, setShowList] = useState(true);
 
   const [mode, setMode] = useState<BoardTool>("select");
-  const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [zoom, setZoom] = useState(1);
+  const { pan, zoom, view, setPan, setZoom, toBoard, viewportCenter, zoomBy, fitTo, reset: resetView } = useBoardView(viewportRef);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const [isInteracting, setIsInteracting] = useState(false);
@@ -146,7 +110,7 @@ export default function DiagramsPage() {
   const imageTarget = useRef<{ replaceId: string | null; at: Point | null }>({ replaceId: null, at: null });
   const pasteCount = useRef(0);
 
-  const { assetTriggerProps, pasteTriggerProps, openAssetMenu } = useAssetMenu();
+  const { openAssetMenu } = useAssetMenu();
   const pressedNode = useRef<{ node: DiagramNode; asset: AssetRef } | null>(null);
   const hasPressFired = useRef(false);
   const fireLongPress = useRef<(point: MenuPoint) => void>(() => {});
@@ -208,9 +172,6 @@ export default function DiagramsPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, [flushSave]);
 
-  const view = useRef({ pan, zoom });
-  view.current = { pan, zoom };
-
   useEffect(() => {
     const all = storage.getAll("diagrams", projectId);
     setDiagrams(all);
@@ -233,7 +194,7 @@ export default function DiagramsPage() {
       x: node.x,
       y: node.y,
       width: node.width,
-      height: isAutoHeight(node.type) ? measured[node.id] ?? node.height : node.height,
+      height: getShape(node.type).isAutoHeight ? measured[node.id] ?? node.height : node.height,
     }),
     [measured]
   );
@@ -242,59 +203,9 @@ export default function DiagramsPage() {
     setMeasured((m) => (m[id] === height ? m : { ...m, [id]: height }));
   }, []);
 
-  function toBoard(clientX: number, clientY: number): Point {
-    const rect = viewportRef.current?.getBoundingClientRect();
-    const { pan: p, zoom: z } = view.current;
-    if (!rect) return { x: 0, y: 0 };
-    return { x: (clientX - rect.left - p.x) / z, y: (clientY - rect.top - p.y) / z };
-  }
-
-  function viewportCenter(): Point {
-    const rect = viewportRef.current?.getBoundingClientRect();
-    return rect ? toBoard(rect.left + rect.width / 2, rect.top + rect.height / 2) : { x: 0, y: 0 };
-  }
-
-  function zoomAround(clientX: number, clientY: number, nextZoom: number) {
-    const rect = viewportRef.current?.getBoundingClientRect();
-    const { pan: p, zoom: z } = view.current;
-    const target = clampZoom(nextZoom);
-    if (!rect) return setZoom(target);
-    const mx = clientX - rect.left;
-    const my = clientY - rect.top;
-    setPan({ x: mx - ((mx - p.x) / z) * target, y: my - ((my - p.y) / z) * target });
-    setZoom(target);
-  }
-
-  function zoomBy(factor: number) {
-    const rect = viewportRef.current?.getBoundingClientRect();
-    if (rect) zoomAround(rect.left + rect.width / 2, rect.top + rect.height / 2, view.current.zoom * factor);
-  }
-
   function fitToCards() {
-    const rect = viewportRef.current?.getBoundingClientRect();
-    const bounds = current ? boundsOf(current.nodes.map(rectOf)) : null;
-    if (!rect || !bounds) {
-      setZoom(1);
-      setPan({ x: 0, y: 0 });
-      return;
-    }
-    const z = clampZoom(Math.min(1, (rect.width - 80) / bounds.width, (rect.height - 80) / bounds.height));
-    setZoom(z);
-    setPan({ x: rect.width / 2 - (bounds.x + bounds.width / 2) * z, y: rect.height / 2 - (bounds.y + bounds.height / 2) * z });
+    fitTo(current ? boundsOf(current.nodes.map(rectOf)) : null);
   }
-
-  // Wheel zooms around the pointer; a trackpad pinch arrives as ctrl+wheel with small steps.
-  useEffect(() => {
-    const viewport = viewportRef.current;
-    if (!viewport) return;
-    const onWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      const factor = e.ctrlKey ? Math.exp(-e.deltaY * 0.01) : e.deltaY > 0 ? 0.9 : 1.1;
-      zoomAround(e.clientX, e.clientY, view.current.zoom * factor);
-    };
-    viewport.addEventListener("wheel", onWheel, { passive: false });
-    return () => viewport.removeEventListener("wheel", onWheel);
-  });
 
   // --- Editing the diagram ---
   function updateCurrent(fn: (d: Diagram) => Diagram) {
@@ -361,28 +272,19 @@ export default function DiagramsPage() {
   const pickImageFor = useCallback((id: string) => pickImage(id), [pickImage]);
 
   function addNode(type: NodeType, at?: Point, extra: Partial<DiagramNode> = {}): DiagramNode {
-    const size = { ...defaultSize(type), ...(extra.width ? { width: extra.width } : {}) };
-    const center = at ?? viewportCenter();
     const cascade = at ? 0 : ((current?.nodes.length ?? 0) % 6) * 20;
-    const node: DiagramNode = {
-      id: uuid(),
-      type,
-      label: isFlowShape(type) ? NODE_LABELS[type] : type === "checklist" ? "To-do" : type === "group" ? "Group" : "",
-      ...extra,
-      x: Math.round(center.x - size.width / 2 + cascade),
-      y: Math.round(center.y - size.height / 2 + cascade),
-      ...size,
-    };
-    updateCurrent((d) => (type === "group" ? { ...d, nodes: [node, ...d.nodes] } : { ...d, nodes: [...d.nodes, node] }));
+    const node = createNode(type, at ?? viewportCenter(), { id: uuid(), cascade, extra });
+    updateCurrent((d) => ({ ...d, nodes: insertNode(d.nodes, node) }));
     selectNodes([node.id]);
     return node;
   }
 
   function addFromMenu(type: NodeType) {
-    if (type === "image") return pickImage(null);
-    if (type === "asset") return setAssetPicker({ replaceId: null });
+    const { placement } = getShape(type);
+    if (placement === "pick-image") return pickImage(null);
+    if (placement === "pick-asset") return setAssetPicker({ replaceId: null });
     const node = addNode(type);
-    if (type === "note" || type === "checklist" || type === "link") setEditingNodeId(node.id);
+    if (placement === "edit") setEditingNodeId(node.id);
   }
 
   async function addImages(files: File[], at: Point) {
@@ -491,7 +393,7 @@ export default function DiagramsPage() {
     const nodes = current?.nodes ?? [];
     const moves = new Map(positions);
     for (const [id, to] of positions) {
-      const group = nodes.find((n) => n.id === id && n.type === "group");
+      const group = nodes.find((n) => n.id === id && getShape(n.type).isContainer);
       if (!group) continue;
       for (const memberId of membersOf(group, nodes).filter((m) => !positions.has(m))) {
         const member = nodes.find((n) => n.id === memberId)!;
@@ -585,7 +487,7 @@ export default function DiagramsPage() {
     }
     const isAdditive = e.shiftKey || mode === "area";
     // Start editing after the browser's own pointer-down focus change, or it would blur the new editor at once.
-    const canEdit = !isAdditive && node.type !== "drawing";
+    const canEdit = !isAdditive && getShape(node.type).body !== "drawing";
     if (canEdit && isDoubleTap(nodeId)) return void setTimeout(() => startEditing(nodeId));
     const selection = selectedIds.includes(nodeId) ? selectedIds : isAdditive ? [...selectedIds, nodeId] : [nodeId];
     selectNodes(selection);
@@ -605,7 +507,7 @@ export default function DiagramsPage() {
   }
 
   function withGroupMembers(ids: string[], nodes: DiagramNode[]): string[] {
-    const members = nodes.filter((n) => n.type === "group" && ids.includes(n.id)).flatMap((group) => membersOf(group, nodes));
+    const members = nodes.filter((n) => getShape(n.type).isContainer && ids.includes(n.id)).flatMap((group) => membersOf(group, nodes));
     return [...new Set([...ids, ...members])];
   }
 
@@ -707,9 +609,9 @@ export default function DiagramsPage() {
   function moveResize(resize: Extract<Interaction, { kind: "resize" }>, point: Point) {
     const node = current?.nodes.find((n) => n.id === resize.nodeId);
     if (!node) return;
-    const min = minSize(node.type);
-    const width = Math.max(min.width, Math.round(resize.width + point.x - resize.start.x));
-    const height = isAutoHeight(node.type) ? node.height : Math.max(min.height, Math.round(resize.height + point.y - resize.start.y));
+    const shape = getShape(node.type);
+    const width = Math.max(shape.minSize.width, Math.round(resize.width + point.x - resize.start.x));
+    const height = shape.isAutoHeight ? node.height : Math.max(shape.minSize.height, Math.round(resize.height + point.y - resize.start.y));
     updateNode(node.id, { width, height });
   }
 
@@ -791,45 +693,19 @@ export default function DiagramsPage() {
     }
   }
 
-  // Copy or cut the selected cards as marked JSON on the system clipboard, so they paste into any board.
-  useEffect(() => {
-    if (showList) return;
-    const onCopy = (e: ClipboardEvent) => {
-      if (!current || !selectedIds.length || isTextField(document.activeElement)) return;
-      if (!(window.getSelection()?.isCollapsed ?? true)) return;
-      e.preventDefault();
-      e.clipboardData?.setData("text/plain", serializeCards(copyCards(current, selectedIds)));
+  useBoardClipboard(!showList, {
+    copySelection: () => {
+      if (!current || !selectedIds.length) return null;
       pasteCount.current = 0;
-      if (e.type === "cut") deleteSelection();
-    };
-    window.addEventListener("copy", onCopy);
-    window.addEventListener("cut", onCopy);
-    return () => {
-      window.removeEventListener("copy", onCopy);
-      window.removeEventListener("cut", onCopy);
-    };
-  });
-
-  // Paste an image, a link or text straight onto the open board.
-  useEffect(() => {
-    if (showList) return;
-    const onPaste = (e: ClipboardEvent) => {
-      if (isTextField(e.target) || isTextField(document.activeElement)) return;
-      const files = imageFilesFrom(e.clipboardData);
-      const text = e.clipboardData?.getData("text/plain") ?? "";
-      const cards = parseCards(text);
-      if (cards) {
-        e.preventDefault();
-        pasteCount.current += 1;
-        return pasteCards(cards, PASTE_OFFSET * pasteCount.current);
-      }
-      if (!files.length && !text.trim()) return;
-      e.preventDefault();
-      if (files.length) void addImages(files, viewportCenter());
-      else addFromText(text, viewportCenter());
-    };
-    window.addEventListener("paste", onPaste);
-    return () => window.removeEventListener("paste", onPaste);
+      return serializeCards(copyCards(current, selectedIds));
+    },
+    deleteSelection,
+    pasteCards: (cards) => {
+      pasteCount.current += 1;
+      pasteCards(cards, PASTE_OFFSET * pasteCount.current);
+    },
+    pasteImages: (files) => void addImages(files, viewportCenter()),
+    pasteText: (text) => addFromText(text, viewportCenter()),
   });
 
   function handleDrop(e: React.DragEvent<HTMLDivElement>) {
@@ -850,8 +726,7 @@ export default function DiagramsPage() {
     setSelectedIds([]);
     setSelectedEdgeId(null);
     setEditingNodeId(null);
-    setPan({ x: 0, y: 0 });
-    setZoom(1);
+    resetView();
   }
 
   function newDiagram() {
@@ -892,115 +767,13 @@ export default function DiagramsPage() {
     }));
   }
 
-  async function exportPng() {
-    if (!current) return;
-    const canvas = await renderDiagramPng({ diagram: current, rectOf, describeAsset: (node) => describeAsset(projectId, node) });
-    downloadFile(`${current.name || "canvas"}.png`, canvas.toDataURL("image/png"));
-  }
-
-  function exportSvg() {
-    if (!current) return;
-    const svg = renderDiagramSvg({ diagram: current, rectOf, describeAsset: (node) => describeAsset(projectId, node) });
-    downloadBlob(`${current.name || "canvas"}.svg`, new Blob([svg], { type: "image/svg+xml" }));
-  }
-
-  function exportJson() {
-    if (!current) return;
-    const url = URL.createObjectURL(new Blob([JSON.stringify(current, null, 2)], { type: "application/json" }));
-    downloadFile(`${current.name || "canvas"}.canvas.json`, url);
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  function renderInput(diagram: Diagram): RenderInput {
+    return { diagram, rectOf, describeAsset: (node) => describeAsset(projectId, node) };
   }
 
   // --- List view ---
   if (showList) {
-    return (
-      <div className="p-6 md:p-10 max-w-3xl mx-auto">
-        <div className="flex items-center justify-between gap-3 mb-1">
-          <h1 className="text-2xl font-bold" style={{ color: "var(--text-primary)" }}>
-            Canvas
-          </h1>
-          <div className="flex items-center gap-2 shrink-0">
-            <HelpButton topic="diagrams" />
-            <PasteButton type="diagram" />
-            <button
-              onClick={newDiagram}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium shrink-0"
-              style={{ background: "var(--accent)", color: "white" }}
-            >
-              <Plus className="w-4 h-4" />
-              New canvas
-            </button>
-          </div>
-        </div>
-        <p className="text-sm mb-3" style={{ color: "var(--text-secondary)" }}>
-          Boards for moodboards, story flow, level planning and reference collections, plus flow charts and state machines.
-        </p>
-        <ExamplesBar projectId={projectId} collections={["diagrams"]} className="mb-6" />
-        {diagrams.length === 0 ? (
-          <div {...pasteTriggerProps("diagram")} className="text-center py-20 rounded-xl border border-dashed" style={{ borderColor: "var(--border)" }}>
-            <GitBranch className="w-12 h-12 mx-auto mb-4" style={{ color: "var(--text-muted)" }} />
-            <p className="text-lg font-medium mb-2" style={{ color: "var(--text-primary)" }}>
-              No canvases yet
-            </p>
-            <p className="text-sm mb-4 px-4" style={{ color: "var(--text-secondary)" }}>
-              Pin up notes, images, videos, links and to-dos, or plan {APP.subject} logic with flow charts
-            </p>
-            <div className="flex justify-center gap-2">
-              <button
-                onClick={newDiagram}
-                className="px-4 py-2 rounded-lg text-sm font-medium"
-                style={{ background: "var(--accent)", color: "white" }}
-              >
-                New canvas
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div {...pasteTriggerProps("diagram")} className="grid gap-3">
-            {diagrams.map((d) => (
-              <div
-                key={d.id}
-                {...assetTriggerProps({ type: "diagram", id: d.id })}
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  const trigger = assetTriggerProps({ type: "diagram", id: d.id });
-                  trigger.onKeyDown(e);
-                  if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) {
-                    e.preventDefault();
-                    loadDiagram(d);
-                  }
-                }}
-                className="group flex items-center justify-between p-4 rounded-xl border transition-colors cursor-pointer"
-                style={{ background: "var(--bg-card)", borderColor: "var(--border)" }}
-                onClick={() => loadDiagram(d)}
-                onMouseOver={(e) => { e.currentTarget.style.borderColor = "var(--border-hover)"; }}
-                onMouseOut={(e) => { e.currentTarget.style.borderColor = "var(--border)"; }}
-              >
-                <div>
-                  <span className="font-medium" style={{ color: "var(--text-primary)" }}>{d.name}</span>
-                  <div className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
-                    {d.nodes.length} cards · {d.edges.length} lines
-                  </div>
-                </div>
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); if (confirm(`Delete "${d.name}"?`)) deleteDiagram(d.id); }}
-                    className="p-2 rounded md:opacity-0 md:group-hover:opacity-100 transition-opacity"
-                    style={{ color: "var(--red)" }}
-                    title="Delete canvas"
-                    aria-label={`Delete ${d.name}`}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                  <AssetPinButton asset={{ type: "diagram", id: d.id }} label={d.name} />
-                  <AssetMenuButton asset={{ type: "diagram", id: d.id }} label={d.name} />
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    );
+    return <CanvasList projectId={projectId} diagrams={diagrams} onOpen={loadDiagram} onNew={newDiagram} onDelete={deleteDiagram} />;
   }
 
   const selectedNode = current?.nodes.find((n) => n.id === selectedNodeId) ?? null;
@@ -1011,8 +784,9 @@ export default function DiagramsPage() {
     onAlign: alignSelection,
     onDistribute: distributeSelection,
   };
-  const groups = current?.nodes.filter((n) => n.type === "group") ?? [];
-  const cards = current?.nodes.filter((n) => n.type !== "group") ?? [];
+  const isBack = (node: DiagramNode) => getShape(node.type).layer === "back";
+  const groups = current?.nodes.filter(isBack) ?? [];
+  const cards = current?.nodes.filter((n) => !isBack(n)) ?? [];
   const renderCard = (node: DiagramNode) => (
     <DiagramCard
       key={node.id}
@@ -1033,84 +807,26 @@ export default function DiagramsPage() {
   // --- Editor view ---
   return (
     <div className="flex flex-col h-full" onKeyDown={handleKeyDown} tabIndex={0}>
-      {/* Top toolbar */}
-      <div
-        className="flex items-center justify-between flex-wrap md:gap-x-3 gap-y-1.5 px-3 min-h-12 py-1.5 border-b shrink-0"
-        style={{ background: "var(--bg-secondary)", borderColor: "var(--border)" }}
-      >
-        <div className="flex items-center gap-1 min-w-0 md:shrink-0">
-          <button
-            onClick={() => { autosave.flush(); setShowList(true); }}
-            className="px-2 py-1 rounded text-xs whitespace-nowrap"
-            style={{ color: "var(--text-primary)" }}
-          >
-            ← All canvases
-          </button>
-          <UndoRedoButtons history={history} />
-          <input
-            className="bg-transparent text-sm font-medium outline-none px-2 py-1 rounded min-w-0 max-w-[40vw] md:max-w-xs"
-            style={{ color: "var(--text-primary)", width: `${Math.max(10, (current?.name || "").length + 2)}ch` }}
-            value={current?.name || ""}
-            onChange={(e) => updateCurrent((d) => ({ ...d, name: e.target.value }))}
-            aria-label="Canvas name"
-            title={current?.name}
-          />
-          {current && (
-            <div className="ml-2 hidden md:block">
-              <LinkedAssets
-                projectId={projectId}
-                type="diagram"
-                id={diagrams.some((d) => d.id === current.id) ? current.id : null}
-                layout="row"
-                maxRowChips={0}
-              />
-            </div>
-          )}
-        </div>
-        <div className="flex items-center gap-1 max-md:flex-wrap">
-          <ToolPicker tool={mode} onChange={changeTool} />
-
-          <div className="w-px h-5 mx-0.5 lg:mx-1" style={{ background: "var(--border)" }} />
-
-          <AddCardMenu onPick={addFromMenu} />
-
-          {selectedEdgeId && (
-            <button
-              onClick={toggleEdgeType}
-              className="px-2 py-1 rounded text-xs"
-              style={{ color: "var(--text-secondary)", background: "var(--bg-card)", border: "1px solid var(--border)" }}
-              title="Change line style (arrow, dashed, plain)"
-              aria-label="Change line style"
-            >
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          )}
-
-          <div className="w-px h-5 mx-0.5 lg:mx-1" style={{ background: "var(--border)" }} />
-
-          <button onClick={() => zoomBy(1.2)} className="p-1.5 rounded" style={{ color: "var(--text-secondary)" }} title="Zoom in" aria-label="Zoom in">
-            <ZoomIn className="w-4 h-4" />
-          </button>
-          <button onClick={() => zoomBy(1 / 1.2)} className="p-1.5 rounded" style={{ color: "var(--text-secondary)" }} title="Zoom out" aria-label="Zoom out">
-            <ZoomOut className="w-4 h-4" />
-          </button>
-          <button onClick={fitToCards} className="p-1.5 rounded" style={{ color: "var(--text-secondary)" }} title="Fit all cards in view" aria-label="Fit all cards in view">
-            <Maximize className="w-4 h-4" />
-          </button>
-
-          <div className="w-px h-5 mx-0.5 lg:mx-1" style={{ background: "var(--border)" }} />
-
-          <SaveIndicator state={autosave.state} className="px-1" />
-          <HelpButton topic="diagrams" />
-          <ExportMenu
-            items={[
-              { label: "PNG image", description: "The whole board as a picture", onClick: () => void exportPng() },
-              { label: "SVG image", description: "Sharp vector picture for docs and design tools", onClick: exportSvg },
-              { label: "JSON", description: "Cards and lines, to re-import or use in code", onClick: exportJson },
-            ]}
-          />
-        </div>
-      </div>
+      <CanvasToolbar
+        projectId={projectId}
+        diagram={current}
+        isSaved={Boolean(current && diagrams.some((d) => d.id === current.id))}
+        history={history}
+        saveState={autosave.state}
+        tool={mode}
+        hasSelectedEdge={Boolean(selectedEdgeId)}
+        onBack={() => { autosave.flush(); setShowList(true); }}
+        onRename={(name) => updateCurrent((d) => ({ ...d, name }))}
+        onTool={changeTool}
+        onAdd={addFromMenu}
+        onToggleEdgeType={toggleEdgeType}
+        onZoomIn={() => zoomBy(1.2)}
+        onZoomOut={() => zoomBy(1 / 1.2)}
+        onFit={fitToCards}
+        onExportPng={() => current && void exportPng(renderInput(current))}
+        onExportSvg={() => current && exportSvg(renderInput(current))}
+        onExportJson={() => current && exportJson(current)}
+      />
 
       {/* Board */}
       <div
@@ -1152,7 +868,7 @@ export default function DiagramsPage() {
           {cards.map(renderCard)}
           {penDraft && (
             <svg className="absolute left-0 top-0 overflow-visible pointer-events-none" width="1" height="1" aria-hidden>
-              <path d={smoothPath(penDraft)} fill="none" stroke={SHAPE_COLORS.drawing} strokeWidth={DRAWING_STROKE} strokeLinecap="round" strokeLinejoin="round" />
+              <path d={smoothPath(penDraft)} fill="none" stroke={getShape("drawing").color} strokeWidth={DRAWING_STROKE} strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           )}
           {selectionBox && (
@@ -1188,40 +904,13 @@ export default function DiagramsPage() {
           <MultiSelectionPanel nodes={selectedNodes} {...arrangeHandlers} onColor={recolorSelection} onDelete={deleteSelection} />
         )}
 
-        {/* Empty board hint */}
-        {current && current.nodes.length === 0 && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none p-6">
-            <p className="text-sm text-center max-w-sm" style={{ color: "var(--text-secondary)" }}>
-              Empty board. Use <b style={{ color: "var(--text-primary)" }}>Add</b> for notes, to-dos, images, links, asset cards
-              or shapes, sketch with the pen, or paste and drop pictures and links straight onto the board. Double-click a card to edit it.
-            </p>
-          </div>
-        )}
-
-        {/* Mode hint */}
-        {(mode === "draw" || (mode === "area" && !selectedIds.length)) && (
-          <div
-            className="absolute bottom-4 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-lg text-xs text-center pointer-events-none max-md:w-[90%]"
-            style={{ background: "var(--bg-card)", color: "var(--accent)", border: "1px solid var(--accent)" }}
-          >
-            {mode === "draw" ? "Draw: drag to sketch" : "Box select: drag around cards, tap cards to add or remove"} · Esc to stop
-          </div>
-        )}
-        {mode === "connect" && (
-          <div
-            className="absolute bottom-4 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-lg text-xs text-center max-md:w-[90%]"
-            style={{ background: "var(--bg-card)", color: "var(--accent)", border: "1px solid var(--accent)" }}
-          >
-            {connectFrom ? "Now click the second card" : "Connect: click the first card, then the second"} · Esc to cancel
-          </div>
-        )}
-
-        <div
-          className="absolute right-3 bottom-3 px-2 py-1 rounded text-[11px] font-mono pointer-events-none max-md:hidden"
-          style={{ background: "var(--bg-card)", color: "var(--text-secondary)" }}
-        >
-          {Math.round(zoom * 100)}%
-        </div>
+        <BoardHints
+          isEmpty={Boolean(current && current.nodes.length === 0)}
+          tool={mode}
+          hasSelection={selectedIds.length > 0}
+          isConnecting={Boolean(connectFrom)}
+          zoom={zoom}
+        />
       </div>
 
       <input

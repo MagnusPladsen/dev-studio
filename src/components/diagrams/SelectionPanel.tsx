@@ -4,7 +4,8 @@ import Link from "next/link";
 import { Check, ExternalLink, ImagePlus, Link2, Pencil, Rows3, Trash2, Boxes } from "lucide-react";
 import type { DiagramNode } from "@/types";
 import { ASSET_KINDS, ASSET_TYPES, assetHref, getAsset, listAssets } from "@/lib/assets";
-import { CARD_COLORS, NODE_LABELS, hasShapeBody, nodeAsset } from "@/lib/diagrams/cards";
+import { CARD_COLORS, nodeAsset } from "@/lib/diagrams/cards";
+import { getShape } from "@/lib/canvas-shapes";
 import { ArrangeActions, type ArrangeHandlers } from "./ArrangeActions";
 
 interface SelectionPanelProps extends ArrangeHandlers {
@@ -21,10 +22,6 @@ interface SelectionPanelProps extends ArrangeHandlers {
 
 const BUTTON = "flex items-center gap-1.5 px-2 py-1 rounded text-xs";
 const BUTTON_STYLE: React.CSSProperties = { background: "var(--bg-primary)", color: "var(--text-primary)", border: "1px solid var(--border)" };
-
-function canLinkAsset(node: DiagramNode): boolean {
-  return hasShapeBody(node.type) || node.type === "note" || node.type === "checklist";
-}
 
 function Swatches({ nodes, onColor }: { nodes: DiagramNode[]; onColor(color: string | undefined): void }) {
   return (
@@ -144,15 +141,15 @@ function DeleteButton({ onDelete, label }: { onDelete(): void; label: string }) 
 /** Floating panel for the selected card: colour, linked asset, arranging and the card's own actions. */
 export function SelectionPanel(props: SelectionPanelProps) {
   const { node, onEdit, onDelete } = props;
-  const canEditText = node.type !== "asset" && node.type !== "link" && node.type !== "drawing";
+  const shape = getShape(node.type);
   return (
     <PanelFrame>
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs font-medium truncate" style={{ color: "var(--text-primary)" }}>
-          {NODE_LABELS[node.type]}{node.label ? `: ${node.label.split("\n")[0]}` : ""}
+          {shape.label}{node.label ? `: ${node.label.split("\n")[0]}` : ""}
         </span>
         <div className="flex items-center gap-0.5 shrink-0">
-          {canEditText && (
+          {shape.canEditText && (
             <button onClick={onEdit} className="p-1 rounded max-md:p-2" style={{ color: "var(--text-primary)" }} title="Edit text (double-click)" aria-label="Edit text">
               <Pencil className="w-3.5 h-3.5" />
             </button>
@@ -163,7 +160,7 @@ export function SelectionPanel(props: SelectionPanelProps) {
       <Swatches nodes={[node]} onColor={props.onColor} />
       <ArrangeActions count={1} {...props} />
       <TypeActions {...props} />
-      {canLinkAsset(node) && <AssetSelect {...props} />}
+      {shape.canLinkAsset && <AssetSelect {...props} />}
     </PanelFrame>
   );
 }
