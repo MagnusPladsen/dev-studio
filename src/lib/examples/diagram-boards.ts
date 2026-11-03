@@ -81,14 +81,14 @@ function penLoop(radiusX: number, radiusY: number): StrokePoint[] {
 
 type Extra = Partial<DiagramNode>;
 
-function card(id: string, type: DiagramNode["type"], x: number, y: number, width: number, height: number, label = "", extra: Extra = {}): DiagramNode {
+export function card(id: string, type: DiagramNode["type"], x: number, y: number, width: number, height: number, label = "", extra: Extra = {}): DiagramNode {
   return { id, type, x, y, width, height, label, ...extra };
 }
 
-const group = (id: string, x: number, y: number, width: number, height: number, label: string, color: string) =>
+export const group = (id: string, x: number, y: number, width: number, height: number, label: string, color: string) =>
   card(id, "group", x, y, width, height, label, { color });
 
-const note = (id: string, x: number, y: number, width: number, text: string, color?: string) =>
+export const note = (id: string, x: number, y: number, width: number, text: string, color?: string) =>
   card(id, "note", x, y, width, 60, text, color ? { color } : {});
 
 const image = (id: string, x: number, y: number, width: number, src: string, aspect: number, caption = "") =>

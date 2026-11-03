@@ -27,7 +27,7 @@ export const EXAMPLE_SLUGS = {
   spritesheets: ["characters"],
   models: ["hero-3d", "coin-3d", "chest-3d", "slime-3d", "tree-3d"],
   palettes: ["meadow-palette", "dungeon-palette"],
-  diagrams: ["pip-moodboard", "meadow-plan", "core-loop", "player-states", "enemy-ai", "screen-flow"],
+  diagrams: ["pip-moodboard", "meadow-plan", "core-loop", "player-states", "enemy-ai", "screen-flow", "save-data"],
   dialogues: ["merchant", "elder-quest", "gate-guard"],
   stories: ["hero", "village", "sword", "elder", "forest", "shadow-king", "quest-sword", "lore-fall"],
   notes: ["welcome", "design-doc", "todo", "bugs"],

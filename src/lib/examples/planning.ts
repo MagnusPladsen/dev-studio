@@ -1,6 +1,7 @@
 import type { DiagramEdge, DiagramNode, DialogueNode } from "@/types";
 import type { ExampleModule } from "./types";
-import { diagramBoardExamples } from "./diagram-boards";
+import { diagramBoardExamples, note } from "./diagram-boards";
+import { relation, table } from "./erd";
 
 // Example assets for: diagrams, dialogues — the logic and conversations of "Pip's Quest".
 
@@ -99,6 +100,22 @@ const diagrams: ExampleModule = {
           ["gameover", "title", "Back to title", "dashed"],
         ]
       ),
+    },
+    {
+      id: ctx.id("save-data"),
+      name: "Save Data",
+      nodes: [
+        table("player", 80, 200, "player", [["id", "int", "PK"], ["save_version", "int"], ["hearts", "int"], ["coins", "int"], ["current_screen", "text"], ["checkpoint", "text"], ["saved_at", "timestamp"]]),
+        table("inventory", 480, 40, "inventory", [["id", "int", "PK"], ["player_id", "int", "FK"], ["item", "text"], ["count", "int"], ["is_equipped", "boolean"]]),
+        table("quests", 480, 260, "quest_progress", [["id", "int", "PK"], ["player_id", "int", "FK"], ["quest", "text"], ["step", "int"], ["is_done", "boolean"]]),
+        table("levels", 480, 480, "level_unlocks", [["id", "int", "PK"], ["player_id", "int", "FK"], ["level", "text"], ["best_coins", "int"], ["unlocked_at", "timestamp"]]),
+        note("autosave", 80, 470, 300, "Saved to local storage each time Pip enters a new screen (ADR-003). Bump save_version when a table changes so old saves still load."),
+      ],
+      edges: [
+        relation("e1", "inventory.player_id", "player.id"),
+        relation("e2", "quests.player_id", "player.id"),
+        relation("e3", "levels.player_id", "player.id"),
+      ],
     },
   ],
 };
