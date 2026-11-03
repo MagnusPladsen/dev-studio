@@ -39,6 +39,17 @@ interface ImportResult<T> { items: T[]; warnings: string[] }
 
 That's all when the tool is already wired. The first importer for a tool also needs the wiring below.
 
+## Formats that refer to other files
+
+Some files point at others: a Tiled map at its tilesets, a tileset at its image. Give such an importer `pick: "many"`
+and a `parseFiles`, and list the extensions of the files it refers to in `companions`. Companions are offered in the
+picker and passed along with a drop, but never imported on their own. Inside `parseFiles`, find one with
+`findCompanion(files, pathInsideTheFile)` (matched by file name, since a browser never knows folders).
+
+When a referenced file isn't there, throw `new MissingFilesError(["tiles.tsx", "tiles.png"])`. `ImportMenu` then asks
+the person to add the files or their folder (and runs `parseFiles` again with them), or to import without them, in
+which case `parseFiles(files, { skipMissing: true })` runs: leave those parts out and say so in `warnings`.
+
 ## Wiring a tool (once per tool)
 
 ```tsx
@@ -111,6 +122,7 @@ Round-trip test: export with the tool's own code, import, and compare with `diff
 | Sprite Sheets | Sheet image cut on a grid (dialog with live preview), atlas JSON + its PNG |
 | Palettes | GIMP `.gpl`, `.hex` / `.txt` lists (Lospec, Paint.NET), JASC `.pal`, Adobe `.ase`, Lospec JSON (also fetched by name) |
 | 3D Pixel Art | MagicaVoxel `.vox` |
+| Tilemap | Tiled maps (`.tmj` / `.json`, `.tmx`) with embedded or external (`.tsj` / `.tsx`) tilesets and their images; also re-imports its own JSON export |
 
 ### Images and options
 

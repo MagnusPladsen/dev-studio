@@ -1,4 +1,4 @@
-import { ImportError, type ImportResult, type Importer } from "./types";
+import { ImportError, MissingFilesError, type ImportOptions, type ImportResult, type Importer } from "./types";
 
 function extensionOf(name: string): string {
   const dot = name.lastIndexOf(".");
@@ -38,7 +38,10 @@ export function importErrorMessage(error: unknown, fileName: string): string {
   return `Couldn't read "${fileName}". It may be damaged or in a format this tool doesn't know.`;
 }
 
-export type ImportOutcome<T> = { ok: true; result: ImportResult<T> } | { ok: false; message: string };
+export type ImportOutcome<T> =
+  | { ok: true; result: ImportResult<T> }
+  /** `missing`: files the import asked for (a `MissingFilesError`), to ask the person for. */
+  | { ok: false; message: string; missing?: string[] };
 
 export async function runImporter<T>(importer: Importer<T>, file: File): Promise<ImportOutcome<T>> {
   try {
@@ -61,8 +64,8 @@ function skippedFilesWarning(skipped: File[]): string {
   return `Skipped ${skipped.length} ${skipped.length === 1 ? "file this tool can't read" : "files this tool can't read"}: ${names}${more}`;
 }
 
-async function parseEach<T>(importer: Importer<T>, files: File[]): Promise<ImportResult<T>> {
-  if (importer.parseFiles) return importer.parseFiles(files);
+async function parseEach<T>(importer: Importer<T>, files: File[], options: ImportOptions): Promise<ImportResult<T>> {
+  if (importer.parseFiles) return importer.parseFiles(files, options);
   const items: T[] = [];
   const warnings: string[] = [];
   for (const file of files) {
@@ -81,18 +84,19 @@ async function parseEach<T>(importer: Importer<T>, files: File[]): Promise<Impor
  * Imports several files (a multi-select, a folder, a drop) with one importer, as one import. Files it doesn't accept
  * are skipped with a warning; files in hidden folders (`.obsidian/`) are left out quietly.
  */
-export async function runImporterOnFiles<T>(importer: Importer<T>, files: File[]): Promise<ImportOutcome<T>> {
+export async function runImporterOnFiles<T>(importer: Importer<T>, files: File[], options: ImportOptions = { skipMissing: false }): Promise<ImportOutcome<T>> {
   if (files.length === 1 && !importer.parseFiles) return runImporter(importer, files[0]);
   const visible = files.filter((file) => !isHiddenPath(file));
-  const readable = visible.filter((file) => acceptsFile(importer.accept, file));
+  const readable = visible.filter((file) => acceptsFile([...importer.accept, ...(importer.companions ?? [])], file));
   const skipped = visible.filter((file) => !readable.includes(file));
   if (!readable.length) return { ok: false, message: visible.length ? `None of these files can be imported here. ${skippedFilesWarning(skipped)}.` : "There were no files to import." };
   try {
-    const result = await parseEach(importer, readable);
+    const result = await parseEach(importer, readable, options);
     const warnings = skipped.length ? [skippedFilesWarning(skipped), ...result.warnings] : result.warnings;
     if (result.items.length === 0) return { ok: false, message: warnings[0] ?? "There was nothing to import in these files." };
     return { ok: true, result: { items: result.items, warnings } };
   } catch (error) {
+    if (error instanceof MissingFilesError) return { ok: false, message: error.message, missing: error.names };
     return { ok: false, message: importErrorMessage(error, readable.length === 1 ? readable[0].name : "these files") };
   }
 }

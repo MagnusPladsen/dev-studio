@@ -23,6 +23,8 @@ import { useConsumedParam, useOpenParam, useTrackOpenAsset, useStorageVersion } 
 import { LinkedAssets } from "@/components/LinkedAssets";
 import { UndoRedoButtons } from "@/components/UndoRedoButtons";
 import { ExportMenu } from "@/components/ExportMenu";
+import { ImportMenu } from "@/components/ImportMenu";
+import { ImportDropZone } from "@/components/ImportDropZone";
 import { HelpButton } from "@/components/HelpButton";
 import { SaveIndicator } from "@/components/SaveIndicator";
 import { ExamplesBar } from "@/components/ExamplesBar";
@@ -31,6 +33,10 @@ import { useAssetMenu } from "@/components/AssetContextMenu";
 import { AssetMenuButton, AssetPinButton, PasteButton } from "@/components/AssetMenuButton";
 import { useHistory } from "@/hooks/useHistory";
 import { useAutosave } from "@/hooks/useAutosave";
+import { useImport } from "@/hooks/useImport";
+import { importAsNewAssets, saveImportedAssets, type ImportStep } from "@/lib/import";
+import { TILEMAP_IMPORTERS, type TilemapImport } from "@/lib/import/tilemap";
+import { BASIC_TILES, toTiledJson } from "@/lib/tilemap/tiled-export";
 import type { TilemapData, TilemapLayer, Sprite } from "@/types";
 import { v4 as uuid } from "uuid";
 
@@ -38,13 +44,6 @@ type Tile = number | string | null;
 type Tool = "paint" | "erase" | "fill";
 
 const TILE_SIZES = [8, 16, 32];
-
-const BASIC_TILES = [
-  "#4a7c59", "#6b8f3c", "#8b6914", "#a0522d",
-  "#708090", "#4682b4", "#2e8b57", "#daa520",
-  "#cd853f", "#8fbc8f", "#556b2f", "#b8860b",
-  "#d2691e", "#bc8f8f", "#f4a460", "#c0c0c0",
-];
 
 function createEmptyLayer(name: string, w: number, h: number): TilemapLayer {
   return { id: uuid(), name, visible: true, tiles: Array.from({ length: h }, () => new Array<Tile>(w).fill(null)) };
@@ -137,6 +136,7 @@ export default function TilemapPage() {
   const projectId = params.projectId as string;
   const { assetTriggerProps, pasteTriggerProps } = useAssetMenu();
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
   const version = useStorageVersion();
 
   const [current, setCurrent] = useState<TilemapData | null>(null);
@@ -234,6 +234,35 @@ export default function TilemapPage() {
     },
     current?.id
   );
+
+  const imports = useImport<TilemapImport>({
+    importers: TILEMAP_IMPORTERS,
+    noun: ["tilemap", "tilemaps"],
+    history,
+    openId: current?.id ?? null,
+    apply: ({ items }) => importTilemaps(items),
+  });
+
+  /** Saves the maps and the sprites cut from their tilesets, and opens the first map; undo removes them all. */
+  function importTilemaps(items: TilemapImport[]): ImportStep {
+    const savedSprites = saveImportedAssets("sprites", projectId, items.flatMap((item) => item.sprites));
+    const step = importAsNewAssets("tilemaps", projectId, items.map((item) => item.tilemap), {
+      previousId: current?.id ?? null,
+      open: selectTilemap,
+      back: (previous) => (previous ? selectTilemap(previous) : setCurrent(null)),
+    });
+    return {
+      openedId: step.openedId,
+      undo() {
+        step.undo();
+        savedSprites.remove();
+      },
+      redo() {
+        savedSprites.restore();
+        step.redo();
+      },
+    };
+  }
 
   const defaultName = () => `Level ${tilemaps.length + 1}`;
 
@@ -364,42 +393,9 @@ export default function TilemapPage() {
     download(c.toDataURL("image/png"), `${safeName(current.name)}.png`);
   }
 
-  /** Tiled-style JSON: each layer is a flat array of tile ids (0 = empty), with a tileset table. */
   function exportJSON() {
     if (!current) return;
-    const gids = new Map<string, number>();
-    const tileset: { id: number; type: "sprite" | "color"; spriteId?: string; name?: string; color?: string }[] = [];
-    const gidFor = (t: Tile): number => {
-      if (t === null || t === undefined) return 0;
-      const key = typeof t === "number" ? `color:${t}` : `sprite:${t}`;
-      let gid = gids.get(key);
-      if (!gid) {
-        gid = gids.size + 1;
-        gids.set(key, gid);
-        if (typeof t === "number") tileset.push({ id: gid, type: "color", color: BASIC_TILES[t % BASIC_TILES.length] });
-        else tileset.push({ id: gid, type: "sprite", spriteId: t, name: spriteById.get(t)?.name });
-      }
-      return gid;
-    };
-    const data = {
-      name: current.name,
-      width: current.width,
-      height: current.height,
-      tilewidth: current.tileSize,
-      tileheight: current.tileSize,
-      orientation: "orthogonal",
-      renderorder: "right-down",
-      layers: current.layers.map((l, i) => ({
-        id: i + 1,
-        name: l.name,
-        type: "tilelayer",
-        visible: l.visible,
-        width: current.width,
-        height: current.height,
-        data: l.tiles.flatMap((row) => row.map(gidFor)),
-      })),
-      tileset,
-    };
+    const data = toTiledJson(current, (id) => spriteById.get(id)?.name);
     const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
     download(url, `${safeName(current.name)}.json`);
     setTimeout(() => URL.revokeObjectURL(url), 1000);
@@ -435,7 +431,8 @@ export default function TilemapPage() {
   );
 
   return (
-    <div className="relative flex max-md:flex-col h-full max-md:h-auto max-md:min-h-full" style={{ background: "var(--bg-primary)" }}>
+    <div ref={rootRef} className="relative flex max-md:flex-col h-full max-md:h-auto max-md:min-h-full" style={{ background: "var(--bg-primary)" }}>
+      <ImportDropZone imports={imports} target={rootRef} />
       {/* Phones: toggles for the side panels */}
       <div className="md:hidden flex items-center gap-2 px-3 py-2 border-b" style={{ borderColor: "var(--border)", background: "var(--bg-secondary)" }}>
         {mobileToggle("tiles", "Maps & tiles", Grid3X3)}
@@ -580,9 +577,9 @@ export default function TilemapPage() {
 
       {/* Main canvas area */}
       <div className="flex-1 flex flex-col overflow-hidden max-md:min-h-[60vh]">
-        <div className="h-10 flex items-center gap-2 px-3 border-b shrink-0 md:max-xl:h-auto md:max-xl:min-h-10 md:max-xl:py-1.5 md:max-xl:flex-wrap md:max-xl:gap-y-1.5" style={{ borderColor: "var(--border)", background: "var(--bg-secondary)" }}>
+        <div className="h-10 flex items-center gap-2 px-3 border-b shrink-0 max-md:h-auto max-md:min-h-10 max-md:py-1.5 max-md:flex-wrap max-md:gap-y-1.5 md:max-xl:h-auto md:max-xl:min-h-10 md:max-xl:py-1.5 md:max-xl:flex-wrap md:max-xl:gap-y-1.5" style={{ borderColor: "var(--border)", background: "var(--bg-secondary)" }}>
           <div className="flex items-center gap-2 min-w-0 max-md:overflow-x-auto [&>*]:shrink-0">
-            <UndoRedoButtons history={history} />
+            <UndoRedoButtons history={imports.history} />
             <div className="w-px h-5 shrink-0" style={{ background: "var(--border)" }} />
             {toolBtn("paint", Paintbrush, "Paint")}
             {toolBtn("fill", PaintBucket, "Fill area")}
@@ -608,6 +605,7 @@ export default function TilemapPage() {
               </>
             )}
             <HelpButton topic="tilemap" />
+            <ImportMenu imports={imports} />
             <ExportMenu
               disabled={!current}
               items={[

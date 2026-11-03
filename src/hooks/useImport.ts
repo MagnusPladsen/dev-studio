@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useToast } from "@/components/Toast";
 import { isTextField, type History } from "@/hooks/useHistory";
-import { findImporter, runImporterOnFiles, type ImportResult, type ImportStep, type Importer } from "@/lib/import";
+import { findImporter, runImporterOnFiles, type ImportOptions, type ImportResult, type ImportStep, type Importer } from "@/lib/import";
 
 export interface UseImportOptions<T> {
   importers: Importer<T>[];
@@ -31,7 +31,24 @@ export interface ImportController {
   /** Imports with this importer, or the matching one for a dropped file. */
   importFile(file: File, importer?: Importer<unknown>): Promise<void>;
   /** Imports several files with one importer as one import (a multi-select, a folder, a drop). */
-  importFiles(files: File[], importer: Importer<unknown>): Promise<void>;
+  importFiles(files: File[], importer: Importer<unknown>, options?: ImportOptions): Promise<void>;
+  /** Files the last import asked for (a `MissingFilesError`); `ImportMenu` asks the person to add them. */
+  missing: MissingFiles | null;
+}
+
+export interface MissingFiles {
+  names: string[];
+  /** Tries again with these files added. */
+  add(files: File[]): void;
+  /** Imports without the missing files. */
+  skip(): void;
+  cancel(): void;
+}
+
+interface MissingRequest {
+  files: File[];
+  importer: Importer<unknown>;
+  names: string[];
 }
 
 const NO_HISTORY: History = { undo() {}, redo() {}, canUndo: false, canRedo: false, checkpoint() {} };
@@ -47,13 +64,16 @@ export function useImport<T>({ importers, noun, apply, review, history = NO_HIST
   const { showToast } = useToast();
   const [isBusy, setIsBusy] = useState(false);
   const [pending, setPending] = useState<PendingStep | null>(null);
+  const [missingRequest, setMissingRequest] = useState<MissingRequest | null>(null);
 
   const importFiles = useCallback(
-    async (files: File[], chosen: Importer<unknown>) => {
+    async (files: File[], chosen: Importer<unknown>, options?: ImportOptions) => {
       const importer = chosen as Importer<T>;
+      setMissingRequest(null);
       setIsBusy(true);
-      const outcome = await runImporterOnFiles(importer, files);
+      const outcome = await runImporterOnFiles(importer, files, options);
       setIsBusy(false);
+      if (!outcome.ok && outcome.missing) return setMissingRequest({ files, importer: chosen, names: outcome.missing });
       if (!outcome.ok) return showToast({ message: outcome.message, tone: "error" });
       const result = review ? await review(outcome.result, importer) : outcome.result;
       if (!result) return;
@@ -75,6 +95,17 @@ export function useImport<T>({ importers, noun, apply, review, history = NO_HIST
     },
     [importers, importFiles, showToast]
   );
+
+  const missing = useMemo<MissingFiles | null>(() => {
+    if (!missingRequest) return null;
+    const { files, importer, names } = missingRequest;
+    return {
+      names,
+      add: (added) => void importFiles([...files, ...added], importer),
+      skip: () => void importFiles(files, importer, { skipMissing: true }),
+      cancel: () => setMissingRequest(null),
+    };
+  }, [missingRequest, importFiles]);
 
   const canUndoImport = Boolean(pending && !pending.isUndone && openId === pending.step.openedId);
   const canRedoImport = Boolean(pending && pending.isUndone && openId === pending.previousOpenId);
@@ -98,6 +129,7 @@ export function useImport<T>({ importers, noun, apply, review, history = NO_HIST
     isBusy,
     importFile,
     importFiles,
+    missing,
     history: { ...history, undo, redo, canUndo: history.canUndo || canUndoImport, canRedo: history.canRedo || canRedoImport },
   };
 }

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.10" orientation="orthogonal" renderorder="right-down" width="4" height="2" tilewidth="8" tileheight="8" infinite="0">
+ <tileset firstgid="1" name="Cave" tilewidth="8" tileheight="8" spacing="0" margin="0" tilecount="4" columns="2">
+  <image source="cave.png" width="16" height="16"/>
+ </tileset>
+ <layer id="1" name="Ground" width="4" height="2">
+  <data encoding="base64" compression="zlib">eJxjZGBgYGRgYGCCYmY0DAABLAAT</data>
+ </layer>
+ <group id="2" name="Details" visible="0">
+  <layer id="3" name="Decor" width="4" height="2">
+   <data encoding="base64" compression="gzip">H4sIAAAAAAAAE2NgYGBgYYAAIN3AgAYAaIG86yAAAAA=</data>
+  </layer>
+ </group>
+ <layer id="4" name="Overlay" width="4" height="2">
+  <data encoding="base64">AAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</data>
+ </layer>
+ <layer id="5" name="Walls" width="4" height="2">
+  <data encoding="csv">
+4,0,0,4,
+0,0,0,0
+</data>
+ </layer>
+ <layer id="6" name="Old style" width="4" height="2">
+  <data>
+   <tile gid="2"/><tile/><tile/><tile/>
+   <tile/><tile/><tile/><tile gid="3"/>
+  </data>
+ </layer>
+ <objectgroup id="7" name="Spawns">
+  <object id="1" x="8" y="8"/>
+ </objectgroup>
+</map>

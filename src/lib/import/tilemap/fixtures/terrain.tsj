@@ -1,0 +1,13 @@
+{
+  "type": "tileset",
+  "name": "Terrain",
+  "tilewidth": 16,
+  "tileheight": 16,
+  "spacing": 2,
+  "margin": 1,
+  "columns": 2,
+  "tilecount": 4,
+  "image": "terrain.png",
+  "imagewidth": 36,
+  "imageheight": 36
+}

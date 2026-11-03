@@ -44,8 +44,11 @@ export function ImportDropZone({ imports, target }: { imports: ImportController;
       hide();
       if (!workspaceOf(e)) return;
       const { importers, importFile, importFiles } = importsRef.current;
-      const files = [...(e.dataTransfer?.files ?? [])].filter((file) => importers.some((importer) => acceptsFile(importer.accept, file)));
+      const dropped = [...(e.dataTransfer?.files ?? [])];
+      const files = dropped.filter((file) => importers.some((importer) => acceptsFile(importer.accept, file)));
       if (!files.length) return;
+      // a map's tilesets and images go along with the importers that refer to them
+      const companionsOf = (importer: Importer<unknown>) => dropped.filter((file) => !files.includes(file) && importer.companions && acceptsFile(importer.companions, file));
       e.preventDefault();
       e.stopPropagation();
       void (async () => {
@@ -56,7 +59,7 @@ export function ImportDropZone({ imports, target }: { imports: ImportController;
           if (importer?.pick === "many" || importer?.pick === "folder") batches.set(importer, [...(batches.get(importer) ?? []), file]);
           else await importFile(file);
         }
-        for (const [importer, batch] of batches) await importFiles(batch, importer);
+        for (const [importer, batch] of batches) await importFiles([...batch, ...companionsOf(importer)], importer);
       })();
     };
     document.addEventListener("dragover", onDragOver, { capture: true });

@@ -5,6 +5,7 @@ import { Upload } from "lucide-react";
 import type { ImportController } from "@/hooks/useImport";
 import type { Importer } from "@/lib/import";
 import { ToolbarMenu } from "./ToolbarMenu";
+import { ImportMissingFiles } from "./ImportMissingFiles";
 
 /**
  * The "Import ▾" button, placed right before a tool's `ExportMenu`: one item per file type the tool reads.
@@ -18,7 +19,7 @@ export function ImportMenu({ imports, disabled, note }: { imports: ImportControl
     const input = inputRef.current;
     if (!input) return;
     chosen.current = importer;
-    input.accept = importer.pick === "folder" ? "" : importer.accept.join(",");
+    input.accept = importer.pick === "folder" ? "" : [...importer.accept, ...(importer.companions ?? [])].join(",");
     input.multiple = importer.pick === "many" || importer.pick === "folder";
     input.webkitdirectory = importer.pick === "folder";
     input.value = "";
@@ -46,6 +47,7 @@ export function ImportMenu({ imports, disabled, note }: { imports: ImportControl
           if (files.length && chosen.current) void imports.importFiles(files, chosen.current);
         }}
       />
+      {imports.missing && <ImportMissingFiles missing={imports.missing} />}
     </>
   );
 }
