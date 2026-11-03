@@ -55,6 +55,8 @@ const GAME_LINKS: [AssetRef["type"], string, AssetRef["type"], string][] = [
   ["decision", "adr-checkpoint-saves", "issue", "i-save-system"],
   ["decision", "adr-autosave", "issue", "i-save-system"],
   ["decision", "adr-autosave", "decision", "adr-checkpoint-saves"],
+  ["issue", "i-save-system", "diagram", "save-data"],
+  ["decision", "adr-autosave", "diagram", "save-data"],
 ];
 
 const MODULES = isDevStudio ? devStudioExamples : GAME_MODULES;

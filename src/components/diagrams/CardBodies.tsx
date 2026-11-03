@@ -7,9 +7,7 @@ import type { DiagramNode } from "@/types";
 import { ASSET_KINDS, assetHref, getAsset } from "@/lib/assets";
 import { ASSET_ICONS } from "@/components/asset-icons";
 import {
-  borderColor,
   checklistItems,
-  isBasicShape,
   hostname,
   imageSrc,
   itemsFromLines,
@@ -35,7 +33,8 @@ import {
 } from "@/lib/diagrams/embeds";
 import { GROUP_HEADER } from "@/lib/diagrams/geometry";
 import { DRAWING_STROKE, drawingStroke, smoothPath } from "@/lib/diagrams/freehand";
-import { polygonPoints, shapeOutline } from "@/lib/diagrams/shapes";
+import { polygonPoints } from "@/lib/diagrams/shapes";
+import { getShape, outlineOf, shapeColor } from "@/lib/canvas-shapes";
 import { v4 as uuid } from "uuid";
 
 export interface BodyProps {
@@ -43,6 +42,8 @@ export interface BodyProps {
   projectId: string;
   isEditing: boolean;
   isLoading: boolean;
+  /** This is the one selected card, so it shows its handles (tables show one per row). */
+  hasHandles: boolean;
   onCommit(patch: Partial<DiagramNode>): void;
   onCancel(): void;
   onPickImage(): void;
@@ -51,7 +52,7 @@ export interface BodyProps {
 /** Marks an element whose clicks belong to it, so pressing it never starts a card drag. */
 export const CONTROL = { "data-card-control": "" };
 
-const FIELD_STYLE: React.CSSProperties = {
+export const FIELD_STYLE: React.CSSProperties = {
   background: "var(--bg-primary)",
   color: "var(--text-primary)",
   border: "1px solid var(--border)",
@@ -127,11 +128,12 @@ function TextEditor({ value, placeholder, multiline, onCommit, onCancel, classNa
 }
 
 export function ShapeBody({ node, projectId, isEditing, onCommit, onCancel }: BodyProps) {
-  const color = borderColor(node);
+  const shape = getShape(node.type);
+  const color = shapeColor(node);
   const asset = nodeAsset(node);
   const isDeleted = asset && !getAsset(projectId, asset.type, asset.id);
-  const padding = node.type === "diamond" ? "px-[22%]" : node.type === "ellipse" ? "px-[12%]" : "px-3";
-  const clamp = isBasicShape(node.type) ? "line-clamp-[8]" : "line-clamp-3";
+  const padding = shape.labelInset ?? "px-3";
+  const clamp = shape.shapeStyle === "basic" ? "line-clamp-[8]" : "line-clamp-3";
   return (
     <div className={`relative w-full h-full flex items-center justify-center text-center ${padding}`}>
       <svg className="absolute inset-0 overflow-visible pointer-events-none" width="100%" height="100%" aria-hidden>
@@ -158,9 +160,10 @@ export function ShapeBody({ node, projectId, isEditing, onCommit, onCancel }: Bo
 }
 
 function ShapeOutline({ node, color }: { node: DiagramNode; color: string }) {
-  const outline = shapeOutline(node.type, { x: 0, y: 0, width: node.width, height: node.height });
-  const fill = node.color && isBasicShape(node.type) ? `${node.color}1f` : "var(--bg-card)";
-  const common = { fill, stroke: color, strokeWidth: isBasicShape(node.type) ? 2 : 1.5 };
+  const outline = outlineOf(node.type, { x: 0, y: 0, width: node.width, height: node.height });
+  const isBasic = getShape(node.type).shapeStyle === "basic";
+  const fill = node.color && isBasic ? `${node.color}1f` : "var(--bg-card)";
+  const common = { fill, stroke: color, strokeWidth: isBasic ? 2 : 1.5 };
   if (outline.kind === "polygon") return <polygon points={polygonPoints(outline.points)} {...common} />;
   if (outline.kind === "ellipse") return <ellipse cx={outline.cx} cy={outline.cy} rx={Math.max(0, outline.rx - 1)} ry={Math.max(0, outline.ry - 1)} {...common} />;
   return <rect x="0.75" y="0.75" width={outline.width - 1.5} height={outline.height - 1.5} rx={outline.radius} {...common} />;
@@ -172,7 +175,7 @@ export function DrawingBody({ node }: BodyProps) {
   return (
     <svg className="absolute inset-0 overflow-visible" width="100%" height="100%" viewBox={`0 0 ${box.width} ${box.height}`} preserveAspectRatio="none" aria-hidden>
       <path d={path} fill="none" stroke="transparent" strokeWidth={16} vectorEffect="non-scaling-stroke" strokeLinecap="round" style={{ pointerEvents: "stroke" }} />
-      <path d={path} fill="none" stroke={borderColor(node)} strokeWidth={DRAWING_STROKE} vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />
+      <path d={path} fill="none" stroke={shapeColor(node)} strokeWidth={DRAWING_STROKE} vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }

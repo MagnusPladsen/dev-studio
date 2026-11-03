@@ -1,18 +1,22 @@
-import type { AssetRef } from "@/types";
+import type { AssetRef, DiagramEdge } from "@/types";
 import type { ExampleModule } from "./types";
 import { issuesModule, type ExampleSprint, type IssueDraft } from "./board";
 import { diagram } from "./planning";
 import { decisionsModule, type DecisionDraft } from "./decisions";
+import { card, group, note } from "./diagram-boards";
+import { relation, table } from "./erd";
 
 // Dev Studio's example project: "Tidepool", a small habit-tracker app heading for its public beta.
 
 export const DEV_STUDIO_SLUGS = {
-  diagrams: ["architecture", "signup-flow"],
+  diagrams: ["architecture", "signup-flow", "data-model"],
   stories: ["ava", "jonas", "sync-api", "streak-engine", "beta-launch"],
   notes: ["welcome", "spec-reminders", "kickoff", "bugs"],
   decisions: ["adr-offline", "adr-server-wins", "adr-conflict-rules", "adr-usage-stats"],
   issues: ["i-onboarding", "i-streaks", "i-reminders", "i-sync-conflicts", "i-dark-mode", "i-crash-bug", "i-analytics", "i-beta-invites"],
 } as const;
+
+const line = (id: string, from: string, to: string, label: string, type: DiagramEdge["type"] = "arrow"): DiagramEdge => ({ id, from, to, label, type });
 
 const diagrams: ExampleModule = {
   collection: "diagrams",
@@ -20,24 +24,45 @@ const diagrams: ExampleModule = {
     {
       id: id("architecture"),
       name: "Architecture",
-      ...diagram(
-        [
-          ["app", "state", 80, 200, "Mobile app"],
-          ["store", "action", 80, 380, "Local store (SQLite)"],
-          ["api", "state", 360, 200, "Sync API"],
-          ["db", "action", 640, 200, "Postgres"],
-          ["push", "event", 360, 40, "Push service"],
-          ["note", "note", 600, 360, "Offline first: the app writes locally and syncs when it can. See ADR-001.", 260],
-        ],
-        [
-          ["app", "store", "Reads and writes"],
-          ["store", "api", "Sync queue"],
-          ["api", "app", "Changes since", "dashed"],
-          ["api", "db", "SQL"],
-          ["api", "push", "Reminder due"],
-          ["push", "app", "Notification", "dashed"],
-        ]
-      ),
+      nodes: [
+        group("phone", 40, 40, 300, 400, "On the phone", "#38bdf8"),
+        group("backend", 400, 40, 560, 400, "Backend", "#a78bfa"),
+        card("store", "ellipse", 80, 100, 220, 80, "Local store (SQLite)"),
+        card("app", "rectangle", 80, 300, 220, 70, "Mobile app"),
+        card("api", "rectangle", 440, 100, 200, 70, "Sync API"),
+        card("db", "ellipse", 720, 95, 200, 80, "Postgres"),
+        card("scheduler", "rectangle", 440, 300, 200, 70, "Reminder scheduler"),
+        card("push", "rectangle", 260, 500, 200, 70, "Push service", { color: "#f472b6" }),
+        note("note", 720, 300, 220, "Offline first: the app writes locally and syncs when it can. See ADR-001."),
+      ],
+      edges: [
+        line("e1", "app", "store", "Reads and writes"),
+        line("e2", "store", "api", "Sync queue"),
+        line("e3", "api", "app", "Changes since", "dashed"),
+        line("e4", "api", "db", "SQL"),
+        line("e5", "api", "scheduler", "Reminder due"),
+        line("e6", "scheduler", "push", "Send"),
+        line("e7", "push", "app", "Notification", "dashed"),
+      ],
+    },
+    {
+      id: id("data-model"),
+      name: "Data Model",
+      nodes: [
+        table("users", 40, 180, "users", [["id", "uuid", "PK"], ["email", "text"], ["display_name", "text"], ["time_zone", "text"], ["created_at", "timestamp"]]),
+        table("habits", 360, 40, "habits", [["id", "uuid", "PK"], ["user_id", "uuid", "FK"], ["name", "text"], ["schedule", "text"], ["archived_at", "timestamp"], ["updated_at", "timestamp"]]),
+        table("devices", 360, 320, "devices", [["id", "uuid", "PK"], ["user_id", "uuid", "FK"], ["platform", "text"], ["push_token", "text"], ["last_synced_at", "timestamp"]]),
+        table("ticks", 680, 260, "ticks", [["id", "uuid", "PK"], ["habit_id", "uuid", "FK"], ["device_id", "uuid", "FK"], ["day", "date"], ["ticked_at", "timestamp"], ["deleted_at", "timestamp"]]),
+        table("reminders", 680, 20, "reminders", [["id", "uuid", "PK"], ["habit_id", "uuid", "FK"], ["time_of_day", "time"], ["days", "text"], ["is_enabled", "boolean"]]),
+        note("conflicts", 40, 400, 280, "Sync conflicts: the latest ticked_at wins and deleted_at always wins (ADR-003). last_synced_at tells the Sync API what to send back."),
+      ],
+      edges: [
+        relation("e1", "habits.user_id", "users.id"),
+        relation("e2", "devices.user_id", "users.id"),
+        relation("e3", "ticks.habit_id", "habits.id"),
+        relation("e4", "ticks.device_id", "devices.id"),
+        relation("e5", "reminders.habit_id", "habits.id"),
+      ],
     },
     {
       id: id("signup-flow"),
@@ -413,6 +438,9 @@ export const DEV_STUDIO_LINKS: [AssetRef["type"], string, AssetRef["type"], stri
   ["issue", "i-beta-invites", "story", "beta-launch"],
   ["note", "kickoff", "story", "beta-launch"],
   ["diagram", "architecture", "decision", "adr-offline"],
+  ["diagram", "data-model", "story", "sync-api"],
+  ["issue", "i-sync-conflicts", "diagram", "data-model"],
+  ["diagram", "data-model", "decision", "adr-conflict-rules"],
   ["decision", "adr-offline", "story", "sync-api"],
   ["decision", "adr-offline", "story", "streak-engine"],
   ["decision", "adr-conflict-rules", "decision", "adr-server-wins"],
