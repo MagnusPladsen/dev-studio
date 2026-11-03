@@ -5,10 +5,16 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 
 export const TOAST_MS = 4000;
+/** Toasts with a list of details stay up longer, so there is time to read them. */
+const DETAILS_TOAST_MS = 9000;
+const MAX_DETAILS = 5;
 
 export interface ToastOptions {
   message: string;
   action?: { label: string; href: string };
+  /** Short follow-up lines under the message, e.g. import warnings. */
+  details?: string[];
+  tone?: "error";
 }
 
 interface ToastContextValue {
@@ -37,7 +43,7 @@ export function ToastProvider({ children }: { children: ReactNode }): React.JSX.
 
   useEffect(() => {
     if (!toast) return;
-    const timer = setTimeout(() => setToast(null), TOAST_MS);
+    const timer = setTimeout(() => setToast(null), toast.details?.length || toast.tone === "error" ? DETAILS_TOAST_MS : TOAST_MS);
     return () => clearTimeout(timer);
   }, [toast]);
 
@@ -55,7 +61,10 @@ export function ToastProvider({ children }: { children: ReactNode }): React.JSX.
             className="pointer-events-auto flex items-center gap-3 rounded-lg px-3 py-2 text-xs shadow-xl"
             style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)", color: "var(--text-primary)" }}
           >
-            <span>{toast.message}</span>
+            <div>
+              <span style={toast.tone === "error" ? { color: "var(--red)" } : undefined}>{toast.message}</span>
+              {Boolean(toast.details?.length) && <ToastDetails details={toast.details!} />}
+            </div>
             {toast.action && (
               <Link
                 href={toast.action.href}
@@ -70,5 +79,18 @@ export function ToastProvider({ children }: { children: ReactNode }): React.JSX.
         )}
       </div>
     </ToastContext.Provider>
+  );
+}
+
+function ToastDetails({ details }: { details: string[] }): React.JSX.Element {
+  const shown = details.slice(0, MAX_DETAILS);
+  const hidden = details.length - shown.length;
+  return (
+    <ul className="mt-1 list-disc pl-4" style={{ color: "var(--text-secondary)" }}>
+      {shown.map((detail) => (
+        <li key={detail}>{detail}</li>
+      ))}
+      {hidden > 0 && <li>and {hidden} more</li>}
+    </ul>
   );
 }

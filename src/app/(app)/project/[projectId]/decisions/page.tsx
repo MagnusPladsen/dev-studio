@@ -17,6 +17,7 @@ import {
   decisionFileName,
   decisionLogMarkdown,
   decisionToMarkdown,
+  nextDecisionNumber,
   sortDecisions,
   supersedeDecision,
   supersededDecisions,
@@ -29,6 +30,11 @@ import { LinkedAssets } from "@/components/LinkedAssets";
 import { UndoRedoButtons } from "@/components/UndoRedoButtons";
 import { SaveIndicator } from "@/components/SaveIndicator";
 import { ExportMenu, type ExportItem } from "@/components/ExportMenu";
+import { ImportMenu } from "@/components/ImportMenu";
+import { ImportDropZone } from "@/components/ImportDropZone";
+import { useImport, type ImportController } from "@/hooks/useImport";
+import { importAsNewAssets } from "@/lib/import";
+import { DECISION_IMPORTERS } from "@/lib/import/decisions";
 import { HelpButton } from "@/components/HelpButton";
 import { toggleChecklistLine, type RenderCtx, type WikiTarget } from "@/components/MarkdownPreview";
 import { DecisionList, type StatusFilter } from "@/components/decisions/DecisionList";
@@ -139,6 +145,7 @@ export default function DecisionLogPage() {
   const wikiTargets = useMemo(() => wikiTargetIndex(projectId), [projectId, version]);
 
   const history = useHistory<Decision | null>(draft, (v) => setDraft(v), draft?.id);
+  const rootRef = useRef<HTMLDivElement>(null);
 
   const select = useCallback(
     (id: string | null) => {
@@ -161,6 +168,26 @@ export default function DecisionLogPage() {
   function update(patch: Partial<Decision>) {
     setDraft((d) => (d ? { ...d, ...patch } : d));
   }
+
+  // Imported decisions are numbered after the last one in this log, in their original order.
+  const imports = useImport<Decision>({
+    importers: DECISION_IMPORTERS,
+    noun: ["decision", "decisions"],
+    history,
+    openId: draft?.id ?? null,
+    apply: ({ items }) => {
+      flush();
+      const first = nextDecisionNumber(storage.getAll("decisions", projectId));
+      return importAsNewAssets("decisions", projectId, items.map((decision, index) => ({ ...decision, number: first + index })), {
+        previousId: draft?.id ?? null,
+        open: (decision) => {
+          select(decision.id);
+          setFilter("all");
+        },
+        back: (previous) => select(previous?.id ?? null),
+      });
+    },
+  });
 
   function create() {
     flush();
@@ -224,7 +251,8 @@ export default function DecisionLogPage() {
   const exportItems = decisionExports(projectId, draft, decisions);
 
   return (
-    <div className="flex h-full overflow-hidden" style={{ background: "var(--bg-primary)" }}>
+    <div ref={rootRef} className="flex h-full overflow-hidden" style={{ background: "var(--bg-primary)" }}>
+      <ImportDropZone imports={imports} target={rootRef} />
       <DecisionList
         projectId={projectId}
         decisions={decisions}
@@ -236,11 +264,12 @@ export default function DecisionLogPage() {
         onFilter={setFilter}
         onOpen={select}
         onCreate={create}
+        imports={imports}
       />
 
       <section className={`${draft ? "flex" : "hidden md:flex"} flex-1 min-w-0 flex-col`}>
         {!draft ? (
-          <EmptyEditor hasDecisions={decisions.length > 0} onCreate={create} exportItems={exportItems} />
+          <EmptyEditor hasDecisions={decisions.length > 0} onCreate={create} exportItems={exportItems} imports={imports} />
         ) : (
           <>
             <div className="shrink-0 border-b px-4 py-2.5 space-y-2" style={{ borderColor: "var(--border)", background: "var(--bg-secondary)" }}>
@@ -277,6 +306,7 @@ export default function DecisionLogPage() {
                   <Trash2 className="w-4 h-4" />
                 </button>
                 <HelpButton topic="decisions" className="md:hidden" />
+                <ImportMenu imports={imports} />
                 <ExportMenu items={exportItems} />
               </div>
               <MetaRow
@@ -455,7 +485,7 @@ function SupersedeBanner({ label, decision, onOpen, isProminent = false }: { lab
   );
 }
 
-function EmptyEditor({ hasDecisions, onCreate, exportItems }: { hasDecisions: boolean; onCreate(): void; exportItems: ExportItem[] }) {
+function EmptyEditor({ hasDecisions, onCreate, exportItems, imports }: { hasDecisions: boolean; onCreate(): void; exportItems: ExportItem[]; imports: ImportController }) {
   return (
     <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
       <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4" style={{ background: "color-mix(in srgb, var(--accent) 12%, transparent)", color: "var(--accent)" }}>
@@ -471,6 +501,7 @@ function EmptyEditor({ hasDecisions, onCreate, exportItems }: { hasDecisions: bo
         <button onClick={onCreate} className="text-xs px-3 py-1.5 rounded-lg font-medium" style={{ background: "var(--accent)", color: "var(--on-accent)" }}>
           New decision
         </button>
+        <ImportMenu imports={imports} />
         {hasDecisions && <ExportMenu items={exportItems} label="Export log" />}
       </div>
     </div>

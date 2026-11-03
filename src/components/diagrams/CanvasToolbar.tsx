@@ -7,6 +7,8 @@ import type { SaveState } from "@/hooks/useAutosave";
 import { UndoRedoButtons } from "@/components/UndoRedoButtons";
 import { SaveIndicator } from "@/components/SaveIndicator";
 import { ExportMenu } from "@/components/ExportMenu";
+import { ImportMenu } from "@/components/ImportMenu";
+import type { ImportController } from "@/hooks/useImport";
 import { HelpButton } from "@/components/HelpButton";
 import { LinkedAssets } from "@/components/LinkedAssets";
 import type { NodeType } from "@/lib/diagrams/cards";
@@ -20,6 +22,7 @@ interface CanvasToolbarProps {
   /** The canvas is saved already, so linked assets can point at it. */
   isSaved: boolean;
   history: History;
+  imports: ImportController;
   saveState: SaveState;
   tool: BoardTool;
   hasSelectedEdge: boolean;
@@ -112,6 +115,7 @@ export function CanvasToolbar(props: CanvasToolbarProps) {
 
         <SaveIndicator state={props.saveState} className="px-1" />
         <HelpButton topic="diagrams" />
+        <ImportMenu imports={props.imports} />
         <ExportMenu
           items={[
             { label: "PNG image", description: "The whole board as a picture", onClick: props.onExportPng },

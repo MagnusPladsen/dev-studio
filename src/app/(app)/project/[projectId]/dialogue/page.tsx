@@ -5,6 +5,11 @@ import { useHistory } from "@/hooks/useHistory";
 import { UndoRedoButtons } from "@/components/UndoRedoButtons";
 import { SaveIndicator } from "@/components/SaveIndicator";
 import { ExportMenu } from "@/components/ExportMenu";
+import { ImportMenu } from "@/components/ImportMenu";
+import { ImportDropZone } from "@/components/ImportDropZone";
+import { useImport } from "@/hooks/useImport";
+import { importAsNewAssets } from "@/lib/import";
+import { DIALOGUE_IMPORTERS } from "@/lib/import/dialogue";
 import { HelpButton } from "@/components/HelpButton";
 import { ExamplesBar } from "@/components/ExamplesBar";
 import { rowButtonProps } from "@/lib/row-button";
@@ -224,6 +229,7 @@ export default function DialoguePage() {
   const [editingNode, setEditingNode] = useState<string | null>(null);
 
   const canvasRef = useRef<HTMLDivElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
   const [loaded, setLoaded] = useState(false);
   const lastTap = useRef({ id: "", at: 0 });
   const [characters, setCharacters] = useState<string[]>([]);
@@ -279,6 +285,27 @@ export default function DialoguePage() {
     },
     activeTree?.id
   );
+
+  const imports = useImport<DialogueTree>({
+    importers: DIALOGUE_IMPORTERS,
+    noun: ["dialogue", "dialogues"],
+    history,
+    openId: activeTree?.id ?? null,
+    apply: ({ items }) =>
+      importAsNewAssets("dialogues", projectId, items, {
+        previousId: activeTree?.id ?? null,
+        open: (tree) => showTree(tree),
+        back: (previous) => showTree(previous ?? null),
+      }),
+  });
+
+  function showTree(tree: DialogueTree | null) {
+    setTrees(storage.getAll("dialogues", projectId));
+    setActiveTree(tree);
+    setSelectedNode(null);
+    setEditingNode(null);
+    setPreview(null);
+  }
 
   function createTree() {
     const tree: DialogueTree = {
@@ -757,7 +784,8 @@ export default function DialoguePage() {
   // LIST VIEW
   if (!activeTree) {
     return (
-      <div className="p-6 md:p-10 max-w-3xl mx-auto">
+      <div ref={rootRef} className="p-6 md:p-10 max-w-3xl mx-auto">
+        <ImportDropZone imports={imports} target={rootRef} />
         <div className="flex items-center justify-between gap-3 mb-3">
           <div>
             <h1
@@ -776,6 +804,7 @@ export default function DialoguePage() {
           <div className="flex items-center gap-2 shrink-0">
             <HelpButton topic="dialogue" />
             <PasteButton type="dialogue" />
+            <ImportMenu imports={imports} />
             <button
               onClick={createTree}
               className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium shrink-0"
@@ -884,7 +913,8 @@ export default function DialoguePage() {
     : null;
 
   return (
-    <div className="flex flex-col h-full">
+    <div ref={rootRef} className="flex flex-col h-full">
+      <ImportDropZone imports={imports} target={rootRef} />
       {/* Toolbar */}
       <div
         className="flex items-center justify-between flex-wrap md:gap-x-3 gap-y-1.5 px-4 min-h-12 py-1.5 border-b shrink-0 max-md:px-2"
@@ -906,7 +936,7 @@ export default function DialoguePage() {
           >
             ← All dialogues
           </button>
-          <UndoRedoButtons history={history} />
+          <UndoRedoButtons history={imports.history} />
           <input
             className="bg-transparent text-sm font-medium outline-none w-48 max-md:w-36 min-w-0 md:shrink-0"
             style={{ color: "var(--text-primary)" }}
@@ -995,6 +1025,7 @@ export default function DialoguePage() {
           </button>
           <SaveIndicator state={saveState} className="px-1" />
           <HelpButton topic="dialogue" />
+          <ImportMenu imports={imports} />
           <ExportMenu
             items={[
               { label: "JSON", description: "The whole tree, to re-import or load in code", onClick: exportTree },

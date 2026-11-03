@@ -7,6 +7,8 @@ import { useAssetMenu } from "@/components/AssetContextMenu";
 import { AssetMenuButton, AssetPinButton, PasteButton } from "@/components/AssetMenuButton";
 import { ExamplesBar } from "@/components/ExamplesBar";
 import { HelpButton } from "@/components/HelpButton";
+import { ImportMenu } from "@/components/ImportMenu";
+import type { ImportController } from "@/hooks/useImport";
 import { COPY } from "@/copy";
 import type { CanvasTemplate } from "@/lib/canvas-shapes/templates";
 import { TemplatePicker } from "./TemplatePicker";
@@ -17,10 +19,11 @@ interface CanvasListProps {
   onOpen(diagram: Diagram): void;
   onNew(template: CanvasTemplate): void;
   onDelete(id: string): void;
+  imports: ImportController;
 }
 
 /** The Canvas start page: every canvas in the project, with new (from a template), delete and the examples bar. */
-export function CanvasList({ projectId, diagrams, onOpen, onNew, onDelete }: CanvasListProps) {
+export function CanvasList({ projectId, diagrams, onOpen, onNew, onDelete, imports }: CanvasListProps) {
   const { assetTriggerProps, pasteTriggerProps } = useAssetMenu();
   const [isPicking, setIsPicking] = useState(false);
   return (
@@ -33,6 +36,7 @@ export function CanvasList({ projectId, diagrams, onOpen, onNew, onDelete }: Can
         <div className="flex items-center gap-2 shrink-0">
           <HelpButton topic="diagrams" />
           <PasteButton type="diagram" />
+          <ImportMenu imports={imports} />
           <button
             onClick={() => setIsPicking(true)}
             className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium shrink-0"
