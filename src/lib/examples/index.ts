@@ -1,6 +1,7 @@
 import type { AssetRef } from "@/types";
 import { storage, PROJECT_COLLECTIONS, type ProjectCollection } from "../storage";
 import { addLink } from "../links";
+import { findElement } from "../diagrams/elements";
 import type { ExampleContext, ExampleModule } from "./types";
 import { artExamples } from "./art";
 import { audioExamples } from "./audio";
@@ -20,8 +21,8 @@ const GAME_MODULES: ExampleModule[] = [...artExamples, ...audioExamples, ...leve
 
 export const exampleId = (projectId: string, slug: string) => `${projectId}--ex--${slug}`;
 
-/** Links between the example assets, so the sample game shows how everything connects. */
-const GAME_LINKS: [AssetRef["type"], string, AssetRef["type"], string][] = [
+/** Links between the example assets, so the sample game shows how everything connects. An end "canvas#element" is one element. */
+export const GAME_LINKS: [AssetRef["type"], string, AssetRef["type"], string][] = [
   ["story", "hero", "sprite", "hero"],
   ["story", "hero", "sound", "jump"],
   ["story", "sword", "sprite", "sword"],
@@ -57,6 +58,7 @@ const GAME_LINKS: [AssetRef["type"], string, AssetRef["type"], string][] = [
   ["decision", "adr-autosave", "decision", "adr-checkpoint-saves"],
   ["issue", "i-save-system", "diagram", "save-data"],
   ["decision", "adr-autosave", "diagram", "save-data"],
+  ["issue", "i-save-system", "diagram", "save-data#player"],
 ];
 
 const MODULES = isDevStudio ? devStudioExamples : GAME_MODULES;
@@ -106,8 +108,8 @@ export async function addExamples(projectId: string, collections?: ProjectCollec
     }
   }
   for (const [ft, fs, tt, ts] of EXAMPLE_LINKS) {
-    const from = { type: ft, id: exampleId(projectId, fs) };
-    const to = { type: tt, id: exampleId(projectId, ts) };
+    const from = exampleRef(projectId, ft, fs);
+    const to = exampleRef(projectId, tt, ts);
     if (assetExists(projectId, from) && assetExists(projectId, to)) addLink(projectId, from, to);
   }
   return added;
@@ -144,6 +146,19 @@ const COLLECTION_OF: Record<AssetRef["type"], ProjectCollection> = {
   decision: "decisions",
 };
 
+/** An example link end: "slug", or "canvas-slug#element-id" for one element on an example canvas. */
+export function parseExampleEnd(slug: string): { slug: string; elementId?: string } {
+  const [asset, elementId] = slug.split("#");
+  return elementId ? { slug: asset, elementId } : { slug: asset };
+}
+
+function exampleRef(projectId: string, type: AssetRef["type"], end: string): AssetRef {
+  const { slug, elementId } = parseExampleEnd(end);
+  const id = exampleId(projectId, slug);
+  return elementId ? { type, id, elementId } : { type, id };
+}
+
 function assetExists(projectId: string, ref: AssetRef) {
+  if (ref.elementId) return Boolean(findElement(projectId, ref.id, ref.elementId));
   return !!storage.getById(COLLECTION_OF[ref.type], ref.id, projectId);
 }

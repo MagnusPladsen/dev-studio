@@ -351,6 +351,8 @@ export interface Decision {
 export interface AssetRef {
   type: AssetType;
   id: string;
+  /** One element (node) on a canvas, when the ref points inside a `diagram` rather than at all of it. */
+  elementId?: string;
 }
 
 export interface AssetRelation {

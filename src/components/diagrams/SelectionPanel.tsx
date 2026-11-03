@@ -1,18 +1,17 @@
 "use client";
 
-import Link from "next/link";
-import { Check, ExternalLink, ImagePlus, Link2, Pencil, Rows3, Trash2, Boxes } from "lucide-react";
+import { Check, ImagePlus, Link2, Pencil, Rows3, Trash2, Boxes } from "lucide-react";
 import type { DiagramNode } from "@/types";
-import { ASSET_KINDS, ASSET_TYPES, assetHref, getAsset, listAssets } from "@/lib/assets";
-import { CARD_COLORS, nodeAsset } from "@/lib/diagrams/cards";
+import { CARD_COLORS } from "@/lib/diagrams/cards";
+import { LinkedAssets } from "@/components/LinkedAssets";
 import { getShape } from "@/lib/canvas-shapes";
 import { ArrangeActions, type ArrangeHandlers } from "./ArrangeActions";
 
 interface SelectionPanelProps extends ArrangeHandlers {
   node: DiagramNode;
   projectId: string;
+  diagramId: string;
   onColor(color: string | undefined): void;
-  onLinkAsset(value: string): void;
   onStack(): void;
   onEdit(): void;
   onReplaceImage(): void;
@@ -43,46 +42,6 @@ function Swatches({ nodes, onColor }: { nodes: DiagramNode[]; onColor(color: str
         );
       })}
     </div>
-  );
-}
-
-function AssetSelect({ node, projectId, onLinkAsset }: Pick<SelectionPanelProps, "node" | "projectId" | "onLinkAsset">) {
-  const asset = nodeAsset(node);
-  const assetName = asset ? getAsset(projectId, asset.type, asset.id)?.name : undefined;
-  const projectAssets = listAssets(projectId);
-  return (
-    <>
-      <label className="block text-xs" style={{ color: "var(--text-secondary)" }}>
-        Linked asset
-        <select
-          value={asset ? `${asset.type}:${asset.id}` : ""}
-          onChange={(e) => onLinkAsset(e.target.value)}
-          className="mt-1 w-full px-2 py-1 rounded text-xs outline-none"
-          style={{ background: "var(--bg-primary)", color: "var(--text-primary)", border: "1px solid var(--border)" }}
-        >
-          <option value="">None</option>
-          {ASSET_TYPES.map((type) => {
-            const group = projectAssets.filter((a) => a.type === type);
-            if (!group.length) return null;
-            return (
-              <optgroup key={type} label={ASSET_KINDS[type].label}>
-                {group.map((a) => (
-                  <option key={a.id} value={`${a.type}:${a.id}`}>{a.name}</option>
-                ))}
-              </optgroup>
-            );
-          })}
-        </select>
-      </label>
-      {asset && (assetName ? (
-        <Link href={assetHref(projectId, asset.type, asset.id)} className="flex items-center gap-1 text-xs hover:underline" style={{ color: "var(--accent)" }}>
-          <ExternalLink className="w-3 h-3" />
-          Open {assetName}
-        </Link>
-      ) : (
-        <span className="text-xs" style={{ color: "var(--text-muted)" }}>Linked asset was deleted</span>
-      ))}
-    </>
   );
 }
 
@@ -138,7 +97,7 @@ function DeleteButton({ onDelete, label }: { onDelete(): void; label: string }) 
   );
 }
 
-/** Floating panel for the selected card: colour, linked asset, arranging and the card's own actions. */
+/** Floating panel for the selected card: colour, links to other assets, arranging and the card's own actions. */
 export function SelectionPanel(props: SelectionPanelProps) {
   const { node, onEdit, onDelete } = props;
   const shape = getShape(node.type);
@@ -160,7 +119,8 @@ export function SelectionPanel(props: SelectionPanelProps) {
       <Swatches nodes={[node]} onColor={props.onColor} />
       <ArrangeActions count={1} {...props} />
       <TypeActions {...props} />
-      {shape.canLinkAsset && <AssetSelect {...props} />}
+      <LinkedAssets projectId={props.projectId} type="diagram" id={props.diagramId} elementId={node.id} isInFloatingPanel />
+
     </PanelFrame>
   );
 }

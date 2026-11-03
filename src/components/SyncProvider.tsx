@@ -14,6 +14,7 @@ import {
   type Persister,
 } from "@/lib/storage";
 import { getSupabase, supabaseEnabled } from "@/lib/supabase";
+import { migrateAllElementAssetLinks } from "@/lib/diagrams/element-links";
 import { createCloudPersister, loadCloudSnapshot, uploadSnapshot, type SyncStatus } from "@/lib/sync/cloud";
 import {
   createFolderPersister,
@@ -142,7 +143,10 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         if (perm === "granted") await attachFolder(handle).catch((e: Error) => reportError(e.message));
         else setFolder({ state: "needs-permission", name: handle.name });
       }
-      if (!cancelled) setReady(true);
+      if (cancelled) return;
+      // Canvas elements once carried a one-way `data.asset` link; make those real links before any tool reads them.
+      migrateAllElementAssetLinks();
+      setReady(true);
     })();
 
     const sub = supabase?.auth.onAuthStateChange((event, session) => {

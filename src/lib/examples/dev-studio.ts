@@ -427,7 +427,7 @@ const ISSUES: IssueDraft[] = [
 
 export const devStudioExamples: ExampleModule[] = [diagrams, stories, notes, decisionsModule(DECISIONS), issuesModule(ISSUES)];
 
-/** Links between the example assets, so the sample project shows how everything connects. */
+/** Links between the example assets, so the sample project shows how everything connects. An end "canvas#element" is one element. */
 export const DEV_STUDIO_LINKS: [AssetRef["type"], string, AssetRef["type"], string][] = [
   ["issue", "i-onboarding", "diagram", "signup-flow"],
   ["issue", "i-streaks", "story", "streak-engine"],
@@ -448,4 +448,7 @@ export const DEV_STUDIO_LINKS: [AssetRef["type"], string, AssetRef["type"], stri
   ["decision", "adr-conflict-rules", "story", "sync-api"],
   ["decision", "adr-conflict-rules", "note", "kickoff"],
   ["decision", "adr-usage-stats", "issue", "i-analytics"],
+  ["story", "sync-api", "diagram", "data-model#users"],
+  ["story", "sync-api", "diagram", "data-model#ticks"],
+  ["issue", "i-sync-conflicts", "diagram", "data-model#ticks"],
 ];

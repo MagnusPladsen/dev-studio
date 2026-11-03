@@ -19,7 +19,7 @@ import { HelpButton } from "@/components/HelpButton";
 import { TutorialsToggle } from "@/components/TutorialsToggle";
 import { ASSET_KINDS, ASSET_TYPES, assetHref, listAssets } from "@/lib/assets";
 import { COPY } from "@/copy";
-import { getRelated } from "@/lib/links";
+import { getRelated, relatedKey, relatedLabel } from "@/lib/links";
 import { getAssetName, getStoredAsset } from "@/lib/asset-actions";
 import { useAssetMenu } from "@/components/AssetContextMenu";
 import { AssetMenuButton, AssetPinButton, PasteButton } from "@/components/AssetMenuButton";
@@ -310,12 +310,12 @@ export default function AssetsPage() {
                     <Link2 className="w-3 h-3 shrink-0" style={{ color: "var(--text-muted)" }} />
                     {a.related.slice(0, 4).map((r) => (
                       <Link
-                        key={`${r.type}:${r.id}`}
-                        href={assetHref(projectId, r.type, r.id)}
+                        key={relatedKey(r)}
+                        href={assetHref(projectId, r.type, r.id, r.elementId)}
                         className="text-xs px-1.5 py-0.5 rounded truncate max-w-32 hover:underline"
                         style={{ background: `${ASSET_KINDS[r.type].color}18`, color: ASSET_KINDS[r.type].color }}
                       >
-                        {r.name}
+                        {relatedLabel(r)}
                       </Link>
                     ))}
                     {a.related.length > 4 && (

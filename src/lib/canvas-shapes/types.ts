@@ -58,7 +58,6 @@ export interface ShapeDefinition {
   /** Moving the card moves the cards inside it. */
   isContainer: boolean;
   canEditText: boolean;
-  canLinkAsset: boolean;
   placement: Placement;
   body: BodyKind;
   /** Shape bodies: the outline drawn in the card's box. */

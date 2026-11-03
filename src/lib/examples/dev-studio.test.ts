@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { ASSET_KINDS } from "@/lib/assets";
 import { appConfigFor } from "@/lib/app-config";
 import { DEV_STUDIO_LINKS, DEV_STUDIO_SLUGS, devStudioExamples } from "./dev-studio";
+import { parseExampleEnd } from "./index";
 
 const ctx = { projectId: "p", id: (slug: string) => `p--ex--${slug}` };
 type ExampleItem = { id: string; title?: string; content?: string; context?: string; options?: string; decision?: string; consequences?: string };
@@ -25,12 +26,11 @@ describe("Dev Studio examples", () => {
   });
 
   it("link only to examples that exist", () => {
-    for (const [fromType, fromSlug, toType, toSlug] of DEV_STUDIO_LINKS) {
-      expect(slugsOf(ASSET_KINDS[fromType].collection)).toContain(fromSlug);
-      expect(slugsOf(ASSET_KINDS[toType].collection)).toContain(toSlug);
+    for (const [fromType, fromEnd, toType, toEnd] of DEV_STUDIO_LINKS) {
+      expect(slugsOf(ASSET_KINDS[fromType].collection)).toContain(parseExampleEnd(fromEnd).slug);
+      expect(slugsOf(ASSET_KINDS[toType].collection)).toContain(parseExampleEnd(toEnd).slug);
     }
   });
-
   it("wiki links point at existing wiki pages or notes", () => {
     const titles = new Set(built.filter((b) => b.collection === "stories" || b.collection === "notes").flatMap(({ items }) => items.map((i) => i.title)));
     for (const { items } of built) {

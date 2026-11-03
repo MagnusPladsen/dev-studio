@@ -127,11 +127,9 @@ function TextEditor({ value, placeholder, multiline, onCommit, onCancel, classNa
   );
 }
 
-export function ShapeBody({ node, projectId, isEditing, onCommit, onCancel }: BodyProps) {
+export function ShapeBody({ node, isEditing, onCommit, onCancel }: BodyProps) {
   const shape = getShape(node.type);
   const color = shapeColor(node);
-  const asset = nodeAsset(node);
-  const isDeleted = asset && !getAsset(projectId, asset.type, asset.id);
   const padding = shape.labelInset ?? "px-3";
   const clamp = shape.shapeStyle === "basic" ? "line-clamp-[8]" : "line-clamp-3";
   return (
@@ -146,15 +144,6 @@ export function ShapeBody({ node, projectId, isEditing, onCommit, onCancel }: Bo
           node.label
         )}
       </div>
-      {asset && (
-        <span
-          className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold"
-          style={{ background: isDeleted ? "var(--text-muted)" : ASSET_KINDS[asset.type]?.color, color: "#0a0a0f" }}
-          title={isDeleted ? "Linked asset was deleted" : `Linked ${ASSET_KINDS[asset.type]?.label ?? "asset"}`}
-        >
-          ↗
-        </span>
-      )}
     </div>
   );
 }

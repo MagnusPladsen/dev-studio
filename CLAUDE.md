@@ -48,6 +48,10 @@ tools comes from `COPY.help`. `npm test` checks both objects have the same keys 
 - **Assets & links**: `src/lib/assets.ts` (`ASSET_KINDS` registry: collection, label, tool path, colour) and
   `src/lib/links.ts` (`getRelated`, `addLink`, `removeLink`). Any asset can link to any other; story `[[wiki links]]`
   count too. `<LinkedAssets>` is the shared panel; `assetHref()` + `useOpenParam()` open an asset via `?open=<id>`.
+  A link end can be one Canvas element: `{ type: "diagram", id, elementId }` (`&element=<nodeId>` deep-links to it).
+  Deleting an element drops its links and undo restores them; `src/lib/diagrams/element-links.ts` migrates the old
+  one-way `node.data.asset` on load. `<AssetPickerList allowElements>` picks a whole asset or a canvas element.
+  Canvas right-click/long-press menus are built in `src/lib/diagrams/canvas-menu.ts` on the shared `ContextMenu`.
 - **Examples**: `src/lib/examples/` — one module per tool group; items get `example: true` and ids
   `ctx.id(slug)`; `addExamples` / `removeExamples` only ever touch flagged items. Slugs in `types.ts`.
 - **Shared editor pieces**: `useAutosave` + `SaveIndicator`, `ExportMenu`, `ExamplesBar`, `useHistory` +
