@@ -15,6 +15,7 @@ import { v4 as uuid } from "uuid";
 import { storage } from "@/lib/storage";
 import type { AssetRef, AssetRelation, Cardinality, Diagram, DiagramEdge, DiagramNode } from "@/types";
 import { useConsumedParam, useOpenParam, useStorageVersion, useTrackOpenAsset } from "@/hooks/useStorage";
+import { useRemoteChanges } from "@/hooks/useRemoteChanges";
 import { useAssetMenu } from "@/components/AssetContextMenu";
 import { AssetPickerModal } from "@/components/AssetPickerModal";
 import type { ContextMenuEntry } from "@/components/ContextMenu";
@@ -213,6 +214,25 @@ export default function DiagramsPage() {
   );
   const [stableContent, setStableContent] = useState(content);
   if (!isInteracting && stableContent !== content) setStableContent(content);
+
+  // Changes from another tab or device: see useRemoteChanges for the rule.
+  const remoteRevision = useRemoteChanges(["diagrams"], projectId, () => {
+    setDiagrams(storage.getAll("diagrams", projectId));
+    if (!current) return false;
+    const stored = storage.getById("diagrams", current.id, projectId);
+    if (!stored) {
+      setCurrent(null);
+      setShowList(true);
+      return false;
+    }
+    if (stored === current || isInteracting || autosave.state !== "saved") return false;
+    setCurrent(stored);
+    setSelectedIds((ids) => ids.filter((id) => stored.nodes.some((n) => n.id === id)));
+    setSelectedEdgeId((id) => (id && stored.edges.some((e) => e.id === id) ? id : null));
+    return true;
+  });
+  const openKey = current ? `${current.id}:${remoteRevision}` : undefined;
+
   const history = useHistory(
     isInteracting ? stableContent : content,
     (v) => {
@@ -221,7 +241,7 @@ export default function DiagramsPage() {
       setSelectedIds([]);
       setSelectedEdgeId(null);
     },
-    current?.id
+    openKey
   );
 
   // Every edit is saved a moment later; a drag saves once, on release.
@@ -233,7 +253,7 @@ export default function DiagramsPage() {
       storage.save("diagrams", d, projectId);
       setDiagrams(storage.getAll("diagrams", projectId));
     },
-    { resetKey: current?.id, enabled: !isInteracting }
+    { resetKey: openKey, enabled: !isInteracting }
   );
 
   // An imported canvas opens straight away; undo deletes it and goes back to what was open before.

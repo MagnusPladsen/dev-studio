@@ -4,18 +4,25 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { User } from "@supabase/supabase-js";
 import {
   addPersister,
+  applyRemoteChanges,
+  cacheKey,
   clearLocalData,
   createLocalPersister,
   getSnapshot,
+  locateCached,
   localHasData,
   mergeIntoCache,
   readLocalSnapshot,
   replaceCache,
+  PROJECT_COLLECTIONS,
+  type ChangeEvent,
   type Persister,
 } from "@/lib/storage";
 import { getSupabase, supabaseEnabled } from "@/lib/supabase";
 import { migrateAllElementAssetLinks } from "@/lib/diagrams/element-links";
-import { createCloudPersister, loadCloudSnapshot, uploadSnapshot, type SyncStatus } from "@/lib/sync/cloud";
+import { createCloudPersister, createCloudReader, loadCloudSnapshot, uploadSnapshot, type SyncStatus } from "@/lib/sync/cloud";
+import { connectRealtime, createRemoteSync, type RemoteSync } from "@/lib/sync/realtime";
+import { listenToOtherTabs } from "@/lib/sync/tabs";
 import {
   createFolderPersister,
   folderSupported,
@@ -48,6 +55,15 @@ interface SyncContextValue {
   reloadView(): void;
 }
 
+function cachedIds(): { projects: string[]; assets: string[] } {
+  const snapshot = getSnapshot();
+  const projects = (snapshot.get(cacheKey("projects")) ?? []).map((p) => p.id);
+  const assets = projects.flatMap((projectId) =>
+    PROJECT_COLLECTIONS.flatMap((col) => (snapshot.get(cacheKey(col, projectId)) ?? []).map((i) => i.id))
+  );
+  return { projects, assets };
+}
+
 const SyncContext = createContext<SyncContextValue | null>(null);
 
 export function useSync(): SyncContextValue {
@@ -68,8 +84,22 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
   const folderRef = useRef<{ handle: FolderHandle; detach(): void } | null>(null);
   const userIdRef = useRef<string | null>(null);
   const switching = useRef<Promise<void>>(Promise.resolve());
+  /** Stops listening for changes from other tabs or devices. */
+  const stopLive = useRef<() => void>(() => {});
 
   const reportError = useCallback((message: string) => setStatus({ state: "error", message }), []);
+
+  /** Changes from elsewhere go into the cache; only a deleted project re-mounts the editors. */
+  const applyRemote = useCallback((changes: ChangeEvent[], dropProject?: (projectId: string) => void) => {
+    for (const change of changes) if (change.op === "deleteProject") dropProject?.(change.projectId);
+    const applied = applyRemoteChanges(changes);
+    if (applied.some((c) => c.op === "deleteProject")) setGeneration((g) => g + 1);
+  }, []);
+
+  const goLive = useCallback((stop: () => void) => {
+    stopLive.current();
+    stopLive.current = stop;
+  }, []);
 
   const usePrimary = useCallback((persister: Persister & { flush?(): Promise<void> }) => {
     primary.current?.detach();
@@ -81,8 +111,9 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
     replaceCache(readLocalSnapshot());
     usePrimary(createLocalPersister(reportError));
+    goLive(listenToOtherTabs(getSnapshot, (changes) => applyRemote(changes)));
     setStatus({ state: "idle" });
-  }, [reportError, usePrimary]);
+  }, [applyRemote, goLive, reportError, usePrimary]);
 
   const attachFolder = useCallback(
     async (handle: FolderHandle) => {
@@ -103,6 +134,8 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     async (u: User) => {
       const supabase = getSupabase()!;
       userIdRef.current = u.id;
+      goLive(() => {});
+      let cursor: string | null = null;
       try {
         if (localHasData()) {
           setStatus({ state: "saving", message: "Moving your local projects into your account…" });
@@ -110,7 +143,9 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
           clearLocalData();
         }
         setStatus({ state: "saving", message: "Loading your projects…" });
-        replaceCache(await loadCloudSnapshot(supabase));
+        const loaded = await loadCloudSnapshot(supabase);
+        replaceCache(loaded.snapshot);
+        cursor = loaded.cursor;
       } catch (err) {
         userIdRef.current = null;
         enterLocal();
@@ -118,11 +153,25 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         return;
       }
       setUser({ id: u.id, email: u.email });
-      usePrimary(createCloudPersister(supabase, u.id, setStatus));
+      let live: RemoteSync | null = null;
+      const persister = createCloudPersister(supabase, u.id, setStatus, (rows) => {
+        live?.written(rows).catch(() => {});
+      });
+      usePrimary(persister);
+      live = createRemoteSync({
+        userId: u.id,
+        reader: createCloudReader(supabase),
+        cursor,
+        apply: (changes) => applyRemote(changes, persister.dropProject),
+        isBusy: persister.isBusy,
+        locate: locateCached,
+        cachedIds,
+      });
+      goLive(connectRealtime(supabase, live, u.id, reportError));
       setStatus({ state: "saved" });
       if (folderRef.current) await attachFolder(folderRef.current.handle).catch(() => {});
     },
-    [attachFolder, enterLocal, reportError, usePrimary]
+    [applyRemote, attachFolder, enterLocal, goLive, reportError, usePrimary]
   );
 
   // ── startup ──
@@ -172,6 +221,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
       sub?.data.subscription.unsubscribe();
+      stopLive.current();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

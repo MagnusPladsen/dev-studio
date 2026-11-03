@@ -42,6 +42,14 @@ tools comes from `COPY.help`. `npm test` checks both objects have the same keys 
   - optional local folder via the File System Access API (`src/lib/sync/folder.ts`).
   `src/components/SyncProvider.tsx` picks the mode, moves browser data into the account on first sign-in, and bumps
   `generation` to re-mount editors after bulk changes (`reloadView()`).
+- **Live updates**: changes from other tabs, devices and the MCP server reach the cache through
+  `applyRemoteChanges` (not sent back to where they came from; `storage.onRemoteChange` hears them). Signed in:
+  `src/lib/sync/realtime.ts` (Supabase Realtime + catch-up after reconnect/wake). Guests: `src/lib/sync/tabs.ts`
+  (`storage` event). Echo/conflict rule: a row with a write of ours queued or in flight is re-read once it lands;
+  otherwise last writer wins by the server's `updated_at`. Editors use `useRemoteChanges`: unsaved local edits win,
+  otherwise the remote copy replaces the open asset (selection/view kept) and undo history restarts, so undo never
+  reverts someone else's change. Canvas, Task Board, Notebook, Wiki/Story and Decision log do this; other editors
+  are re-mounted on their open asset by `<LiveRefresh>`, which also shows the "deleted elsewhere" notice.
 - **Supabase**: tables `projects` and `assets` (JSON bodies, row level security per user). Schema lives in
   `supabase/migrations/` and is applied by Supabase's GitHub integration. Adding a collection means a new migration
   that widens `assets_collection_check`. Env: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
@@ -86,7 +94,9 @@ errors and horizontal overflow on phones, and exercise the feature changed. Do t
 
 - Task Board: on touch screens cards move via a "Move to…" menu, not drag.
 - Dialogue condition nodes have a single exit (no "else" branch).
-- Cloud sign-in hasn't been tested end to end yet.
+- Cloud sign-in hasn't been tested end to end yet, and neither have Realtime live updates (unit-tested with mocks).
+- Folder sync has no live updates: edits made to the JSON files on disk show up only after reconnecting the folder
+  or reloading.
 - 3D Pixel Art (voxels, route `/voxels`): OBJ `Kd` is written in linear colour, so OBJ colours look dark in Godot/Unity/three.js; use `.glb` for engines.
 
 ## Next up (from competitor research, highest value first)

@@ -31,6 +31,7 @@ import { assetHref } from "@/lib/assets";
 import { LinkedAssets } from "@/components/LinkedAssets";
 import { StoryGraph } from "@/components/story/StoryGraph";
 import { useOpenParam, useTrackOpenAsset, useStorageVersion } from "@/hooks/useStorage";
+import { useRemoteChanges } from "@/hooks/useRemoteChanges";
 import type { StoryEntry } from "@/types";
 import { useAutosave } from "@/hooks/useAutosave";
 import { SaveIndicator } from "@/components/SaveIndicator";
@@ -138,6 +139,12 @@ export default function StoryPage() {
 
   const { showToast } = useToast();
 
+  // The open entry is read from storage, so remote changes show by themselves; unsaved typing stays on top
+  // as the draft. A remote change to the open entry starts a fresh undo history (see useRemoteChanges).
+  const remoteRevision = useRemoteChanges(["stories"], projectId, (changes) =>
+    changes.some((c) => (c.op === "put" ? c.item.id : c.op === "delete" ? c.id : null) === stored?.id)
+  );
+
   // Entry-level undo (title, type, tags, links, saved content). Typing in the editor uses the textarea's own undo.
   const history = useHistory(
     stored,
@@ -148,7 +155,7 @@ export default function StoryPage() {
       storage.save("stories", { ...v, links, updatedAt: new Date().toISOString() }, projectId);
       if (dropped > 0) showToast({ message: skippedLinksMessage(dropped) });
     },
-    stored?.id
+    stored ? `${stored.id}:${remoteRevision}` : undefined
   );
 
   const grouped = useMemo(() => {

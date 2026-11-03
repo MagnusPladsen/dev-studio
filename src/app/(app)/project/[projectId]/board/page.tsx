@@ -31,6 +31,7 @@ import { storage } from "@/lib/storage";
 import { countRelated, linksTouching, restoreLinks, type RelatedCount } from "@/lib/links";
 import { taskProgress } from "@/lib/task-list";
 import { useOpenParam, useTrackOpenAsset, useStorageVersion } from "@/hooks/useStorage";
+import { useRemoteChanges } from "@/hooks/useRemoteChanges";
 import { useHistory } from "@/hooks/useHistory";
 import { UndoRedoButtons } from "@/components/UndoRedoButtons";
 import { ExportMenu } from "@/components/ExportMenu";
@@ -161,7 +162,9 @@ export default function TaskBoardPage() {
     },
     [projectId]
   );
-  const history = useHistory(snapshot, restore, board?.id);
+  // the board reads storage directly, so remote changes show by themselves; they start a fresh undo history
+  const remoteRevision = useRemoteChanges(["boards", "issues"], projectId);
+  const history = useHistory(snapshot, restore, board ? `${board.id}:${remoteRevision}` : undefined);
 
   // Imported issues join this board (one per project): CSV files first go through the column-matching step.
   const imports = useImport<IssueDraft>({
