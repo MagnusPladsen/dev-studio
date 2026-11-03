@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { getSupabase } from "@/lib/supabase";
 import { APP } from "@/lib/app-config";
+import { takeReturnPath } from "@/lib/sign-in";
 
 export default function AuthCallbackPage() {
   const router = useRouter();
@@ -40,7 +41,7 @@ export default function AuthCallbackPage() {
         setError("That sign-in link has expired or was already used. Request a new one.");
         return;
       }
-      router.replace("/projects");
+      router.replace(takeReturnPath() ?? "/projects");
     })();
   }, [router]);
 

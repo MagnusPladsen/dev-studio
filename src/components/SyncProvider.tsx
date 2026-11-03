@@ -20,6 +20,7 @@ import {
 } from "@/lib/storage";
 import { getSupabase, supabaseEnabled } from "@/lib/supabase";
 import { clearDeviceStorage, deleteOwnAccount } from "@/lib/account";
+import { signInWithEmail, signInWithGitHub } from "@/lib/sign-in";
 import { migrateAllElementAssetLinks } from "@/lib/diagrams/element-links";
 import { createCloudPersister, createCloudReader, loadCloudSnapshot, uploadSnapshot, type SyncStatus } from "@/lib/sync/cloud";
 import { connectRealtime, createRemoteSync, type RemoteSync } from "@/lib/sync/realtime";
@@ -256,24 +257,8 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       status,
       folder,
       folderAvailable,
-      async signInWithEmail(email) {
-        const supabase = getSupabase();
-        if (!supabase) return "Cloud sync is not configured on this server.";
-        const { error } = await supabase.auth.signInWithOtp({
-          email,
-          options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
-        });
-        return error?.message ?? null;
-      },
-      async signInWithGitHub() {
-        const supabase = getSupabase();
-        if (!supabase) return "Cloud sync is not configured on this server.";
-        const { error } = await supabase.auth.signInWithOAuth({
-          provider: "github",
-          options: { redirectTo: `${window.location.origin}/auth/callback` },
-        });
-        return error?.message ?? null;
-      },
+      signInWithEmail,
+      signInWithGitHub,
       async signOut() {
         await primary.current?.persister.flush?.();
         await getSupabase()?.auth.signOut();
