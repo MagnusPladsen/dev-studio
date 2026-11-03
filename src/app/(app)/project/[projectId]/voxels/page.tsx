@@ -5,6 +5,8 @@ import dynamic from "next/dynamic";
 import { useParams, useSearchParams } from "next/navigation";
 import { Loader2, PanelTopOpen } from "lucide-react";
 import { ExportMenu } from "@/components/ExportMenu";
+import { ImportDropZone } from "@/components/ImportDropZone";
+import { ImportMenu } from "@/components/ImportMenu";
 import { HelpButton } from "@/components/HelpButton";
 import { SaveIndicator } from "@/components/SaveIndicator";
 import { UndoRedoButtons } from "@/components/UndoRedoButtons";
@@ -26,6 +28,9 @@ import { VoxelEmptyState } from "@/components/voxels/VoxelEmptyState";
 import { TOOL_META, VoxelToolbar } from "@/components/voxels/VoxelToolbar";
 import type { VoxelViewportApi } from "@/components/voxels/VoxelViewport";
 import { isTextField } from "@/hooks/useHistory";
+import { useImport } from "@/hooks/useImport";
+import { importAsNewAssets } from "@/lib/import";
+import { VOXEL_IMPORTERS } from "@/lib/import/voxels";
 import { useConsumedParam, useOpenParam, useTrackOpenAsset, useStorageVersion } from "@/hooks/useStorage";
 import { addLink } from "@/lib/links";
 import { storage } from "@/lib/storage";
@@ -33,6 +38,8 @@ import { addColor, FALLBACK_COLORS, hexToRgb, MAX_COLORS, remapToPalette } from 
 import type { Symmetry } from "@/lib/voxels/edit";
 import { createGrid, DEFAULT_GRID_SIZE, resizeGrid, type Vec3, type VoxelGrid } from "@/lib/voxels/grid";
 import { normalizeBox } from "@/lib/voxels/selection";
+import { renderThumbnail } from "@/lib/voxels/thumbnail";
+import { decodeVoxels } from "@/lib/voxels/codec";
 import { AXIS_INDEX, layerCount, sliceToCell, type SliceAxis } from "@/lib/voxels/slice";
 import type { Palette, VoxelModel } from "@/types";
 
@@ -64,6 +71,12 @@ function getNextModelName(models: VoxelModel[]): string {
 function getStartColorValue(colors: string[]): number {
   const index = colors.findIndex((color) => hexToRgb(color).reduce((sum, channel) => sum + channel, 0) > 180);
   return index + 1 || 1;
+}
+
+/** Imported models get the same list thumbnail the editor draws when it saves. */
+function withThumbnail(model: VoxelModel): VoxelModel {
+  const grid = { size: model.size, data: decodeVoxels(model.voxels, model.size[0] * model.size[1] * model.size[2]) };
+  return { ...model, thumbnail: renderThumbnail(grid, model.colors) || undefined };
 }
 
 function getStartPalette(palettes: Palette[], preferredId: string | null): Palette | undefined {
@@ -212,6 +225,7 @@ export default function VoxelsPage(): React.JSX.Element {
   const [showBelow, setShowBelow] = useState(true);
   const [selectAllLayers, setSelectAllLayers] = useState(false);
   const viewportApiRef = useRef<VoxelViewportApi | null>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!exportError) return;
@@ -333,6 +347,19 @@ export default function VoxelsPage(): React.JSX.Element {
     setColorValue(getStartColorValue(remapped.colors));
   }
 
+  const imports = useImport<VoxelModel>({
+    importers: VOXEL_IMPORTERS,
+    noun: ["model", "models"],
+    history: editor.history,
+    openId: activeModelId,
+    apply: ({ items }) =>
+      importAsNewAssets("models", projectId, items.map(withThumbnail), {
+        previousId: activeModelId,
+        open: openModel,
+        back: (previous) => (previous ? openModel(previous) : editor.closeModel()),
+      }),
+  });
+
   const modelList = (
     <ModelList
       projectId={projectId}
@@ -346,7 +373,8 @@ export default function VoxelsPage(): React.JSX.Element {
   );
 
   return (
-    <div className="flex flex-col h-full overflow-hidden" style={{ background: "var(--bg-primary)" }}>
+    <div ref={rootRef} className="flex flex-col h-full overflow-hidden" style={{ background: "var(--bg-primary)" }}>
+      <ImportDropZone imports={imports} target={rootRef} />
       <div
         className="flex items-center justify-between gap-2 px-4 h-12 shrink-0 border-b max-md:h-auto max-md:flex-wrap max-md:py-2 max-md:px-3"
         style={{ background: "var(--bg-secondary)", borderColor: "var(--border)" }}
@@ -377,10 +405,11 @@ export default function VoxelsPage(): React.JSX.Element {
           </button>
         </div>
         <div className="flex items-center gap-1.5">
-          <UndoRedoButtons history={editor.history} />
+          <UndoRedoButtons history={imports.history} />
           <div className="w-px h-5 mx-1" style={{ background: "var(--border)" }} />
           {doc && <SaveIndicator state={editor.saveState} />}
           <HelpButton topic="voxels" />
+          <ImportMenu imports={imports} />
           <ExportMenu disabled={!doc} items={exportItems} />
         </div>
       </div>

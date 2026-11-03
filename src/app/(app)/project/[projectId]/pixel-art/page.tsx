@@ -42,6 +42,13 @@ import { useAutosave } from "@/hooks/useAutosave";
 import { LinkedAssets } from "@/components/LinkedAssets";
 import { SaveIndicator } from "@/components/SaveIndicator";
 import { ExportMenu } from "@/components/ExportMenu";
+import { ImportDropZone } from "@/components/ImportDropZone";
+import { ImportMenu } from "@/components/ImportMenu";
+import { PixelImportDialog } from "@/components/pixel-art/PixelImportDialog";
+import { useImport, type ImportController } from "@/hooks/useImport";
+import { findImporter, importAsNewAssets, type ImportResult, type ImportStep, type Importer } from "@/lib/import";
+import { MAX_IMAGE_BYTES } from "@/lib/import/image/limits";
+import { PIXEL_ART_IMPORTERS, pixelArtImporters, type PixelImportOptions } from "@/lib/import/pixel-art";
 import { HelpButton } from "@/components/HelpButton";
 import { ExamplesBar } from "@/components/ExamplesBar";
 import { rowButtonProps } from "@/lib/row-button";
@@ -288,6 +295,7 @@ export default function PixelArtPage() {
   const drawStartRef = useRef<{ x: number; y: number } | null>(null);
   const lastPixelRef = useRef<{ x: number; y: number } | null>(null);
   const overlayRef = useRef<ImageData | null>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
 
 
   // ── build initial blank frame ──
@@ -980,6 +988,66 @@ export default function PixelArtPage() {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
+  // ── import ──
+  const [pendingImport, setPendingImport] = useState<{ file: File; importer: Importer<Sprite> } | null>(null);
+  const importAsLayerRef = useRef(false);
+
+  function addImportedLayer(sprite: Sprite) {
+    const next = JSON.parse(JSON.stringify(frames)) as FrameData[];
+    const layers = next[activeFrame].layers;
+    layers.push({ id: uuid(), name: sprite.name, visible: true, pixels: sprite.frames[0].pixels });
+    setFrames(next);
+    setActiveLayer(layers.length - 1);
+    pushHistory(next, activeFrame, layers.length - 1);
+  }
+
+  function addImportedSprites(items: Sprite[]): ImportStep {
+    const step = importAsNewAssets("sprites", projectId, items, {
+      previousId: savedSpriteId,
+      open: (sprite) => void loadSprite(sprite),
+      back: (previous) => (previous ? void loadSprite(previous) : startSprite(canvasW, canvasH, false)),
+    });
+    // a pending autosave must not bring an undone import back
+    const ids = items.map((sprite) => sprite.id);
+    return {
+      ...step,
+      undo() {
+        ids.forEach((id) => deletedRef.current.add(id));
+        step.undo();
+      },
+      redo() {
+        ids.forEach((id) => deletedRef.current.delete(id));
+        step.redo();
+      },
+    };
+  }
+
+  const imports = useImport<Sprite>({
+    importers: PIXEL_ART_IMPORTERS,
+    noun: ["sprite", "sprites"],
+    history: { undo, redo, ...historyState, checkpoint() {} },
+    openId: savedSpriteId,
+    apply: ({ items }: ImportResult<Sprite>) => (importAsLayerRef.current ? addImportedLayer(items[0]) : addImportedSprites(items)),
+  });
+  // Every picture goes through the dialog first (new sprite or layer, shrink, palette); huge files fail straight away.
+  const askFirstImports: ImportController = {
+    ...imports,
+    async importFile(file, chosen) {
+      const importer = (chosen as Importer<Sprite> | undefined) ?? (await findImporter(PIXEL_ART_IMPORTERS, file));
+      if (!importer || file.size > MAX_IMAGE_BYTES) return imports.importFile(file, importer ?? undefined);
+      setPendingImport({ file, importer });
+    },
+  };
+  function runPendingImport(options: PixelImportOptions) {
+    if (!pendingImport) return;
+    const { file, importer } = pendingImport;
+    setPendingImport(null);
+    importAsLayerRef.current = Boolean(options.canvas);
+    const configured = pixelArtImporters(options).find((candidate) => candidate.id === importer.id) ?? importer;
+    void imports.importFile(file, configured as Importer<unknown>);
+  }
+  const paletteName = paletteSource === "default" ? "the default palette" : (projectPalettes.find((p) => p.id === paletteSource)?.name ?? "the palette");
+
   // ── init with blank if no frames ──
   // Runs once per instance, and not after a sprite opened via ?open=: effects re-run (strict mode, Activity).
   useEffect(() => {
@@ -1155,7 +1223,18 @@ export default function PixelArtPage() {
   );
 
   return (
-    <div className="flex flex-col h-full overflow-hidden" style={{ background: "var(--bg-primary)" }}>
+    <div ref={rootRef} className="flex flex-col h-full overflow-hidden" style={{ background: "var(--bg-primary)" }}>
+      <ImportDropZone imports={askFirstImports} target={rootRef} />
+      {pendingImport && (
+        <PixelImportDialog
+          file={pendingImport.file}
+          canBeLayer={pendingImport.importer.id === "pixel-image"}
+          canvas={{ width: canvasW, height: canvasH }}
+          palette={{ name: paletteName, colors: palette }}
+          onImport={runPendingImport}
+          onCancel={() => setPendingImport(null)}
+        />
+      )}
       {/* Top bar */}
       <div
         className="flex items-center gap-1.5 px-4 h-12 shrink-0 border-b max-md:px-3"
@@ -1337,14 +1416,13 @@ export default function PixelArtPage() {
             </button>
           </div>
           <div className="flex items-center gap-1.5 max-xl:shrink-0">
-            <UndoRedoButtons
-              history={{ undo, redo, ...historyState }}
-            />
+            <UndoRedoButtons history={imports.history} />
             <div style={{ width: 1, height: 20, background: "var(--border)", margin: "0 4px" }} />
             <SaveIndicator state={touched ? saveState : "saved"} />
             <HelpButton topic="pixel-art" />
           </div>
         </div>
+        <ImportMenu imports={askFirstImports} />
         <ExportMenu
           items={[
             { label: "PNG (current frame)", description: `Frame ${activeFrame + 1} at ${canvasW}×${canvasH}`, onClick: exportPNG },

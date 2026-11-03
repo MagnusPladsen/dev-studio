@@ -12,6 +12,16 @@ import { UndoRedoButtons } from "@/components/UndoRedoButtons";
 import { useHistory } from "@/hooks/useHistory";
 import { useAutosave } from "@/hooks/useAutosave";
 import { ExportMenu } from "@/components/ExportMenu";
+import { ImportDropZone } from "@/components/ImportDropZone";
+import { ImportMenu } from "@/components/ImportMenu";
+import { AtlasImageDialog } from "@/components/sprites/AtlasImageDialog";
+import { SliceDialog } from "@/components/sprites/SliceDialog";
+import { useToast } from "@/components/Toast";
+import { useImport, type ImportController } from "@/hooks/useImport";
+import { findImporter, importAsNewAssets, importErrorMessage, saveImportedAssets, type ImportStep, type Importer } from "@/lib/import";
+import { browserImageCodec } from "@/lib/import/image/codec";
+import { MAX_TEXT_BYTES } from "@/lib/import/image/limits";
+import { atlasImporter, readAtlas, SPRITE_SHEET_IMPORTERS, sheetSliceImporter, type SheetGrid, type SheetImport } from "@/lib/import/sprites";
 import { scalePixels, type ScaleFactor, type ScaleMethod } from "@/lib/pixel-scale";
 import { HelpButton } from "@/components/HelpButton";
 import { SaveIndicator } from "@/components/SaveIndicator";
@@ -64,6 +74,18 @@ function computeLayout(sprites: Sprite[], padding: number): Layout {
 const inputStyle = { background: "var(--bg-primary)", color: "var(--text-primary)", border: "1px solid var(--border)" };
 const secondaryBtn = { color: "var(--text-primary)", border: "1px solid var(--border)" };
 
+async function isAtlasFile(file: File): Promise<boolean> {
+  if (file.size > MAX_TEXT_BYTES) return false;
+  try {
+    return readAtlas(JSON.parse(await file.text())).frames.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+/** A sheet import waiting for an answer: how to cut an image, or which PNG goes with an atlas. */
+type PendingSheetImport = { kind: "slice"; image: File } | { kind: "atlas"; atlas: File };
+
 interface Selection {
   id: string | null;
   spriteIds: string[];
@@ -75,7 +97,9 @@ export default function SpriteSheetPage() {
   const projectId = params.projectId as string;
   const { assetTriggerProps, pasteTriggerProps } = useAssetMenu();
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
   const version = useStorageVersion();
+  const { showToast } = useToast();
 
   const [current, setCurrent] = useState<SpriteSheet | null>(null);
   const [selectedSpriteIds, setSelectedSpriteIds] = useState<string[]>([]);
@@ -184,6 +208,82 @@ export default function SpriteSheetPage() {
     setPadding(sheet.padding);
   }
 
+  /** Saves the new sprites and sheets; undo deletes both and goes back to the sheet that was open. */
+  function addImportedSheets(items: SheetImport[]): ImportStep {
+    const sprites = saveImportedAssets("sprites", projectId, items.flatMap((item) => item.sprites));
+    const step = importAsNewAssets(
+      "spritesheets",
+      projectId,
+      items.map((item) => item.sheet),
+      {
+        previousId: current?.id ?? null,
+        open: selectSheet,
+        back: (previous) => (previous ? selectSheet(previous) : setCurrent(null)),
+      }
+    );
+    return {
+      openedId: step.openedId,
+      undo() {
+        step.undo();
+        sprites.remove();
+      },
+      redo() {
+        sprites.restore();
+        step.redo();
+      },
+    };
+  }
+
+  const imports = useImport<SheetImport>({
+    importers: SPRITE_SHEET_IMPORTERS,
+    noun: ["sprite sheet", "sprite sheets"],
+    history,
+    openId: current?.id ?? null,
+    apply: ({ items }) => addImportedSheets(items),
+  });
+
+  // A sheet image asks for its grid first; an atlas asks for its PNG, unless both were dropped together.
+  const pendingRef = useRef<PendingSheetImport | null>(null);
+  const [pendingImport, setPendingImportState] = useState<PendingSheetImport | null>(null);
+  function setPendingImport(next: PendingSheetImport | null) {
+    pendingRef.current = next;
+    setPendingImportState(next);
+  }
+
+  async function importAtlas(atlas: File, image: File) {
+    setPendingImport(null);
+    try {
+      const pixels = await browserImageCodec.decode(image);
+      await imports.importFile(atlas, atlasImporter(pixels) as Importer<unknown>);
+    } catch (error) {
+      showToast({ message: importErrorMessage(error, image.name), tone: "error" });
+    }
+  }
+
+  const askFirstImports: ImportController = {
+    ...imports,
+    async importFile(file, chosen) {
+      const importer = chosen ?? (await findImporter(SPRITE_SHEET_IMPORTERS as Importer<unknown>[], file));
+      const pending = pendingRef.current;
+      if (importer?.id === "sheet-slice") {
+        if (pending?.kind === "atlas") return importAtlas(pending.atlas, file);
+        return setPendingImport({ kind: "slice", image: file });
+      }
+      if (importer?.id === "sheet-atlas") {
+        // a file that isn't an atlas goes straight to the importer, which says why
+        if (!(await isAtlasFile(file))) return imports.importFile(file, importer);
+        if (pending?.kind === "slice") return importAtlas(file, pending.image);
+        return setPendingImport({ kind: "atlas", atlas: file });
+      }
+      return imports.importFile(file, importer ?? undefined);
+    },
+  };
+
+  function sliceSheet(image: File, grid: SheetGrid) {
+    setPendingImport(null);
+    void imports.importFile(image, sheetSliceImporter(grid) as Importer<unknown>);
+  }
+
   const defaultName = () => `Sheet ${sheets.length + 1}`;
 
   function openNewForm() {
@@ -274,7 +374,14 @@ export default function SpriteSheetPage() {
   );
 
   return (
-    <div className="flex max-md:flex-col h-full max-md:h-auto max-md:min-h-full" style={{ background: "var(--bg-primary)" }}>
+    <div ref={rootRef} className="flex max-md:flex-col h-full max-md:h-auto max-md:min-h-full" style={{ background: "var(--bg-primary)" }}>
+      <ImportDropZone imports={askFirstImports} target={rootRef} />
+      {pendingImport?.kind === "slice" && (
+        <SliceDialog file={pendingImport.image} onImport={(grid) => sliceSheet(pendingImport.image, grid)} onCancel={() => setPendingImport(null)} />
+      )}
+      {pendingImport?.kind === "atlas" && (
+        <AtlasImageDialog atlasFile={pendingImport.atlas} onPick={(image) => void importAtlas(pendingImport.atlas, image)} onCancel={() => setPendingImport(null)} />
+      )}
       {/* Phones: toggles for the side panels */}
       <div className="md:hidden flex items-center gap-2 px-3 py-2 border-b" style={{ borderColor: "var(--border)", background: "var(--bg-secondary)" }}>
         {mobileToggle("sheets", "Sheets & sprites", Images)}
@@ -399,7 +506,7 @@ export default function SpriteSheetPage() {
       <div className="flex-1 flex flex-col overflow-hidden max-md:min-h-[60vh]">
         <div className="h-10 flex items-center gap-3 px-3 border-b shrink-0 md:max-xl:h-auto md:max-xl:min-h-10 md:max-xl:py-1.5 md:max-xl:flex-wrap md:max-xl:gap-y-1.5" style={{ borderColor: "var(--border)", background: "var(--bg-secondary)" }}>
           <div className="flex items-center gap-3 min-w-0 max-md:overflow-x-auto md:max-xl:flex-wrap md:max-xl:gap-y-1.5 [&>*]:shrink-0">
-            <UndoRedoButtons history={history} />
+            <UndoRedoButtons history={imports.history} />
             <div className="w-px h-5 shrink-0" style={{ background: "var(--border)" }} />
             <label className="flex items-center gap-1.5 text-xs shrink-0" style={{ color: current ? "var(--text-secondary)" : "var(--text-muted)" }}>
               Padding
@@ -454,6 +561,7 @@ export default function SpriteSheetPage() {
               </>
             )}
             <HelpButton topic="sprites" />
+            <ImportMenu imports={askFirstImports} />
             <ExportMenu
               disabled={!current || layout.frames.length === 0}
               items={[
