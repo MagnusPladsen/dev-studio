@@ -6,8 +6,11 @@ import type { ImportController } from "@/hooks/useImport";
 import type { Importer } from "@/lib/import";
 import { ToolbarMenu } from "./ToolbarMenu";
 
-/** The "Import ▾" button, placed right before a tool's `ExportMenu`: one item per file type the tool reads. */
-export function ImportMenu({ imports, disabled }: { imports: ImportController; disabled?: boolean }) {
+/**
+ * The "Import ▾" button, placed right before a tool's `ExportMenu`: one item per file type the tool reads.
+ * `note` goes in the menu's help line, e.g. to say which files can't be imported.
+ */
+export function ImportMenu({ imports, disabled, note }: { imports: ImportController; disabled?: boolean; note?: string }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const chosen = useRef<Importer<unknown> | null>(null);
 
@@ -30,7 +33,7 @@ export function ImportMenu({ imports, disabled }: { imports: ImportController; d
         title="Import a file into this tool"
         disabled={disabled || imports.isBusy}
         items={imports.importers.map((importer) => ({ label: importer.label, description: importer.description, onClick: () => pick(importer) }))}
-        footer="You can also drop a file here."
+        footer={note ? `${note} You can also drop a file here.` : "You can also drop a file here."}
       />
       <input
         ref={inputRef}

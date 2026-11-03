@@ -22,6 +22,8 @@ interface ImportResult<T> { items: T[]; warnings: string[] }
 - `items` are the tool's own type (`Diagram`, `Issue`, `Sprite`…) with **fresh ids**. Use `reidentify(items)` when
   copying data that already has ids.
 - `warnings` are short sentences about what was skipped or changed. They are listed in the toast.
+- Cap the file size first with `assertFileSize(file, maxBytes)` (`file-size.ts`), so a huge file is refused with a
+  clear message before it is read.
 - Throw `ImportError` for files you understand but can't use. Any other error (a `SyntaxError` from `JSON.parse`, a
   bug) becomes a generic "Couldn't read …" message, so never put raw error text in front of the user.
 - `pick: "many"` / `"folder"` imports every chosen (or dropped) file as one import: one toast, one undo step.
@@ -54,7 +56,7 @@ const imports = useImport<Diagram>({
 });
 
 <UndoRedoButtons history={imports.history} />   // the wrapped history knows about the import step
-<ImportMenu imports={imports} />                // right before the tool's <ExportMenu>
+<ImportMenu imports={imports} />                // right before the tool's <ExportMenu>; `note` adds to its help line
 <ExportMenu items={…} />
 <ImportDropZone imports={imports} target={rootRef} />   // anywhere; drops inside rootRef import
 ```
@@ -98,7 +100,9 @@ Round-trip test: export with the tool's own code, import, and compare with `diff
 | Tool | Importers |
 | --- | --- |
 | Canvas | Canvas JSON, Excalidraw, SQL schema (`CREATE TABLE`) |
-| Dialogue | Dialogue JSON |
+| Dialogue | Dialogue JSON, Yarn Spinner 2 (`.yarn`) |
+| Music | MIDI (format 0/1), Song JSON |
+| Sound effects | sfxr / jsfxr (JSON, b58 code, sfxr.me link), Sound JSON |
 | Decision log | Decision log JSON, ADR Markdown (adr-tools / MADR, files or folder) |
 | Task Board | Issues CSV (Jira, Linear, GitHub Projects, Trello presets), Board JSON (merged into the board) |
 | Wiki / Story | Markdown files or folder (Obsidian vault) |
