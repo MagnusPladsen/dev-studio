@@ -13,6 +13,8 @@ interface Importer<T> {
   accept: string[];                             // [".json", "application/json"]: picker filter + drop matching
   detect?(file: File, text: string): boolean;   // only for drops, when several importers share an extension
   parse(file: File): Promise<ImportResult<T>>;  // throw new ImportError("Plain words for the user")
+  pick?: "one" | "many" | "folder";             // picker: one file (default), a multi-select, or a whole folder
+  parseFiles?(files: File[]): Promise<ImportResult<T>>; // several files as one import, when they refer to each other
 }
 interface ImportResult<T> { items: T[]; warnings: string[] }
 ```
@@ -22,6 +24,9 @@ interface ImportResult<T> { items: T[]; warnings: string[] }
 - `warnings` are short sentences about what was skipped or changed. They are listed in the toast.
 - Throw `ImportError` for files you understand but can't use. Any other error (a `SyntaxError` from `JSON.parse`, a
   bug) becomes a generic "Couldn't read …" message, so never put raw error text in front of the user.
+- `pick: "many"` / `"folder"` imports every chosen (or dropped) file as one import: one toast, one undo step.
+  `runImporterOnFiles` skips files the importer doesn't accept (with a warning) and hidden folders like
+  `.obsidian/` (quietly). Without `parseFiles` each file is parsed on its own; a file that fails becomes a warning.
 - An importer is pure: it reads the file and returns items. It never touches `storage` or React state.
 
 ## Adding an importer to a tool
@@ -63,6 +68,11 @@ const imports = useImport<Diagram>({
   document's state as one change and return nothing. `useHistory` records it as one undo step. Select the first
   imported item.
 
+## A step before applying
+
+`useImport({ review })` runs between reading and applying: resolve with the (changed) result, or `null` to cancel
+quietly. The Task Board uses it for its CSV column-matching dialog and to add the merge's own warnings.
+
 ## Undo
 
 `useImport` returns `history`: the tool's own history plus the import step. Pass it to `UndoRedoButtons`. Ctrl/⌘+Z
@@ -87,6 +97,9 @@ Round-trip test: export with the tool's own code, import, and compare with `diff
 
 | Tool | Importers |
 | --- | --- |
-| Canvas | Canvas JSON |
+| Canvas | Canvas JSON, Excalidraw, SQL schema (`CREATE TABLE`) |
 | Dialogue | Dialogue JSON |
-| Decision log | Decision log JSON |
+| Decision log | Decision log JSON, ADR Markdown (adr-tools / MADR, files or folder) |
+| Task Board | Issues CSV (Jira, Linear, GitHub Projects, Trello presets), Board JSON (merged into the board) |
+| Wiki / Story | Markdown files or folder (Obsidian vault) |
+| Notebook | Markdown files or folder (sub-folders become note folders) |

@@ -49,3 +49,50 @@ export async function runImporter<T>(importer: Importer<T>, file: File): Promise
     return { ok: false, message: importErrorMessage(error, file.name) };
   }
 }
+
+/** A file inside a hidden folder of a picked folder (`.obsidian/`, `.git/`): settings, never content. */
+function isHiddenPath(file: File): boolean {
+  return (file.webkitRelativePath || file.name).split("/").some((part) => part.startsWith("."));
+}
+
+function skippedFilesWarning(skipped: File[]): string {
+  const names = skipped.slice(0, 3).map((file) => `"${file.name}"`).join(", ");
+  const more = skipped.length > 3 ? ` and ${skipped.length - 3} more` : "";
+  return `Skipped ${skipped.length} ${skipped.length === 1 ? "file this tool can't read" : "files this tool can't read"}: ${names}${more}`;
+}
+
+async function parseEach<T>(importer: Importer<T>, files: File[]): Promise<ImportResult<T>> {
+  if (importer.parseFiles) return importer.parseFiles(files);
+  const items: T[] = [];
+  const warnings: string[] = [];
+  for (const file of files) {
+    try {
+      const result = await importer.parse(file);
+      items.push(...result.items);
+      warnings.push(...result.warnings);
+    } catch (error) {
+      warnings.push(importErrorMessage(error, file.name));
+    }
+  }
+  return { items, warnings };
+}
+
+/**
+ * Imports several files (a multi-select, a folder, a drop) with one importer, as one import. Files it doesn't accept
+ * are skipped with a warning; files in hidden folders (`.obsidian/`) are left out quietly.
+ */
+export async function runImporterOnFiles<T>(importer: Importer<T>, files: File[]): Promise<ImportOutcome<T>> {
+  if (files.length === 1 && !importer.parseFiles) return runImporter(importer, files[0]);
+  const visible = files.filter((file) => !isHiddenPath(file));
+  const readable = visible.filter((file) => acceptsFile(importer.accept, file));
+  const skipped = visible.filter((file) => !readable.includes(file));
+  if (!readable.length) return { ok: false, message: visible.length ? `None of these files can be imported here. ${skippedFilesWarning(skipped)}.` : "There were no files to import." };
+  try {
+    const result = await parseEach(importer, readable);
+    const warnings = skipped.length ? [skippedFilesWarning(skipped), ...result.warnings] : result.warnings;
+    if (result.items.length === 0) return { ok: false, message: warnings[0] ?? "There was nothing to import in these files." };
+    return { ok: true, result: { items: result.items, warnings } };
+  } catch (error) {
+    return { ok: false, message: importErrorMessage(error, readable.length === 1 ? readable[0].name : "these files") };
+  }
+}

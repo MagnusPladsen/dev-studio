@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { Upload } from "lucide-react";
 import type { ImportController } from "@/hooks/useImport";
-import { acceptsDragType, acceptsFile } from "@/lib/import";
+import { acceptsDragType, acceptsFile, findImporter, type Importer } from "@/lib/import";
 
 const HIDE_AFTER_MS = 120;
 
@@ -43,13 +43,20 @@ export function ImportDropZone({ imports, target }: { imports: ImportController;
     const onDrop = (e: DragEvent) => {
       hide();
       if (!workspaceOf(e)) return;
-      const { importers, importFile } = importsRef.current;
+      const { importers, importFile, importFiles } = importsRef.current;
       const files = [...(e.dataTransfer?.files ?? [])].filter((file) => importers.some((importer) => acceptsFile(importer.accept, file)));
       if (!files.length) return;
       e.preventDefault();
       e.stopPropagation();
       void (async () => {
-        for (const file of files) await importFile(file);
+        // several files for an importer that takes many (Markdown notes) are one import; others go one by one
+        const batches = new Map<Importer<unknown>, File[]>();
+        for (const file of files) {
+          const importer = await findImporter(importers, file);
+          if (importer?.pick === "many" || importer?.pick === "folder") batches.set(importer, [...(batches.get(importer) ?? []), file]);
+          else await importFile(file);
+        }
+        for (const [importer, batch] of batches) await importFiles(batch, importer);
       })();
     };
     document.addEventListener("dragover", onDragOver, { capture: true });

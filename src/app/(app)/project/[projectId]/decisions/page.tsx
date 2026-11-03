@@ -289,7 +289,7 @@ export default function DecisionLogPage() {
                   style={{ color: "var(--text-primary)" }}
                 />
                 <SaveIndicator state={isSaving ? "saving" : "saved"} className="hidden sm:inline-flex shrink-0" />
-                <UndoRedoButtons history={history} />
+                <UndoRedoButtons history={imports.history} />
                 <ModeToggle mode={mode} onMode={setMode} />
                 <button
                   onClick={supersede}

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/components/Toast";
 import { isTextField, type History } from "@/hooks/useHistory";
-import { findImporter, runImporter, type ImportResult, type ImportStep, type Importer } from "@/lib/import";
+import { findImporter, runImporterOnFiles, type ImportResult, type ImportStep, type Importer } from "@/lib/import";
 
 export interface UseImportOptions<T> {
   importers: Importer<T>[];
@@ -18,6 +18,11 @@ export interface UseImportOptions<T> {
   history?: History;
   /** What the tool has open now (an asset id, or null for its list). */
   openId?: string | null;
+  /**
+   * An optional step between reading and applying, e.g. a dialog to match CSV columns. Resolve with the items to
+   * import (changed or not), or null when the person cancels: nothing is imported and no message is shown.
+   */
+  review?(result: ImportResult<T>, importer: Importer<T>): Promise<ImportResult<T> | null>;
 }
 
 export interface ImportController {
@@ -25,6 +30,8 @@ export interface ImportController {
   isBusy: boolean;
   /** Imports with this importer, or the matching one for a dropped file. */
   importFile(file: File, importer?: Importer<unknown>): Promise<void>;
+  /** Imports several files with one importer as one import (a multi-select, a folder, a drop). */
+  importFiles(files: File[], importer: Importer<unknown>): Promise<void>;
 }
 
 const NO_HISTORY: History = { undo() {}, redo() {}, canUndo: false, canRedo: false, checkpoint() {} };
@@ -36,27 +43,37 @@ interface PendingStep {
 }
 
 /** Runs a tool's importers, reports the outcome in a toast, and makes the import one undo step. */
-export function useImport<T>({ importers, noun, apply, history = NO_HISTORY, openId = null }: UseImportOptions<T>): ImportController & { history: History } {
+export function useImport<T>({ importers, noun, apply, review, history = NO_HISTORY, openId = null }: UseImportOptions<T>): ImportController & { history: History } {
   const { showToast } = useToast();
   const [isBusy, setIsBusy] = useState(false);
   const [pending, setPending] = useState<PendingStep | null>(null);
 
-  const importFile = useCallback(
-    async (file: File, chosen?: Importer<unknown>) => {
-      const importer = (chosen as Importer<T> | undefined) ?? (await findImporter(importers, file));
-      if (!importer) return showToast({ message: `This tool can't import "${file.name}".`, tone: "error" });
+  const importFiles = useCallback(
+    async (files: File[], chosen: Importer<unknown>) => {
+      const importer = chosen as Importer<T>;
       setIsBusy(true);
-      const outcome = await runImporter(importer, file);
+      const outcome = await runImporterOnFiles(importer, files);
       setIsBusy(false);
       if (!outcome.ok) return showToast({ message: outcome.message, tone: "error" });
+      const result = review ? await review(outcome.result, importer) : outcome.result;
+      if (!result) return;
       history.checkpoint();
-      const step = apply(outcome.result, importer);
+      const step = apply(result, importer);
       history.checkpoint();
       setPending(step ? { step, previousOpenId: openId, isUndone: false } : null);
-      const count = outcome.result.items.length;
-      showToast({ message: `Imported ${count} ${count === 1 ? noun[0] : noun[1]}`, details: outcome.result.warnings });
+      const count = result.items.length;
+      showToast({ message: `Imported ${count} ${count === 1 ? noun[0] : noun[1]}`, details: result.warnings });
     },
-    [importers, noun, apply, history, openId, showToast]
+    [noun, apply, review, history, openId, showToast]
+  );
+
+  const importFile = useCallback(
+    async (file: File, chosen?: Importer<unknown>) => {
+      const importer = chosen ?? ((await findImporter(importers, file)) as Importer<unknown> | null);
+      if (!importer) return showToast({ message: `This tool can't import "${file.name}".`, tone: "error" });
+      await importFiles([file], importer);
+    },
+    [importers, importFiles, showToast]
   );
 
   const canUndoImport = Boolean(pending && !pending.isUndone && openId === pending.step.openedId);
@@ -80,6 +97,7 @@ export function useImport<T>({ importers, noun, apply, history = NO_HISTORY, ope
     importers: importers as Importer<unknown>[],
     isBusy,
     importFile,
+    importFiles,
     history: { ...history, undo, redo, canUndo: history.canUndo || canUndoImport, canRedo: history.canRedo || canRedoImport },
   };
 }

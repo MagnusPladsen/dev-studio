@@ -1,0 +1,6 @@
+Summary,Issue key,Issue id,Issue Type,Status,Status Category,Priority,Labels,Labels,Sprint,Sprint,Custom field (Story Points),Due date,Description
+Save slots overwrite each other,SHIP-12,10012,Bug,In Review,In Progress,High,save-system,,Sprint 4,Sprint 5,3,14/Mar/26 12:00 AM,"Two slots share a file name.
+Repro: save in slot 1, then slot 2."
+Add a pause menu,SHIP-13,10013,Story,Backlog,To Do,Medium,ui,menus,,,5,,
+Write release notes,SHIP-9,10009,Task,Done,Done,Low,,,Sprint 4,,1,not a date,
+,SHIP-14,10014,Task,To Do,To Do,Low,,,,,,,

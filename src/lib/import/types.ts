@@ -20,6 +20,13 @@ export interface Importer<T> {
   detect?(file: File, text: string): boolean;
   /** Reads the file. Throws an `ImportError` with a message the user can read when the file can't be used. */
   parse(file: File): Promise<ImportResult<T>>;
+  /** What the file picker lets people choose: one file (the default), several, or a whole folder (e.g. an Obsidian vault). */
+  pick?: "one" | "many" | "folder";
+  /**
+   * Reads several files as one import, for formats whose files refer to each other (ADRs superseding each other).
+   * Without it each file is parsed on its own and the results are joined.
+   */
+  parseFiles?(files: File[]): Promise<ImportResult<T>>;
 }
 
 /** How to take an import back out, for imports that aren't part of the tool's `useHistory` (e.g. new assets). */

@@ -15,7 +15,9 @@ export function ImportMenu({ imports, disabled }: { imports: ImportController; d
     const input = inputRef.current;
     if (!input) return;
     chosen.current = importer;
-    input.accept = importer.accept.join(",");
+    input.accept = importer.pick === "folder" ? "" : importer.accept.join(",");
+    input.multiple = importer.pick === "many" || importer.pick === "folder";
+    input.webkitdirectory = importer.pick === "folder";
     input.value = "";
     input.click();
   }
@@ -37,8 +39,8 @@ export function ImportMenu({ imports, disabled }: { imports: ImportController; d
         aria-hidden
         tabIndex={-1}
         onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (file && chosen.current) void imports.importFile(file, chosen.current);
+          const files = [...(e.target.files ?? [])];
+          if (files.length && chosen.current) void imports.importFiles(files, chosen.current);
         }}
       />
     </>
