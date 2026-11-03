@@ -266,7 +266,7 @@ export interface Board {
   updatedAt: string;
 }
 
-export type IssueType = "feature" | "bug" | "task" | "art" | "audio" | "design" | "writing";
+export type IssueType = "feature" | "bug" | "task" | "art" | "audio" | "design" | "writing" | "chore" | "docs";
 export type IssuePriority = "lowest" | "low" | "medium" | "high" | "highest";
 
 export interface Issue {

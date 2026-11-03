@@ -12,6 +12,7 @@ import { GraphHeader, ZoomControls } from "./GraphToolbar";
 import { useGraphGestures } from "./useGraphGestures";
 import { useGraphLayout } from "./useGraphLayout";
 import { useGraphViewport } from "./useGraphViewport";
+import { COPY } from "@/copy";
 
 const ZOOM_STEP = 1.3;
 
@@ -60,10 +61,10 @@ function EmptyGraph(): React.JSX.Element {
     <div className="flex-1 flex flex-col items-center justify-center gap-2 p-6 text-center">
       <BookOpen className="w-8 h-8" style={{ color: "var(--text-muted)" }} />
       <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-        No story entries yet.
+        {COPY.story.graphEmptyTitle}
       </p>
       <p className="text-xs max-w-xs" style={{ color: "var(--text-muted)" }}>
-        Create entries and link them with [[wiki links]] or linked assets to see how your world connects.
+        {COPY.story.graphEmptyBody}
       </p>
     </div>
   );

@@ -1,6 +1,7 @@
 import type { AssetType } from "@/types";
 import { storage, type ProjectCollection } from "./storage";
-import { APP, isDevStudio } from "./app-config";
+import { APP } from "./app-config";
+import { COPY } from "@/copy";
 import { decisionCode } from "./decisions";
 
 export interface AssetKind {
@@ -17,7 +18,7 @@ export const ASSET_KINDS: Record<AssetType, AssetKind> = {
   music: { type: "music", collection: "music", label: "Music", path: "music", color: "#34d399" },
   tilemap: { type: "tilemap", collection: "tilemaps", label: "Tilemap", path: "tilemap", color: "#60a5fa" },
   diagram: { type: "diagram", collection: "diagrams", label: "Canvas", path: "diagrams", color: "#f472b6" },
-  story: { type: "story", collection: "stories", label: isDevStudio ? "Wiki page" : "Story", path: "story", color: "#fb923c" },
+  story: { type: "story", collection: "stories", label: COPY.assetKinds.story, path: "story", color: "#fb923c" },
   dialogue: { type: "dialogue", collection: "dialogues", label: "Dialogue", path: "dialogue", color: "#f87171" },
   palette: { type: "palette", collection: "palettes", label: "Palette", path: "palettes", color: "#2dd4bf" },
   spritesheet: { type: "spritesheet", collection: "spritesheets", label: "Sprite sheet", path: "sprites", color: "#38bdf8" },

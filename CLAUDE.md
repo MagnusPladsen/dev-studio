@@ -21,8 +21,12 @@ brand `accent` (purple / teal: root layout sets `--accent`, `src/app/icon.tsx` +
 `assetTypes`; `ASSET_TYPES` and the sidebar only show those, and `src/proxy.ts` redirects other tool routes to the
 dashboard. In Dev Studio, Story is labelled **Wiki** (entry types Person/System/Component/Event/Reference/Goal).
 Both landing pages end with `<OtherAppPromo>` linking to the other app. Projects carry `app` (missing = GameDev Studio); the projects list shows the other app's projects behind a toggle
-and opens them on the other site. Examples: `src/lib/examples/dev-studio.ts` (Tidepool, a habit app). Write new UI
-text so it fits both apps, or switch on `isDevStudio` / `APP.subject`.
+and opens them on the other site. Examples: `src/lib/examples/dev-studio.ts` (Tidepool, a habit app).
+
+**Text per app:** wording that differs between the apps lives in `src/copy/` (`AppCopy` in `types.ts`, one object per
+app in `gamedev-studio.ts` / `dev-studio.ts`, same key order; read it as `COPY` from `@/copy`). New per-app text goes
+there, not in `isDevStudio ? … : …` ternaries; text that reads the same in both apps stays inline. Help for the shared
+tools comes from `COPY.help`. `npm test` checks both objects have the same keys and no empty strings.
 
 ## Architecture
 

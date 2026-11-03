@@ -20,14 +20,14 @@ import {
   PRIORITIES,
   PRIORITY_META,
   PriorityIcon,
-  TYPES,
-  TYPE_META,
   TypeIcon,
   fieldStyle,
   formatDate,
   relativeTime,
   saveIssue,
   secondaryBtn,
+  typeLabel,
+  typeOptions,
 } from "./meta";
 
 interface Props {
@@ -165,9 +165,9 @@ export function IssueDetail({ projectId, board, issue, onClose }: Props) {
             <div className="flex items-center gap-2">
               <TypeIcon type={issue.type} />
               <select value={issue.type} onChange={(e) => update({ type: e.target.value as IssueType })} className="flex-1 px-2 py-1.5 rounded-md text-xs outline-none" style={fieldStyle}>
-                {TYPES.map((t) => (
+                {typeOptions(issue.type).map((t) => (
                   <option key={t} value={t}>
-                    {TYPE_META[t].label}
+                    {typeLabel(t)}
                   </option>
                 ))}
               </select>

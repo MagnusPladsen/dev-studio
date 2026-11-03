@@ -50,8 +50,8 @@ import {
   PRIORITY_META,
   PriorityIcon,
   TYPES,
-  TYPE_META,
   TypeIcon,
+  typeLabel,
   createDefaultBoard,
   completeSprint,
   createIssue,
@@ -67,7 +67,7 @@ import {
   secondaryBtn,
   today,
 } from "@/components/board/meta";
-import { APP } from "@/lib/app-config";
+import { COPY } from "@/copy";
 
 const MOVE_MENU_WIDTH = 176;
 const MOVE_MENU_ROW_HEIGHT = 30;
@@ -191,7 +191,7 @@ export default function TaskBoardPage() {
     const rows = [...issues]
       .sort((a, b) => a.key.localeCompare(b.key, undefined, { numeric: true }))
       .map((i) =>
-        [i.key, i.title, TYPE_META[i.type]?.label, PRIORITY_META[i.priority]?.label, col(i.status), sprint(i.sprintId), i.points ?? "", i.dueDate ?? "", i.labels.join(" "), i.archived ? "yes" : "no", i.createdAt, i.updatedAt, i.description]
+        [i.key, i.title, typeLabel(i.type), PRIORITY_META[i.priority]?.label, col(i.status), sprint(i.sprintId), i.points ?? "", i.dueDate ?? "", i.labels.join(" "), i.archived ? "yes" : "no", i.createdAt, i.updatedAt, i.description]
           .map(csvCell)
           .join(",")
       );
@@ -324,7 +324,7 @@ function FilterBar({ filters, setFilters, labels }: { filters: Filters; setFilte
         <option value="">All types</option>
         {TYPES.map((t) => (
           <option key={t} value={t}>
-            {TYPE_META[t].label}
+            {typeLabel(t)}
           </option>
         ))}
       </select>
@@ -1149,7 +1149,7 @@ function BacklogView({
                   <input
                     defaultValue={sprint.goal ?? ""}
                     onBlur={(e) => e.target.value !== (sprint.goal ?? "") && patchSprint(sprint.id, { goal: e.target.value || undefined })}
-                    placeholder="Sprint goal, e.g. First playable level"
+                    placeholder={COPY.board.sprintGoalPlaceholder}
                     className="basis-full bg-transparent text-xs outline-none rounded px-1 py-0.5 focus:bg-[var(--bg-primary)]"
                     style={{ color: "var(--text-secondary)" }}
                     aria-label="Sprint goal"
@@ -1401,7 +1401,7 @@ function AllIssuesView({
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
                     <span className="inline-flex items-center gap-1.5">
-                      <TypeIcon type={i.type} /> {TYPE_META[i.type]?.label}
+                      <TypeIcon type={i.type} /> {typeLabel(i.type)}
                     </span>
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
@@ -1518,7 +1518,7 @@ function CreateIssueDialog({
       >
         <label className={lbl} style={{ color: "var(--text-muted)" }}>
           Title
-          <input autoFocus value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Add wall jump" className="w-full px-2.5 py-2 rounded-md text-sm outline-none" style={fieldStyle} />
+          <input autoFocus value={title} onChange={(e) => setTitle(e.target.value)} placeholder={COPY.board.newIssuePlaceholder} className="w-full px-2.5 py-2 rounded-md text-sm outline-none" style={fieldStyle} />
         </label>
         <div className="grid grid-cols-2 gap-3">
           <label className={lbl} style={{ color: "var(--text-muted)" }}>
@@ -1526,7 +1526,7 @@ function CreateIssueDialog({
             <select value={type} onChange={(e) => setType(e.target.value as IssueType)} className={sel} style={fieldStyle}>
               {TYPES.map((t) => (
                 <option key={t} value={t}>
-                  {TYPE_META[t].label}
+                  {typeLabel(t)}
                 </option>
               ))}
             </select>
@@ -1663,11 +1663,10 @@ function EmptyState({ projectId, onCreate }: { projectId: string; onCreate(): vo
           <SquareKanban className="w-6 h-6" style={{ color: "var(--tool-color, var(--accent))" }} />
         </div>
         <h2 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
-          Plan your {APP.subject}, one issue at a time
+          {COPY.board.emptyTitle}
         </h2>
         <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-          Issues move from To Do to In Progress, Testing and Done. Group them into sprints of a week or two, and link each issue to
-          the sprites, sounds and story it&rsquo;s about. Finished issues are archived but stay searchable.
+          {COPY.board.emptyBody}
         </p>
         <div className="flex items-center justify-center gap-2">
           <button onClick={onCreate} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md text-sm font-semibold" style={{ background: "var(--accent)" }}>
