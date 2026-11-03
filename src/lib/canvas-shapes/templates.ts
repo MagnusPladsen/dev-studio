@@ -1,5 +1,5 @@
 import type { DiagramEdge, DiagramNode } from "@/types";
-import { isDevStudio } from "@/lib/app-config";
+import { COPY } from "@/copy";
 import type { NodeType } from "@/lib/diagrams/cards";
 import { createNode, insertNode } from "./create";
 
@@ -39,17 +39,7 @@ function layout(cards: CardSpec[], lines: LineSpec[], makeId: () => string) {
 
 const checklist = (texts: string[], makeId: () => string) => ({ items: texts.map((text) => ({ id: makeId(), text, done: false })) });
 
-const FLOW = isDevStudio
-  ? { start: "User opens sign-up", check: "Email valid?", yes: "Create account", no: "Show error", end: "Signed in" }
-  : { start: "Player presses Jump", check: "On the ground?", yes: "Jump", no: "Buffer the jump", end: "Landed" };
-
-const ARCHITECTURE = isDevStudio
-  ? { front: "Frontend", client: "Web app", mobile: "Mobile app", back: "Backend", api: "API", worker: "Background jobs", store: "Database", outside: "Email service" }
-  : { front: "Players", client: "Game client", mobile: "Mobile build", back: "Online services", api: "Game server", worker: "Matchmaking", store: "Save data", outside: "Leaderboards" };
-
-const MOODBOARD = isDevStudio
-  ? { look: "Visual style", refs: "Products we like", tone: "Voice and tone", todo: ["Collect screenshots", "Pick a colour palette", "Choose fonts"] }
-  : { look: "Art style", refs: "Reference games", tone: "Music and sound", todo: ["Collect screenshots", "Pick a colour palette", "Find a font"] };
+const { flowChart: FLOW, architecture: ARCHITECTURE, moodboard: MOODBOARD } = COPY.canvas.templates;
 
 export const CANVAS_TEMPLATES: CanvasTemplate[] = [
   {
@@ -78,7 +68,7 @@ export const CANVAS_TEMPLATES: CanvasTemplate[] = [
   {
     id: "architecture",
     name: "Architecture",
-    description: isDevStudio ? "Apps, API, jobs and data, grouped by layer" : "Client, servers and data, grouped by layer",
+    description: COPY.canvas.templates.architectureDescription,
     build: (makeId) =>
       layout(
         [

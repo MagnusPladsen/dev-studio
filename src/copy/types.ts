@@ -81,6 +81,15 @@ export interface AppCopy {
     /** Tag next to a story entry in the [[ link suggestions. */
     storySuggestionLabel: string;
   };
+  canvas: {
+    /** Starting card labels of the New canvas templates. */
+    templates: {
+      flowChart: { start: string; check: string; yes: string; no: string; end: string };
+      architectureDescription: string;
+      architecture: { front: string; client: string; mobile: string; back: string; api: string; worker: string; store: string; outside: string };
+      moodboard: { look: string; refs: string; tone: string; todo: string[] };
+    };
+  };
   wikiLinks: {
     /** What a [[link]] to a story entry opens, as in "Open story entry “Pip”". */
     storyTarget: string;

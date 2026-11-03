@@ -220,6 +220,23 @@ export const DEV_STUDIO_COPY = {
     emptyBody: "Keep ideas, to-do lists, meeting notes and specs here. Link notes to issues, wiki pages and decisions.",
     storySuggestionLabel: "Wiki",
   },
+  canvas: {
+    templates: {
+      flowChart: { start: "User opens sign-up", check: "Email valid?", yes: "Create account", no: "Show error", end: "Signed in" },
+      architectureDescription: "Apps, API, jobs and data, grouped by layer",
+      architecture: {
+        front: "Frontend",
+        client: "Web app",
+        mobile: "Mobile app",
+        back: "Backend",
+        api: "API",
+        worker: "Background jobs",
+        store: "Database",
+        outside: "Email service",
+      },
+      moodboard: { look: "Visual style", refs: "Products we like", tone: "Voice and tone", todo: ["Collect screenshots", "Pick a colour palette", "Choose fonts"] },
+    },
+  },
   wikiLinks: {
     storyTarget: "wiki page",
   },

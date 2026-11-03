@@ -232,6 +232,23 @@ export const GAMEDEV_STUDIO_COPY = {
     emptyBody: "Keep ideas, to-do lists, design notes and playtest feedback here. Link notes to sprites, sounds and story entries.",
     storySuggestionLabel: "Story",
   },
+  canvas: {
+    templates: {
+      flowChart: { start: "Player presses Jump", check: "On the ground?", yes: "Jump", no: "Buffer the jump", end: "Landed" },
+      architectureDescription: "Client, servers and data, grouped by layer",
+      architecture: {
+        front: "Players",
+        client: "Game client",
+        mobile: "Mobile build",
+        back: "Online services",
+        api: "Game server",
+        worker: "Matchmaking",
+        store: "Save data",
+        outside: "Leaderboards",
+      },
+      moodboard: { look: "Art style", refs: "Reference games", tone: "Music and sound", todo: ["Collect screenshots", "Pick a colour palette", "Find a font"] },
+    },
+  },
   wikiLinks: {
     storyTarget: "story entry",
   },
