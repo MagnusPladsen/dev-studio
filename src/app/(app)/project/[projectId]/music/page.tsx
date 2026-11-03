@@ -26,6 +26,12 @@ import { previewGain, usePreviewVolume } from "@/hooks/usePreviewVolume";
 import { useAutosave } from "@/hooks/useAutosave";
 import { SaveIndicator } from "@/components/SaveIndicator";
 import { ExportMenu } from "@/components/ExportMenu";
+import { ImportMenu } from "@/components/ImportMenu";
+import { ImportDropZone } from "@/components/ImportDropZone";
+import { useImport } from "@/hooks/useImport";
+import { importAsNewAssets } from "@/lib/import";
+import { MUSIC_IMPORTERS } from "@/lib/import/music";
+import { downloadBlob } from "@/lib/download";
 import { HelpButton } from "@/components/HelpButton";
 import { ExamplesBar } from "@/components/ExamplesBar";
 import { rowButtonProps } from "@/lib/row-button";
@@ -131,6 +137,7 @@ export default function MusicPage() {
   const [noteLen, setNoteLen] = useState(0.5);
   const [tracksOpen, setTracksOpen] = useState(false);
   const rollRef = useRef<HTMLDivElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
   const [rollW, setRollW] = useState(0);
   // when zoomed out, the beats stretch to fill the visible width instead of leaving empty space
   const BEAT_W = Math.max(BASE_BEAT_W * zoom.x, rollW > 0 ? (rollW - 50) / patternLen : 0);
@@ -397,6 +404,26 @@ export default function MusicPage() {
     activeTrack?.id
   );
 
+  const imports = useImport<MusicTrack>({
+    importers: MUSIC_IMPORTERS,
+    noun: ["song", "songs"],
+    history,
+    openId: activeTrack?.id ?? null,
+    apply: ({ items }) =>
+      importAsNewAssets("music", projectId, items, {
+        previousId: activeTrack?.id ?? null,
+        open: (t) => showImported(t),
+        back: (previous) => showImported(previous ?? null),
+      }),
+  });
+
+  function showImported(t: MusicTrack | null) {
+    autosave.flush();
+    stopPlayback();
+    setTracks(storage.getAll("music", projectId));
+    openTrack(t);
+  }
+
   function newTrack() {
     autosave.flush();
     const t = { ...createEmptyTrack(projectId), name: `Untitled track ${tracks.length + 1}` };
@@ -539,6 +566,11 @@ export default function MusicPage() {
     URL.revokeObjectURL(url);
   }
 
+  function exportJson() {
+    if (!activeTrack) return;
+    downloadBlob(`${activeTrack.name}.json`, new Blob([JSON.stringify(activeTrack, null, 2)], { type: "application/json" }));
+  }
+
   function renamingDone(newName: string) {
     if (!activeTrack) return;
     const updated = { ...activeTrack, name: newName || "Untitled", updatedAt: new Date().toISOString() };
@@ -566,14 +598,15 @@ export default function MusicPage() {
   const gridH = PITCH_COUNT * ROW_H;
 
   return (
-    <div className="flex flex-col h-full" style={{ background: "var(--bg-primary)" }}>
+    <div ref={rootRef} className="flex flex-col h-full" style={{ background: "var(--bg-primary)" }}>
+      <ImportDropZone imports={imports} target={rootRef} />
       {/* Top bar */}
       <div
         className="flex items-center justify-between gap-2 px-4 max-md:px-2 h-12 border-b shrink-0"
         style={{ background: "var(--bg-secondary)", borderColor: "var(--border)" }}
       >
         <div className="flex items-center gap-3 max-md:gap-2 min-w-0">
-          <UndoRedoButtons history={history} />
+          <UndoRedoButtons history={imports.history} />
           <button
             onClick={() => setTracksOpen(true)}
             className="md:hidden flex items-center gap-1 px-2 py-1.5 rounded-md text-xs shrink-0"
@@ -594,9 +627,13 @@ export default function MusicPage() {
         <div className="flex items-center gap-3 max-md:gap-1.5 shrink-0">
           {activeTrack && <SaveIndicator state={autosave.state} className="max-[359px]:hidden" />}
           <HelpButton topic="music" />
+          <ImportMenu imports={imports} />
           <ExportMenu
             disabled={!activeTrack}
-            items={[{ label: "WAV (this pattern)", description: `${patternLen} beats, with muted channels left out`, onClick: exportWav }]}
+            items={[
+              { label: "WAV (this pattern)", description: `${patternLen} beats, with muted channels left out`, onClick: exportWav },
+              { label: "Song JSON", description: "Every channel and note, to import again later", onClick: exportJson },
+            ]}
           />
         </div>
       </div>

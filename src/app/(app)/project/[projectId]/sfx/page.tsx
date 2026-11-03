@@ -14,6 +14,12 @@ import { previewGain, usePreviewVolume } from "@/hooks/usePreviewVolume";
 import { useAutosave } from "@/hooks/useAutosave";
 import { SaveIndicator } from "@/components/SaveIndicator";
 import { ExportMenu } from "@/components/ExportMenu";
+import { ImportMenu } from "@/components/ImportMenu";
+import { ImportDropZone } from "@/components/ImportDropZone";
+import { useImport } from "@/hooks/useImport";
+import { importAsNewAssets } from "@/lib/import";
+import { SFX_IMPORTERS } from "@/lib/import/sfx";
+import { downloadBlob } from "@/lib/download";
 import { HelpButton } from "@/components/HelpButton";
 import { ExamplesBar } from "@/components/ExamplesBar";
 import { rowButtonProps } from "@/lib/row-button";
@@ -261,6 +267,7 @@ export default function SfxPage() {
   const projectId = params.projectId as string;
   const { assetTriggerProps, pasteTriggerProps } = useAssetMenu();
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
   const storeVersion = useStorageVersion();
   const [sfxParams, setSfxParams] = useState<SfxParams>({ ...DEFAULT_PARAMS });
   const [name, setName] = useState("New sound");
@@ -269,6 +276,21 @@ export default function SfxPage() {
   // bumps when a different sound is opened, so undo history starts fresh
   const [historyKey, setHistoryKey] = useState(0);
   const history = useHistory(sfxParams, (p) => setSfxParams(p), historyKey);
+  const imports = useImport<SoundEffect>({
+    importers: SFX_IMPORTERS,
+    noun: ["sound", "sounds"],
+    history,
+    openId: activeId,
+    apply: ({ items }) => {
+      autosave.flush();
+      const draft = { name, params: sfxParams };
+      return importAsNewAssets("sounds", projectId, items, {
+        previousId: activeId,
+        open: (sound) => loadSaved(sound, false),
+        back: (previous) => (previous ? loadSaved(previous, false) : showDraft(draft.name, draft.params)),
+      });
+    },
+  });
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const savedSounds = useMemo(() => storage.getAll("sounds", projectId), [projectId, storeVersion]);
@@ -392,6 +414,19 @@ export default function SfxPage() {
     setHistoryKey((k) => k + 1);
   }
 
+  function showDraft(draftName: string, draftParams: SfxParams) {
+    setActiveId(null);
+    setName(draftName);
+    setSfxParams({ ...draftParams });
+    setHistoryKey((k) => k + 1);
+  }
+
+  function exportJson() {
+    const saved = activeId ? storage.getById("sounds", activeId, projectId) : undefined;
+    const sound = { ...saved, name: name.trim() || "Untitled sound", params: sfxParams };
+    downloadBlob(`${sound.name}.json`, new Blob([JSON.stringify(sound, null, 2)], { type: "application/json" }));
+  }
+
   function exportWav() {
     const wav = bufferToWav(synthesize(sfxParams));
     const blob = new Blob([wav], { type: "audio/wav" });
@@ -433,9 +468,10 @@ export default function SfxPage() {
   );
 
   return (
-    <div className="p-4 md:p-6 h-full overflow-auto" style={{ background: "var(--bg-primary)" }}>
+    <div ref={rootRef} className="p-4 md:p-6 h-full overflow-auto" style={{ background: "var(--bg-primary)" }}>
+      <ImportDropZone imports={imports} target={rootRef} />
       <div className="flex items-center gap-3 mb-4 flex-wrap">
-        <UndoRedoButtons history={history} />
+        <UndoRedoButtons history={imports.history} />
         <h1 className="text-xl font-bold max-md:hidden" style={{ color: "var(--text-primary)" }}>
           SFX Generator
         </h1>
@@ -448,7 +484,13 @@ export default function SfxPage() {
             </span>
           )}
           <HelpButton topic="sfx" />
-          <ExportMenu items={[{ label: "WAV", description: "16-bit mono, 44.1 kHz", onClick: exportWav }]} />
+          <ImportMenu imports={imports} note="WAV and MP3 can't be imported: a recording has no settings to edit." />
+          <ExportMenu
+            items={[
+              { label: "WAV", description: "16-bit mono, 44.1 kHz", onClick: exportWav },
+              { label: "Sound JSON", description: "The settings, to import again later", onClick: exportJson },
+            ]}
+          />
         </div>
       </div>
 
