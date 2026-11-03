@@ -36,10 +36,11 @@ import { BetaBadge } from "@/components/BetaBadge";
 import { ToolTutorial } from "@/components/ToolTutorial";
 import { NewBadge, isNewTool } from "@/components/NewBadge";
 import { ASSET_KINDS, ASSET_TYPES } from "@/lib/assets";
-import { APP, isDevStudio } from "@/lib/app-config";
+import { APP } from "@/lib/app-config";
 import { getPins, isToolPinned, orderTools, toggleToolPin } from "@/lib/pins";
 import { useStorageVersion } from "@/hooks/useStorage";
 import { storage } from "@/lib/storage";
+import { COPY } from "@/copy";
 
 /** Tints the shared surface colours with a tool's colour, so every editor inside picks it up. */
 function toolTheme(color?: string, onAccent = "#0b0b10"): React.CSSProperties {
@@ -70,7 +71,7 @@ const allToolNav = [
   { icon: Volume2, name: "SFX", path: "sfx", color: ASSET_KINDS.sound.color },
   { icon: Grid3X3, name: "Tilemap", path: "tilemap", color: ASSET_KINDS.tilemap.color },
   { icon: GitBranch, name: "Canvas", path: "diagrams", color: ASSET_KINDS.diagram.color },
-  { icon: BookOpen, name: isDevStudio ? "Wiki" : "Story", path: "story", color: ASSET_KINDS.story.color },
+  { icon: BookOpen, name: COPY.nav.story, path: "story", color: ASSET_KINDS.story.color },
   { icon: NotebookPen, name: "Notebook", path: "notebook", color: ASSET_KINDS.note.color },
   { icon: Scale, name: "Decision log", path: "decisions", color: ASSET_KINDS.decision.color },
   { icon: MessageSquare, name: "Dialogue", path: "dialogue", color: ASSET_KINDS.dialogue.color },

@@ -7,10 +7,12 @@ import {
   ChevronsUp,
   ChevronUp,
   Equal,
+  FileText,
   Music,
   Paintbrush,
   PenTool,
   Sparkles,
+  Wrench,
   type LucideIcon,
 } from "lucide-react";
 import { v4 as uuid } from "uuid";
@@ -18,17 +20,36 @@ import type { Board, BoardColumn, ColumnCategory, Issue, IssuePriority, IssueTyp
 import { storage } from "@/lib/storage";
 import { issueKeyPrefix, issueNumber } from "@/lib/examples/board";
 import { parseTask } from "@/lib/task-list";
+import { isDevStudio } from "@/lib/app-config";
+import { COPY } from "@/copy";
 
-export const TYPE_META: Record<IssueType, { label: string; icon: LucideIcon; color: string }> = {
-  feature: { label: "Feature", icon: Sparkles, color: "#34d399" },
-  bug: { label: "Bug", icon: Bug, color: "#f87171" },
-  task: { label: "Task", icon: CheckSquare, color: "#60a5fa" },
-  art: { label: "Art", icon: Paintbrush, color: "#a78bfa" },
-  audio: { label: "Audio", icon: Music, color: "#fbbf24" },
-  design: { label: "Design", icon: PenTool, color: "#f472b6" },
-  writing: { label: "Writing", icon: BookOpen, color: "#fb923c" },
+export const TYPE_META: Record<IssueType, { icon: LucideIcon; color: string }> = {
+  feature: { icon: Sparkles, color: "#34d399" },
+  bug: { icon: Bug, color: "#f87171" },
+  task: { icon: CheckSquare, color: "#60a5fa" },
+  art: { icon: Paintbrush, color: "#a78bfa" },
+  audio: { icon: Music, color: "#fbbf24" },
+  design: { icon: PenTool, color: "#f472b6" },
+  writing: { icon: BookOpen, color: "#fb923c" },
+  chore: { icon: Wrench, color: "#94a3b8" },
+  docs: { icon: FileText, color: "#fb923c" },
 };
-export const TYPES = Object.keys(TYPE_META) as IssueType[];
+
+const GAME_TYPES: IssueType[] = ["feature", "bug", "task", "art", "audio", "design", "writing"];
+const DEV_TYPES: IssueType[] = ["feature", "bug", "task", "design", "chore", "docs"];
+
+/** The types this app offers when creating or filtering issues. Saved issues keep whatever type they have. */
+export const TYPES = isDevStudio ? DEV_TYPES : GAME_TYPES;
+
+/** A type's label, or the raw value for a type this version doesn't know. */
+export function typeLabel(type: string): string {
+  return Object.hasOwn(COPY.board.issueTypes, type) ? COPY.board.issueTypes[type as IssueType] : type;
+}
+
+/** `TYPES`, plus `current` when an issue already has a type this app doesn't offer, so the picker still shows it. */
+export function typeOptions(current: string): string[] {
+  return TYPES.includes(current as IssueType) ? TYPES : [...TYPES, current];
+}
 
 export const PRIORITY_META: Record<IssuePriority, { label: string; icon: LucideIcon; color: string; rank: number }> = {
   highest: { label: "Highest", icon: ChevronsUp, color: "#f87171", rank: 5 },
@@ -207,8 +228,9 @@ export const secondaryBtn: React.CSSProperties = {
 export function TypeIcon({ type, className = "w-3.5 h-3.5" }: { type: IssueType; className?: string }) {
   const m = TYPE_META[type] ?? TYPE_META.task;
   const Icon = m.icon;
+  const label = typeLabel(type);
   return (
-    <span title={m.label} aria-label={m.label} className="inline-flex shrink-0">
+    <span title={label} aria-label={label} className="inline-flex shrink-0">
       <Icon className={className} style={{ color: m.color }} />
     </span>
   );

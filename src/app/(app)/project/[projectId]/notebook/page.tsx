@@ -34,71 +34,14 @@ import { HelpButton } from "@/components/HelpButton";
 import { useAssetMenu } from "@/components/AssetContextMenu";
 import { MarkdownPreview, toggleChecklistLine, type RenderCtx, type WikiTarget } from "@/components/MarkdownPreview";
 import { AssetMenuButton, AssetPinButton, PasteButton } from "@/components/AssetMenuButton";
-import { isDevStudio } from "@/lib/app-config";
+import { COPY } from "@/copy";
 
 const ACCENT = "#a3e635";
 const SAVE_DELAY = 600;
 
 // ─── templates ───────────────────────────────────────────────────────
 
-type NoteTemplate = { key: string; label: string; title: string; content: string };
-
-const GAME_TEMPLATES: NoteTemplate[] = [
-  { key: "blank", label: "Blank", title: "Untitled note", content: "" },
-  {
-    key: "todo",
-    label: "To-do list",
-    title: "To-do",
-    content: "- [ ] First task\n- [ ] Second task\n- [ ] Third task\n",
-  },
-  {
-    key: "gdd",
-    label: "Game design doc",
-    title: "Game design doc",
-    content:
-      "## Pitch\nOne or two sentences: what is the game and why is it fun?\n\n## Core loop\nWhat does the player do again and again?\n\n## Controls\n- Move:\n- Action:\n\n## Art style\n\n## Audio\n\n## Scope\n- [ ] Must have:\n- [ ] Nice to have:\n",
-  },
-  {
-    key: "bugs",
-    label: "Bug list",
-    title: "Bug list",
-    content:
-      "## Open\n- [ ] What happens, and the steps to make it happen\n\n## Fixed\n- [x] Example: player could jump through ceilings\n",
-  },
-  {
-    key: "playtest",
-    label: "Playtest notes",
-    title: "Playtest notes",
-    content:
-      "**Date:** \n**Tester:** \n**Build:** \n\n## What worked\n- \n\n## What was confusing\n- \n\n## Ideas to try\n- [ ] \n",
-  },
-];
-
-const DEV_TEMPLATES: NoteTemplate[] = [
-  GAME_TEMPLATES[0],
-  GAME_TEMPLATES[1],
-  {
-    key: "spec",
-    label: "Feature spec",
-    title: "Feature spec",
-    content:
-      "## Problem\nWho has it, and why does it matter?\n\n## Proposal\n\n## Out of scope\n- \n\n## Open questions\n- [ ] \n",
-  },
-  {
-    key: "bugs",
-    label: "Bug list",
-    title: "Bug list",
-    content: "## Open\n- [ ] What happens, and the steps to make it happen\n\n## Fixed\n- [x] Example: saving twice created a duplicate\n",
-  },
-  {
-    key: "meeting",
-    label: "Meeting notes",
-    title: "Meeting notes",
-    content: "**Date:** \n**People:** \n\n## Agenda\n- \n\n## Decisions\n- \n\n## Action items\n- [ ] \n",
-  },
-];
-
-const TEMPLATES = isDevStudio ? DEV_TEMPLATES : GAME_TEMPLATES;
+const TEMPLATES = COPY.notebook.templates;
 
 // ─── helpers ─────────────────────────────────────────────────────────
 
@@ -623,8 +566,7 @@ export default function NotebookPage() {
               {notes.length ? "Pick a note, or start a new one" : "Your notebook is empty"}
             </p>
             <p className="text-sm max-w-sm mb-5" style={{ color: "var(--text-secondary)" }}>
-              Keep ideas, to-do lists, design notes and playtest feedback here. Link notes to sprites, sounds and story
-              entries.
+              {COPY.notebook.emptyBody}
             </p>
             <div className="flex flex-wrap justify-center gap-2">
               {TEMPLATES.map((t) => (
@@ -795,7 +737,7 @@ export default function NotebookPage() {
                           >
                             <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: s.type === "note" ? ACCENT : "#fb923c" }} />
                             <span className="truncate flex-1">{s.title}</span>
-                            <span style={{ color: "var(--text-muted)" }}>{s.type === "note" ? "Note" : "Story"}</span>
+                            <span style={{ color: "var(--text-muted)" }}>{s.type === "note" ? "Note" : COPY.notebook.storySuggestionLabel}</span>
                           </button>
                         ))}
                       </div>

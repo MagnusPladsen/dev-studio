@@ -3,6 +3,7 @@
 import { Check } from "lucide-react";
 import type { MenuTriggerProps } from "@/components/AssetContextMenu";
 import { ASSET_KINDS } from "@/lib/assets";
+import { COPY } from "@/copy";
 
 // Small Markdown renderer shared by the Notebook and the Decision log: headings, lists, clickable
 // checklists, quotes, code, links and [[wiki links]] to notes and wiki pages.
@@ -66,7 +67,7 @@ function renderInline(text: string, ctx: RenderCtx, keyBase: string): React.Reac
               ? { color: ASSET_KINDS[target.type].color, background: `color-mix(in srgb, ${ASSET_KINDS[target.type].color} 10%, transparent)` }
               : { color: "var(--red)", border: "1px dashed rgba(248,113,113,0.5)" }
           }
-          title={target ? `Open ${target.type === "note" ? "note" : "story entry"} “${target.title}”` : `No note called “${title}” yet. Click to create it.`}
+          title={target ? `Open ${target.type === "note" ? "note" : COPY.wikiLinks.storyTarget} “${target.title}”` : `No note called “${title}” yet. Click to create it.`}
         >
           {(alias ?? titleRaw).trim()}
         </button>

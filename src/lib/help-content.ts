@@ -1,5 +1,6 @@
 import { ArrowLeftRight, Film, SquareDashed, ArrowRight, Box, CalendarRange, CirclePlay, Columns3, Copy, Download, GitPullRequestArrow, Hash, FileCode, FileText, FlipHorizontal2, FolderOpen, Gauge, Grid3X3, Image, Layers, LayoutGrid, LayoutTemplate, Link2, List, ListChecks, ListTodo, Maximize2, MessageSquare, MousePointer2, Music, Network, NotebookPen, PaintBucket, Paintbrush, Palette, Pencil, Piano, Pipette, Play, Rows3, Ruler, Scaling, Search, Shapes, Shuffle, SlidersHorizontal, Sparkles, SquareCheck, StickyNote, VolumeX, WandSparkles, Waypoints, type LucideIcon } from "lucide-react";
-import { isDevStudio } from "./app-config";
+import { COPY, type HelpText } from "@/copy";
+import { MENU_TIP, UNDO_TIP } from "@/copy/shared";
 
 export type HelpTopic =
   | "assets"
@@ -35,80 +36,15 @@ export interface HelpContent {
   tips: string[];
 }
 
-const UNDO_TIP = "Ctrl/⌘+Z undoes, Ctrl/⌘+Shift+Z redoes. Every change saves by itself.";
-const MENU_TIP = "Right-click (or long-press) an item in the list for copy, rename, links and more.";
+/** Pairs a shared tool's per-app help text with its icons, one icon per `canDo` line. */
+function withIcons(text: HelpText, icons: LucideIcon[]): HelpContent {
+  return { ...text, canDo: text.canDo.map((line, index) => ({ icon: icons[index], text: line })) };
+}
 
 export const HELP: Record<HelpTopic, HelpContent> = {
-  assets: {
-    title: "Project dashboard",
-    summary: "Your project's home: open any tool and see everything you've made.",
-    canDo: [
-      { icon: LayoutGrid, text: "Open any of the tools from the cards at the top." },
-      { icon: List, text: "See every asset in the project, newest first, with its links." },
-      { icon: Search, text: "Search by name or filter by type." },
-      { icon: Sparkles, text: "Add or remove the example assets for the whole project." },
-      { icon: Download, text: "Export the whole project as one JSON file." },
-    ],
-    steps: [
-      "Pick a tool card, for example Pixel Art.",
-      "Make something there. It saves by itself.",
-      "Come back here to find it in the list below.",
-      "Click a name to open it, or a linked chip to jump to that asset.",
-    ],
-    tips: [
-      "Not sure where to start? Press Add examples and explore them.",
-      "Right-click (or long-press) a row to rename, duplicate, link or delete it.",
-      "Export project gives a backup you can import again from Projects.",
-    ],
-  },
-  board: {
-    title: "Task Board",
-    summary: `Plan your ${isDevStudio ? "project" : "game"}'s work with issues, columns and sprints.`,
-    canDo: [
-      { icon: ListTodo, text: "Track tasks and bugs as issues with type, priority, points and labels." },
-      { icon: Columns3, text: "Drag issues between columns, or use the Move to… menu." },
-      { icon: CalendarRange, text: "Plan sprints in Backlog, then start and complete them." },
-      { icon: Search, text: "Search and filter everything in All issues, archived ones too." },
-      { icon: NotebookPen, text: "Add notes to an issue; they live in the Notebook." },
-    ],
-    steps: [
-      "Press Create issue and give it a title.",
-      "Drag the card across the columns as work moves on.",
-      "Click a card to edit its details, links and notes.",
-      "Archive done issues to keep the board tidy.",
-    ],
-    tips: [
-      "Press C to create an issue.",
-      "Rename or add columns to fit how you work.",
-      UNDO_TIP,
-      "Export the board as CSV or JSON.",
-    ],
-  },
-  diagrams: {
-    title: "Canvas",
-    summary: isDevStudio
-      ? "A free-form board for architecture sketches, flow charts, plans, moodboards and references."
-      : "A free-form board for moodboards, story flow, level plans, sketches and references.",
-    canDo: [
-      { icon: StickyNote, text: "Add notes, to-do lists, images, links, groups and any project asset as cards." },
-      { icon: Shapes, text: "Draw rectangles, ellipses, diamonds and flow-chart shapes, and sketch with the pen." },
-      { icon: ArrowRight, text: "Connect cards and shapes with arrows to show flow." },
-      { icon: MousePointer2, text: "Select many cards at once to move, recolour, duplicate, align or distribute them." },
-      { icon: CirclePlay, text: "Play YouTube, Spotify, Vimeo and SoundCloud links right on the board." },
-    ],
-    steps: [
-      "Add a card or shape from Add, or paste and drop pictures and links in.",
-      "Pick the pen tool to sketch; Esc goes back to selecting.",
-      "Use the Connect tool, or drag a selected card's dot onto another card.",
-      "Shift+drag (or the box-select tool on touch) around cards to select several.",
-    ],
-    tips: [
-      "Drag empty space to pan; scroll or pinch to zoom. Shift+click adds or removes a card.",
-      "Ctrl/⌘+C, Ctrl/⌘+V and Ctrl/⌘+D copy, paste and duplicate cards, lines included.",
-      "Double-click a card or line to edit it. Delete removes the selection; Ctrl/⌘+Z undoes.",
-      "Export the board as PNG, SVG or JSON.",
-    ],
-  },
+  assets: withIcons(COPY.help.assets, [LayoutGrid, List, Search, Sparkles, Download]),
+  board: withIcons(COPY.help.board, [ListTodo, Columns3, CalendarRange, Search, NotebookPen]),
+  diagrams: withIcons(COPY.help.diagrams, [StickyNote, Shapes, ArrowRight, MousePointer2, CirclePlay]),
   dialogue: {
     title: "Dialogue Trees",
     summary: "Write branching conversations for your characters.",
@@ -153,53 +89,8 @@ export const HELP: Record<HelpTopic, HelpContent> = {
       UNDO_TIP,
     ],
   },
-  decisions: {
-    title: "Decision log",
-    summary: isDevStudio
-      ? "Record why the project is built the way it is, one decision at a time."
-      : "Record why your game works the way it does, one decision at a time.",
-    canDo: [
-      { icon: Hash, text: "Number every decision (ADR-001, ADR-002…) with a status and a date." },
-      { icon: FileText, text: "Write the context, options, decision and consequences in Markdown." },
-      { icon: GitPullRequestArrow, text: "Supersede a decision: the new one links back to the one it replaces." },
-      { icon: Link2, text: "Link decisions to issues, wiki pages, notes and canvases." },
-      { icon: Download, text: "Export one decision or the whole log as Markdown, or everything as JSON." },
-    ],
-    steps: [
-      "Press New decision and give it a title.",
-      "Fill in the context and the options you looked at.",
-      "Write the decision, then set its status to Accepted.",
-      "When it changes later, press Supersede to write the new one.",
-    ],
-    tips: [
-      "Filter the list by status, or search across every field and tag.",
-      `Write [[Title]] in a field to link a note or ${isDevStudio ? "wiki page" : "story entry"}.`,
-      UNDO_TIP,
-      MENU_TIP,
-    ],
-  },
-  notebook: {
-    title: "Notebook",
-    summary: isDevStudio ? "Keep ideas, to-do lists, meeting notes and specs." : "Keep ideas, to-do lists, design notes and playtest feedback.",
-    canDo: [
-      { icon: FileText, text: "Write notes in Markdown, with headings, lists and code." },
-      { icon: ListChecks, text: "Tick off checklists and see progress at a glance." },
-      { icon: FolderOpen, text: "Sort notes into folders, add tags and pin the important ones." },
-      { icon: Link2, text: `Link to other notes and ${isDevStudio ? "wiki pages" : "story entries"} with [[double brackets]].` },
-      { icon: LayoutTemplate, text: isDevStudio ? "Start from templates like a to-do list or meeting notes." : "Start from templates like a to-do list or game design doc." },
-    ],
-    steps: [
-      "Press New note, or pick a template from the arrow next to it.",
-      "Give it a title and start writing.",
-      "Type - [ ] to make a checklist item.",
-      "Switch to Preview to read it and tick items off.",
-    ],
-    tips: [
-      "Type [[ to search notes and story entries to link.",
-      UNDO_TIP,
-      MENU_TIP,
-    ],
-  },
+  decisions: withIcons(COPY.help.decisions, [Hash, FileText, GitPullRequestArrow, Link2, Download]),
+  notebook: withIcons(COPY.help.notebook, [FileText, ListChecks, FolderOpen, Link2, LayoutTemplate]),
   palettes: {
     title: "Palettes",
     summary: "Keep your game's colours in one place and reuse them.",
@@ -289,29 +180,7 @@ export const HELP: Record<HelpTopic, HelpContent> = {
       MENU_TIP,
     ],
   },
-  story: {
-    title: isDevStudio ? "Wiki" : "Story",
-    summary: isDevStudio
-      ? "Document your project: people, systems, components, goals and decisions, all linked."
-      : "Write your game's lore: characters, places, items, quests and events.",
-    canDo: [
-      { icon: FileText, text: "Write entries in Markdown, sorted by type and tags." },
-      { icon: Link2, text: "Link entries with [[double brackets]]; hover a link for a summary." },
-      { icon: ArrowLeftRight, text: "See which entries mention this one." },
-      { icon: Network, text: "View how everything connects in the graph." },
-    ],
-    steps: [
-      "Press New entry, pick a type and give it a title.",
-      `Write about it. Types like ${isDevStudio ? "Person" : "Character"} start from a template.`,
-      "Type [[ to link another entry.",
-      `Open the graph button to see your ${isDevStudio ? "project" : "world"}'s connections.`,
-    ],
-    tips: [
-      "Click a [[link]] to an entry that doesn't exist yet to create it.",
-      UNDO_TIP,
-      MENU_TIP,
-    ],
-  },
+  story: withIcons(COPY.help.story, [FileText, Link2, ArrowLeftRight, Network]),
   tilemap: {
     title: "Tilemap",
     summary: "Paint game levels with your own sprites as tiles.",

@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { ArrowUpRight, LogIn } from "lucide-react";
 import { BetaBadge } from "@/components/BetaBadge";
-import { APP, OTHER_APP, isDevStudio } from "@/lib/app-config";
+import { APP, OTHER_APP } from "@/lib/app-config";
+import { COPY } from "@/copy";
 import { supabaseEnabled } from "@/lib/supabase";
 import { ASSET_ICONS } from "@/components/asset-icons";
 import { ASSET_KINDS } from "@/lib/assets";
@@ -92,15 +93,6 @@ export function LandingNav({ sections }: { sections: { href: string; label: stri
   );
 }
 
-const OTHER_APP_PITCH = isDevStudio
-  ? {
-      question: "Making a game?",
-      pitch: "GameDev Studio has these planning tools plus pixel art, 3D pixel art, music, sound effects, tilemaps and dialogue trees, all linked together.",
-    }
-  : {
-      question: "Planning something that isn't a game?",
-      pitch: "Dev Studio is the Task Board, Canvas, Wiki, Notebook and Decision log on their own, made for any software project. Same account, same free tools.",
-    };
 
 /** "Have you tried the other studio?" card, in the other app's own colour. */
 export function OtherAppPromo() {
@@ -116,10 +108,10 @@ export function OtherAppPromo() {
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium mb-1" style={{ color: OTHER_APP.accent }}>
-            {OTHER_APP_PITCH.question} Have you tried {OTHER_APP.name}?
+            {COPY.landing.otherAppQuestion} Have you tried {OTHER_APP.name}?
           </p>
           <p className="leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-            {OTHER_APP_PITCH.pitch}
+            {COPY.landing.otherAppPitch}
           </p>
         </div>
         <span

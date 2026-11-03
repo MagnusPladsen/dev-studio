@@ -9,6 +9,7 @@ import { v4 as uuid } from "uuid";
 import { addExamples } from "@/lib/examples";
 import { useStorageVersion } from "@/hooks/useStorage";
 import { APP, OTHER_APP, belongsToApp } from "@/lib/app-config";
+import { COPY } from "@/copy";
 
 export default function ProjectsPage() {
   const router = useRouter();
@@ -66,7 +67,7 @@ export default function ProjectsPage() {
     const a = document.createElement("a");
     a.href = url;
     const project = projects.find((p) => p.id === id);
-    a.download = `${project?.name || "project"}.gamedev.json`;
+    a.download = `${project?.name || "project"}${COPY.projects.exportExtension}`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -84,7 +85,7 @@ export default function ProjectsPage() {
         if (result) {
           setImportError(null);
         } else {
-          setImportError(`"${file.name}" isn't a ${APP.name} project file. Use a .gamedev.json file made with Export.`);
+          setImportError(COPY.projects.importError(file.name));
         }
       };
       reader.readAsText(file);
@@ -100,7 +101,7 @@ export default function ProjectsPage() {
             Projects
           </h1>
           <p className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}>
-            Each project keeps its assets separate. Create one per {APP.subject}.
+            {COPY.projects.intro}
           </p>
           <p className="text-xs mt-2" style={{ color: "var(--yellow)" }}>
             {APP.name} is in beta. Export your projects now and then as a backup.
@@ -111,7 +112,7 @@ export default function ProjectsPage() {
             onClick={importProject}
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm transition-colors"
             style={{ background: "var(--bg-card)", color: "var(--text-primary)", border: "1px solid var(--border-hover)" }}
-            title="Open a project file you exported earlier (.gamedev.json)"
+            title={COPY.projects.importTitle}
           >
             <Upload className="w-4 h-4" />
             Import
@@ -178,9 +179,7 @@ export default function ProjectsPage() {
             <span>
               Start with example assets
               <span className="block text-xs mt-0.5" style={{ color: "var(--text-secondary)" }}>
-                {APP.id === "dev-studio"
-                  ? "A small sample software project (Tidepool, a habit app) across every tool. Remove it any time."
-                  : "A small sample game (Pip's Quest) across every tool. Remove it any time."}
+                {COPY.projects.examplesHint}
               </span>
             </span>
           </label>
@@ -216,7 +215,7 @@ export default function ProjectsPage() {
             No projects yet
           </p>
           <p className="text-sm mb-6" style={{ color: "var(--text-secondary)" }}>
-            Create a project to start building your {APP.subject}
+            {COPY.projects.emptyHint}
           </p>
           <button
             onClick={() => setShowNew(true)}
