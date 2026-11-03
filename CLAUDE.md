@@ -79,6 +79,7 @@ tools comes from `COPY.help`. `npm test` checks both objects have the same keys 
 
 - Everything is free, no watermark, no sign-up required; keep saying so where people export.
 - Never generate assets with AI. Examples are hand-made data in code that users edit and make their own.
+- Privacy: `/privacy` (EN + NO, unconfirmed facts in `src/lib/privacy-facts.ts`), Export all and Delete account / Clear data in the Account panel (`AccountPrivacy`, `delete_own_account` SQL function). Analytics loads only after opt-in via `<ConsentBanner>`; any new tracking or third-party script must be gated the same way and added to the policy.
 - Each tool has its own colour (`ASSET_KINDS[type].color`). The layout tints the workspace and sets `--accent` /
   `--on-accent` to it, so primary buttons are written as `background: var(--accent)`; never hardcode purple.
 - Desktop layout is considered done. Phone fixes use `max-md:` classes (or mobile base classes restored by `md:`) so

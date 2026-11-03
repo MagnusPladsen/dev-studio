@@ -19,6 +19,7 @@ import {
   type Persister,
 } from "@/lib/storage";
 import { getSupabase, supabaseEnabled } from "@/lib/supabase";
+import { clearDeviceStorage, deleteOwnAccount } from "@/lib/account";
 import { migrateAllElementAssetLinks } from "@/lib/diagrams/element-links";
 import { createCloudPersister, createCloudReader, loadCloudSnapshot, uploadSnapshot, type SyncStatus } from "@/lib/sync/cloud";
 import { connectRealtime, createRemoteSync, type RemoteSync } from "@/lib/sync/realtime";
@@ -53,6 +54,10 @@ interface SyncContextValue {
   disconnectFolder(): Promise<void>;
   /** Re-mount the open editor so it re-reads storage (after bulk changes like adding examples). */
   reloadView(): void;
+  /** Deletes the signed-in account with all its projects. Returns an error message, or null when done. */
+  deleteAccount(): Promise<string | null>;
+  /** Guests: removes every project and setting this app keeps in this browser, and forgets the local folder. */
+  clearDeviceData(): Promise<void>;
 }
 
 function cachedIds(): { projects: string[]; assets: string[] } {
@@ -297,8 +302,30 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         await forgetFolder();
         setFolder({ state: "none" });
       },
+      async deleteAccount() {
+        const supabase = getSupabase();
+        if (!supabase || !userIdRef.current) return "You are not signed in.";
+        await primary.current?.persister.flush?.();
+        // the deletes that follow must not reach a connected folder through live updates
+        goLive(() => {});
+        folderRef.current?.detach();
+        const error = await deleteOwnAccount(supabase);
+        if (!error) return null;
+        const { data } = await supabase.auth.getUser();
+        if (data.user) await enterCloud(data.user);
+        return error;
+      },
+      async clearDeviceData() {
+        folderRef.current?.detach();
+        folderRef.current = null;
+        await forgetFolder();
+        setFolder({ state: "none" });
+        clearDeviceStorage(localStorage);
+        replaceCache(new Map());
+        setGeneration((g) => g + 1);
+      },
     }),
-    [ready, generation, user, status, folder, folderAvailable, attachFolder, reportError]
+    [ready, generation, user, status, folder, folderAvailable, attachFolder, enterCloud, goLive, reportError]
   );
 
   return <SyncContext.Provider value={value}>{children}</SyncContext.Provider>;
