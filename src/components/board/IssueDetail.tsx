@@ -17,18 +17,17 @@ import { SaveIndicator } from "@/components/SaveIndicator";
 import {
   CATEGORY_LABEL,
   MiniMarkdown,
-  PRIORITIES,
   PRIORITY_META,
   PriorityIcon,
   TypeIcon,
   fieldStyle,
   formatDate,
   relativeTime,
-  saveIssue,
   secondaryBtn,
   typeLabel,
   typeOptions,
 } from "./meta";
+import { PRIORITIES, clampPoints, saveIssue, withLabel, withoutLabel } from "@/lib/board";
 
 interface Props {
   projectId: string;
@@ -207,7 +206,7 @@ export function IssueDetail({ projectId, board, issue, onClose }: Props) {
               min={0}
               max={100}
               value={issue.points ?? ""}
-              onChange={(e) => update({ points: e.target.value === "" ? undefined : Math.max(0, Number(e.target.value)) })}
+              onChange={(e) => update({ points: e.target.value === "" ? undefined : clampPoints(Number(e.target.value)) })}
               placeholder="–"
               className="w-24 px-2 py-1.5 rounded-md text-xs outline-none"
               style={fieldStyle}
@@ -227,7 +226,7 @@ export function IssueDetail({ projectId, board, issue, onClose }: Props) {
               {issue.labels.map((l) => (
                 <span key={l} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px]" style={{ background: "var(--bg-hover)", color: "var(--text-secondary)" }}>
                   {l}
-                  <button onClick={() => update({ labels: issue.labels.filter((x) => x !== l) })} aria-label={`Remove label ${l}`} style={{ color: "var(--text-muted)" }}>
+                  <button onClick={() => update({ labels: withoutLabel(issue.labels, l) })} aria-label={`Remove label ${l}`} style={{ color: "var(--text-muted)" }}>
                     <X className="w-3 h-3" />
                   </button>
                 </span>
@@ -238,8 +237,8 @@ export function IssueDetail({ projectId, board, issue, onClose }: Props) {
                 onKeyDown={(e) => {
                   if (e.key === "Enter" || e.key === ",") {
                     e.preventDefault();
-                    const l = labelInput.trim().toLowerCase().replace(/\s+/g, "-");
-                    if (l && !issue.labels.includes(l)) update({ labels: [...issue.labels, l] });
+                    const labels = withLabel(issue.labels, labelInput);
+                    if (labels !== issue.labels) update({ labels });
                     setLabelInput("");
                   }
                 }}

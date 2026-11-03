@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { v4 as uuid } from "uuid";
 import { storage } from "@/lib/storage";
+import { normalizeTag } from "@/lib/tags";
 import { dropDeletedLinkTargets, getRelated, wikiTargets } from "@/lib/links";
 import { assetHref } from "@/lib/assets";
 import { LinkedAssets } from "@/components/LinkedAssets";
@@ -268,7 +269,7 @@ export default function StoryPage() {
 
   function addTag() {
     if (!tagInput.trim() || !selected) return;
-    const tag = tagInput.trim().toLowerCase();
+    const tag = normalizeTag("story", tagInput);
     if (!selected.tags.includes(tag)) saveEntry({ tags: [...selected.tags, tag] });
     setTagInput("");
   }

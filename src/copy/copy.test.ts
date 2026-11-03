@@ -54,3 +54,24 @@ describe("app copy", () => {
     expect(strings(DEV_STUDIO_COPY).filter(([path, text]) => gameWords.test(text) && !path.startsWith("landing."))).toEqual([]);
   });
 });
+
+describe("copyFor", () => {
+  it("picks each app's text whatever app was built", async () => {
+    const { COPY, copyFor } = await import("./index");
+    expect(copyFor("dev-studio")).toBe(DEV_STUDIO_COPY);
+    expect(copyFor("gamedev-studio")).toBe(GAMEDEV_STUDIO_COPY);
+    expect(COPY).toBe(GAMEDEV_STUDIO_COPY);
+  });
+
+  it("feeds the per-app canvas templates and asset labels", async () => {
+    const { canvasTemplatesFor, CANVAS_TEMPLATES } = await import("@/lib/canvas-shapes/templates");
+    const { assetKindLabel, assetTypesFor } = await import("@/lib/assets");
+    const architecture = (app: "dev-studio" | "gamedev-studio") => canvasTemplatesFor(app).find((t) => t.id === "architecture")!.description;
+    expect(architecture("dev-studio")).toBe(DEV_STUDIO_COPY.canvas.templates.architectureDescription);
+    expect(architecture("gamedev-studio")).toBe(GAMEDEV_STUDIO_COPY.canvas.templates.architectureDescription);
+    expect(CANVAS_TEMPLATES.map((t) => t.description)).toEqual(canvasTemplatesFor("gamedev-studio").map((t) => t.description));
+    expect(assetKindLabel("story", "dev-studio")).toBe(DEV_STUDIO_COPY.assetKinds.story);
+    expect(assetKindLabel("issue", "dev-studio")).toBe("Issue");
+    expect(assetTypesFor("dev-studio")).toEqual(["diagram", "story", "note", "issue", "decision"]);
+  });
+});

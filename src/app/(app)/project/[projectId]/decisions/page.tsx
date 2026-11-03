@@ -6,6 +6,7 @@ import { ArrowRight, BookOpenText, ChevronLeft, GitPullRequestArrow, PenLine, Sc
 import { v4 as uuid } from "uuid";
 import type { Decision, DecisionStatus, Note } from "@/types";
 import { storage } from "@/lib/storage";
+import { normalizeTag } from "@/lib/tags";
 import { assetHref } from "@/lib/assets";
 import { addLink } from "@/lib/links";
 import { registerAutosaveFlush } from "@/lib/autosave-registry";
@@ -230,7 +231,7 @@ export default function DecisionLogPage() {
   }
 
   function addTag() {
-    const tag = tagInput.trim().replace(/^#/, "");
+    const tag = normalizeTag("decision", tagInput);
     setTagInput("");
     if (draft && tag && !draft.tags.includes(tag)) update({ tags: [...draft.tags, tag] });
   }

@@ -1,0 +1,64 @@
+import { z } from "zod";
+import { id, projectRow, tags } from "./common";
+
+/** Sounds and music are read-only for the MCP (it may rename, tag and link them). Dialogue text is editable. */
+
+export const soundSchema = z.looseObject({
+  ...projectRow,
+  name: z.string(),
+  params: z.looseObject({
+    waveType: z.enum(["square", "sawtooth", "sine", "triangle", "noise"]),
+    frequency: z.number(),
+    frequencySlide: z.number(),
+    repeatSpeed: z.number(),
+    sustainTime: z.number(),
+    decayTime: z.number(),
+    attackTime: z.number(),
+    hpFilterCutoff: z.number(),
+    lpFilterCutoff: z.number(),
+    lpFilterResonance: z.number(),
+    volume: z.number(),
+    vibratoDepth: z.number(),
+    vibratoSpeed: z.number(),
+  }),
+  tags,
+});
+
+const musicNoteSchema = z.looseObject({ pitch: z.number(), start: z.number(), duration: z.number(), velocity: z.number() });
+
+export const musicSchema = z.looseObject({
+  ...projectRow,
+  name: z.string(),
+  bpm: z.number().positive(),
+  channels: z.array(
+    z.looseObject({
+      id,
+      name: z.string(),
+      instrument: z.string(),
+      volume: z.number(),
+      patterns: z.array(z.looseObject({ id, notes: z.array(musicNoteSchema) })),
+    })
+  ),
+  tags,
+});
+
+const dialogueNodeSchema = z.looseObject({
+  id,
+  type: z.enum(["dialogue", "choice", "condition", "action", "start", "end"]),
+  x: z.number(),
+  y: z.number(),
+  speaker: z.string().optional(),
+  text: z.string().optional(),
+  choices: z.array(z.looseObject({ text: z.string(), targetId: z.string() })).optional(),
+  nextId: z.string().optional(),
+  condition: z.string().optional(),
+});
+
+export const dialogueSchema = z
+  .looseObject({
+    ...projectRow,
+    name: z.string(),
+    nodes: z.array(dialogueNodeSchema),
+    tags,
+  })
+  .refine((tree) => new Set(tree.nodes.map((n) => n.id)).size === tree.nodes.length, { message: "Dialogue node ids must be unique", path: ["nodes"] });

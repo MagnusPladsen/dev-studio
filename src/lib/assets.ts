@@ -1,7 +1,7 @@
 import type { AssetType } from "@/types";
 import { storage, type ProjectCollection } from "./storage";
-import { APP } from "./app-config";
-import { COPY } from "@/copy";
+import { APP, appConfigFor, type AppId } from "./app-config";
+import { COPY, copyFor } from "@/copy";
 import { decisionCode } from "./decisions";
 
 export interface AssetKind {
@@ -28,8 +28,19 @@ export const ASSET_KINDS: Record<AssetType, AssetKind> = {
   decision: { type: "decision", collection: "decisions", label: "Decision", path: "decisions", color: "#818cf8" },
 };
 
+/** An asset type's name in an app; the Story tool is called Wiki in Dev Studio. */
+export function assetKindLabel(type: AssetType, app: AppId): string {
+  return type === "story" ? copyFor(app).assetKinds.story : ASSET_KINDS[type].label;
+}
+
+/** The asset types an app offers, for a project of either app. */
+export function assetTypesFor(app: AppId): AssetType[] {
+  const offered = appConfigFor(app).assetTypes;
+  return (Object.keys(ASSET_KINDS) as AssetType[]).filter((type) => offered.includes(type));
+}
+
 /** The asset types this app offers (see `APP.assetTypes`). */
-export const ASSET_TYPES = (Object.keys(ASSET_KINDS) as AssetType[]).filter((type) => APP.assetTypes.includes(type));
+export const ASSET_TYPES = assetTypesFor(APP.id);
 
 export interface AssetSummary {
   type: AssetType;

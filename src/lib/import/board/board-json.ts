@@ -1,6 +1,6 @@
 import type { Board, BoardColumn, ColumnCategory, Issue, IssuePriority } from "@/types";
 import { ImportError, type Importer } from "@/lib/import";
-import { issueNumber } from "@/lib/examples/board";
+import { issueNumber } from "@/lib/board";
 import { categoryFrom, priorityFrom } from "./fields";
 import type { IssueDraft, SprintDraft } from "./types";
 

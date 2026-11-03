@@ -1,3 +1,5 @@
+import { normalizeTag } from "@/lib/tags";
+
 export type FrontMatterValue = string | string[] | boolean;
 
 export interface MarkdownDocument {
@@ -47,7 +49,7 @@ export function text(value: FrontMatterValue | undefined): string {
 export function tagsOf(data: Record<string, FrontMatterValue>): string[] {
   const raw = data.tags ?? data.tag;
   const list = Array.isArray(raw) ? raw : typeof raw === "string" ? raw.split(/[,\s]+/) : [];
-  return [...new Set(list.map((tag) => tag.trim().replace(/^#/, "")).filter(Boolean))];
+  return [...new Set(list.map((tag) => normalizeTag("note", tag)).filter(Boolean))];
 }
 
 export function fileTitle(file: File): string {

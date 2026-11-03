@@ -17,12 +17,13 @@ import type {
   TilemapData,
   VoxelModel,
 } from "@/types";
-import { createDefaultBoard, createIssue, takeIssueKey } from "@/components/board/meta";
+import { createDefaultBoard, createIssue, takeIssueKey } from "./board";
 import { ASSET_KINDS, assetHref, summarize, type AssetSummary } from "./assets";
 import { addLink } from "./links";
 import { removeAssetPin } from "./pins";
 import { storage, type CollectionName } from "./storage";
 import { decisionToMarkdown, nextDecisionNumber } from "./decisions";
+import type { ClipboardPayload } from "./clipboard";
 
 export type StoredAsset =
   | Sprite
@@ -40,8 +41,6 @@ export type StoredAsset =
   | Decision;
 
 export type ClonePlacement = "in-place" | "backlog";
-
-export type ClipboardPayload = { kind: "text"; text: string } | { kind: "png"; dataUrl: string };
 
 const TITLED_TYPES: AssetType[] = ["story", "note", "issue", "decision"];
 const DIAGRAM_NODE_WIDTH = 220;
@@ -281,20 +280,6 @@ export function systemClipboardPayload(type: AssetType, item: StoredAsset): Clip
       return { kind: "text", text: decisionToMarkdown(item as Decision, storage.getAll("decisions", (item as Decision).projectId)) };
     default:
       return { kind: "text", text: getAssetName(type, item) };
-  }
-}
-
-export async function copyToSystemClipboard(payload: ClipboardPayload): Promise<boolean> {
-  try {
-    if (payload.kind === "text") {
-      await navigator.clipboard.writeText(payload.text);
-      return true;
-    }
-    const blob = fetch(payload.dataUrl).then((response) => response.blob());
-    await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
-    return true;
-  } catch {
-    return false;
   }
 }
 

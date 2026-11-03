@@ -1,6 +1,6 @@
 import { v4 as uuid } from "uuid";
 import type { Board, BoardColumn, Issue, IssueType, Sprint } from "@/types";
-import { issueNumber } from "@/lib/examples/board";
+import { issueNumber } from "@/lib/board";
 import type { IssueDraft, SprintDraft } from "./types";
 
 /** Same palette as the board's own new columns. */

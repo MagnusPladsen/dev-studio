@@ -1,18 +1,7 @@
 import type { Board, Issue, IssuePriority, IssueType, Sprint } from "@/types";
-import { createDefaultBoard, today } from "@/components/board/meta";
+import { createDefaultBoard, issueKeyPrefix, issueNumber, today } from "@/lib/board";
 import { storage } from "../storage";
 import type { ExampleContext, ExampleModule } from "./types";
-
-/** "Pip's Quest" → "PIP". Shared by the board page so example keys match the board. */
-export function issueKeyPrefix(projectName: string | undefined): string {
-  const letters = (projectName ?? "").replace(/[^a-z]/gi, "").toUpperCase();
-  return letters.slice(0, 3) || "ISS";
-}
-
-export function issueNumber(key: string): number {
-  const n = parseInt(key.split("-").pop() ?? "", 10);
-  return Number.isFinite(n) ? n : 0;
-}
 
 /** A sprint the example issues sit in. The `current` one starts active, unless the board already runs a sprint. */
 export type ExampleSprint = { slug: string; name: string; goal: string; current?: boolean };
