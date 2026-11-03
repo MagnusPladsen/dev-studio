@@ -9,6 +9,7 @@ import type { Board, Issue, IssuePriority, IssueType, Note } from "@/types";
 import { storage } from "@/lib/storage";
 import { addLink, getRelated } from "@/lib/links";
 import { assetHref } from "@/lib/assets";
+import { toggleTask } from "@/lib/task-list";
 import { useAutosave, type SaveState } from "@/hooks/useAutosave";
 import { useStorageVersion } from "@/hooks/useStorage";
 import { LinkedAssets } from "@/components/LinkedAssets";
@@ -286,7 +287,10 @@ export function IssueDetail({ projectId, board, issue, onClose }: Props) {
               onClick={() => setTab("write")}
               title="Click to edit"
             >
-              {draft.description.trim() ? <MiniMarkdown text={draft.description} /> : <p className="text-sm" style={{ color: "var(--text-muted)" }}>No description yet. Click to write one.</p>}
+              {draft.description.trim() ? (
+                <MiniMarkdown text={draft.description} onToggleTask={(line) => setDraft((d) => ({ ...d, description: toggleTask(d.description, line) }))} />
+              ) : ( <p className="text-sm" style={{ color: "var(--text-muted)" }}>No description yet. Click to write one.</p>
+              )}
             </div>
           )}
         </section>

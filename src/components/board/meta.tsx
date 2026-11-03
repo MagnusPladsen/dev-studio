@@ -17,6 +17,7 @@ import { v4 as uuid } from "uuid";
 import type { Board, BoardColumn, ColumnCategory, Issue, IssuePriority, IssueType } from "@/types";
 import { storage } from "@/lib/storage";
 import { issueKeyPrefix, issueNumber } from "@/lib/examples/board";
+import { parseTask } from "@/lib/task-list";
 
 export const TYPE_META: Record<IssueType, { label: string; icon: LucideIcon; color: string }> = {
   feature: { label: "Feature", icon: Sparkles, color: "#34d399" },
@@ -172,6 +173,25 @@ export function createIssue(
   return { issue, board: b };
 }
 
+/** Closes a sprint: done issues are archived, open ones move to `targetSprintId` (null = backlog). */
+export function completeSprint(projectId: string, board: Board, sprintId: string, targetSprintId: string | null): Board {
+  const doneIds = new Set(board.columns.filter((c) => c.category === "done").map((c) => c.id));
+  for (const issue of storage.getAll("issues", projectId)) {
+    if (issue.sprintId !== sprintId || issue.archived) continue;
+    if (doneIds.has(issue.status)) saveIssue(projectId, board, issue, { archived: true });
+    else saveIssue(projectId, board, issue, { sprintId: targetSprintId });
+  }
+  const closedAt = new Date().toISOString();
+  return saveBoard(projectId, board, { sprints: board.sprints.map((s) => (s.id === sprintId ? { ...s, state: "closed", closedAt } : s)) });
+}
+
+/** Brings a closed sprint back as a planned one, ready to start again. */
+export function reopenSprint(projectId: string, board: Board, sprintId: string): Board {
+  return saveBoard(projectId, board, {
+    sprints: board.sprints.map((s) => (s.id === sprintId ? { ...s, state: "planned", closedAt: undefined } : s)),
+  });
+}
+
 export const fieldStyle: React.CSSProperties = {
   background: "var(--bg-primary)",
   color: "var(--text-primary)",
@@ -204,8 +224,11 @@ export function PriorityIcon({ priority, className = "w-3.5 h-3.5" }: { priority
   );
 }
 
-/** Very small markdown → JSX for issue descriptions (headings, lists, bold/italic, code). */
-export function MiniMarkdown({ text }: { text: string }) {
+/**
+ * Very small markdown → JSX for issue descriptions (headings, lists, task lists, bold/italic, code).
+ * `onToggleTask` gets the line number of a ticked "- [ ]" item; without it the boxes are read-only.
+ */
+export function MiniMarkdown({ text, onToggleTask }: { text: string; onToggleTask?(line: number): void }) {
   const lines = text.split("\n");
   const out: React.ReactNode[] = [];
   let list: React.ReactNode[] = [];
@@ -235,7 +258,25 @@ export function MiniMarkdown({ text }: { text: string }) {
     if (ul || ol) {
       if (list.length && ordered !== !!ol) flush();
       ordered = !!ol;
-      list.push(<li key={i}>{inline((ul ?? ol)![1], `l${i}`)}</li>);
+      const task = parseTask(line, i);
+      list.push(
+        task ? (
+          <li key={i} className="list-none -ml-5 flex items-start gap-2">
+            <input
+              type="checkbox"
+              checked={task.done}
+              disabled={!onToggleTask}
+              onClick={(e) => e.stopPropagation()}
+              onChange={() => onToggleTask?.(i)}
+              className="mt-1 shrink-0"
+              aria-label={task.text}
+            />
+            <span style={task.done ? { textDecoration: "line-through", color: "var(--text-muted)" } : undefined}>{inline(task.text, `t${i}`)}</span>
+          </li>
+        ) : (
+          <li key={i}>{inline((ul ?? ol)![1], `l${i}`)}</li>
+        )
+      );
       return;
     }
     flush();

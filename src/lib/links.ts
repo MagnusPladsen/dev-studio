@@ -1,5 +1,5 @@
 import { v4 as uuid } from "uuid";
-import type { AssetLink, AssetRef, AssetType, StoryEntry } from "@/types";
+import type { AssetLink, AssetRef, AssetRelation, AssetType, StoryEntry } from "@/types";
 import { storage } from "./storage";
 import { ASSET_KINDS, getAsset, type AssetSummary } from "./assets";
 
@@ -62,6 +62,62 @@ export function getRelated(projectId: string, type: AssetType, id: string): Rela
   }
 
   return [...found.values()];
+}
+
+export interface RelatedCount {
+  notes: number;
+  others: number;
+}
+
+/**
+ * What `getRelated` would count for each of `ids` (all of one non-story type), in one pass over
+ * the links and story entries instead of one pass per asset.
+ */
+export function countRelated(projectId: string, ids: string[]): Map<string, RelatedCount> {
+  const wanted = new Set(ids);
+  const seen = new Map<string, Set<string>>();
+  const counts = new Map<string, RelatedCount>(ids.map((id) => [id, { notes: 0, others: 0 }]));
+  const add = (id: string, ref: AssetRef) => {
+    const keys = seen.get(id) ?? new Set<string>();
+    seen.set(id, keys);
+    const key = `${ref.type}:${ref.id}`;
+    if (ref.id === id || keys.has(key) || !getAsset(projectId, ref.type, ref.id)) return;
+    keys.add(key);
+    const count = counts.get(id)!;
+    if (ref.type === "note") count.notes++;
+    else count.others++;
+  };
+
+  for (const rel of storage.getAll("links", projectId)) {
+    if (wanted.has(rel.from.id)) add(rel.from.id, rel.to);
+    if (wanted.has(rel.to.id)) add(rel.to.id, rel.from);
+  }
+  for (const entry of storage.getAll("stories", projectId)) {
+    for (const l of entry.links ?? []) if (wanted.has(l.targetId)) add(l.targetId, { type: "story", id: entry.id });
+  }
+  return counts;
+}
+
+/** The explicit links that touch each of `ids`. */
+export function linksTouching(projectId: string, ids: string[]): Map<string, AssetRelation[]> {
+  const wanted = new Set(ids);
+  const found = new Map<string, AssetRelation[]>();
+  for (const link of storage.getAll("links", projectId)) {
+    for (const end of new Set([link.from.id, link.to.id])) {
+      if (wanted.has(end)) found.set(end, [...(found.get(end) ?? []), link]);
+    }
+  }
+  return found;
+}
+
+/** Puts back links that were removed along with an asset, once both ends exist again. */
+export function restoreLinks(projectId: string, links: AssetRelation[]) {
+  const current = new Set(storage.getAll("links", projectId).map((l) => l.id));
+  for (const link of links) {
+    if (current.has(link.id)) continue;
+    const ends = [link.from, link.to].every((ref) => storage.getById(ASSET_KINDS[ref.type].collection, ref.id, projectId));
+    if (ends) storage.save("links", link, projectId);
+  }
 }
 
 export function addLink(projectId: string, from: AssetRef, to: AssetRef) {
