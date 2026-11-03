@@ -95,7 +95,7 @@ export const GAMEDEV_STUDIO_COPY = {
         "Play YouTube, Spotify, Vimeo and SoundCloud links right on the board.",
       ],
       steps: [
-        "Add a card or shape from Add, or paste and drop pictures and links in.",
+        "Start from a template, then add cards and shapes from the Shapes panel (click, or drag onto the board) or Add.",
         "Pick the pen tool to sketch; Esc goes back to selecting.",
         "Use the Connect tool, or drag a selected card's dot onto another card.",
         "Shift+drag (or the box-select tool on touch) around cards to select several.",
@@ -104,6 +104,7 @@ export const GAMEDEV_STUDIO_COPY = {
         "Drag empty space to pan; scroll or pinch to zoom. Shift+click adds or removes a card.",
         "Ctrl/⌘+C, Ctrl/⌘+V and Ctrl/⌘+D copy, paste and duplicate cards, lines included.",
         "Double-click a card or line to edit it. Delete removes the selection; Ctrl/⌘+Z undoes.",
+        "Press / on the board to search for a shape and drop it where the pointer is.",
         "Export the board as PNG, SVG or JSON.",
       ],
     },

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { GitBranch, Plus, Trash2 } from "lucide-react";
 import type { Diagram } from "@/types";
 import { useAssetMenu } from "@/components/AssetContextMenu";
@@ -7,20 +8,24 @@ import { AssetMenuButton, AssetPinButton, PasteButton } from "@/components/Asset
 import { ExamplesBar } from "@/components/ExamplesBar";
 import { HelpButton } from "@/components/HelpButton";
 import { APP } from "@/lib/app-config";
+import type { CanvasTemplate } from "@/lib/canvas-shapes/templates";
+import { TemplatePicker } from "./TemplatePicker";
 
 interface CanvasListProps {
   projectId: string;
   diagrams: Diagram[];
   onOpen(diagram: Diagram): void;
-  onNew(): void;
+  onNew(template: CanvasTemplate): void;
   onDelete(id: string): void;
 }
 
-/** The Canvas start page: every canvas in the project, with new, delete and the examples bar. */
+/** The Canvas start page: every canvas in the project, with new (from a template), delete and the examples bar. */
 export function CanvasList({ projectId, diagrams, onOpen, onNew, onDelete }: CanvasListProps) {
   const { assetTriggerProps, pasteTriggerProps } = useAssetMenu();
+  const [isPicking, setIsPicking] = useState(false);
   return (
     <div className="p-6 md:p-10 max-w-3xl mx-auto">
+      {isPicking && <TemplatePicker onPick={onNew} onClose={() => setIsPicking(false)} />}
       <div className="flex items-center justify-between gap-3 mb-1">
         <h1 className="text-2xl font-bold" style={{ color: "var(--text-primary)" }}>
           Canvas
@@ -29,7 +34,7 @@ export function CanvasList({ projectId, diagrams, onOpen, onNew, onDelete }: Can
           <HelpButton topic="diagrams" />
           <PasteButton type="diagram" />
           <button
-            onClick={onNew}
+            onClick={() => setIsPicking(true)}
             className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium shrink-0"
             style={{ background: "var(--accent)", color: "white" }}
           >
@@ -53,7 +58,7 @@ export function CanvasList({ projectId, diagrams, onOpen, onNew, onDelete }: Can
           </p>
           <div className="flex justify-center gap-2">
             <button
-              onClick={onNew}
+              onClick={() => setIsPicking(true)}
               className="px-4 py-2 rounded-lg text-sm font-medium"
               style={{ background: "var(--accent)", color: "white" }}
             >

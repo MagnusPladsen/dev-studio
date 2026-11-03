@@ -19,6 +19,8 @@ import { ASSET_KINDS, getAsset } from "@/lib/assets";
 import { linkCardSize, linkPreview, linkUrl, nodeAsset, type NodeType } from "@/lib/diagrams/cards";
 import { getShape } from "@/lib/canvas-shapes";
 import { createNode, insertNode } from "@/lib/canvas-shapes/create";
+import { SHAPE_DRAG_TYPE } from "@/lib/canvas-shapes/library";
+import type { CanvasTemplate } from "@/lib/canvas-shapes/templates";
 import { imageUrlFor, normalizeUrl } from "@/lib/diagrams/embeds";
 import { boundsOf, idsInside, stackColumn, type Point, type Rect } from "@/lib/diagrams/geometry";
 import {
@@ -43,6 +45,9 @@ import { MultiSelectionPanel, SelectionPanel } from "@/components/diagrams/Selec
 import { CanvasList } from "@/components/diagrams/CanvasList";
 import { CanvasToolbar } from "@/components/diagrams/CanvasToolbar";
 import { BoardHints } from "@/components/diagrams/BoardHints";
+import { ShapeLibrary, ShapeLibraryToggle, isPhoneLayout, useShapeLibraryOpen } from "@/components/diagrams/ShapeLibrary";
+import { QuickAdd } from "@/components/diagrams/QuickAdd";
+import { SelectionContextBar } from "@/components/diagrams/SelectionContextBar";
 import type { BoardTool } from "@/components/diagrams/ToolPicker";
 
 type Interaction =
@@ -80,6 +85,7 @@ export default function DiagramsPage() {
   const projectId = params.projectId as string;
   const { showToast } = useToast();
 
+  const rootRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -98,7 +104,10 @@ export default function DiagramsPage() {
   const [editingEdgeId, setEditingEdgeId] = useState<string | null>(null);
   const [measured, setMeasured] = useState<Record<string, number>>({});
   const [loadingPreviews, setLoadingPreviews] = useState<ReadonlySet<string>>(new Set());
-  const [assetPicker, setAssetPicker] = useState<{ replaceId: string | null } | null>(null);
+  const [assetPicker, setAssetPicker] = useState<{ replaceId: string | null; at?: Point } | null>(null);
+  const [isLibraryOpen, setIsLibraryOpen] = useShapeLibraryOpen();
+  /** Where a "/" quick-add will place its shape, while the search is open. */
+  const [quickAddAt, setQuickAddAt] = useState<Point | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [selectionBox, setSelectionBox] = useState<Rect | null>(null);
   const [penDraft, setPenDraft] = useState<Point[] | null>(null);
@@ -109,6 +118,8 @@ export default function DiagramsPage() {
   const lastTap = useRef({ key: "", time: 0 });
   const imageTarget = useRef<{ replaceId: string | null; at: Point | null }>({ replaceId: null, at: null });
   const pasteCount = useRef(0);
+  /** The pointer's last screen position over the board, for placing quick-add shapes under it. */
+  const hoverPoint = useRef<Point | null>(null);
 
   const { openAssetMenu } = useAssetMenu();
   const pressedNode = useRef<{ node: DiagramNode; asset: AssetRef } | null>(null);
@@ -279,12 +290,28 @@ export default function DiagramsPage() {
     return node;
   }
 
-  function addFromMenu(type: NodeType) {
+  /** Adds a card from the Add menu, the library or quick-add: at `at`, or in the middle of the view. */
+  function addShape(type: NodeType, at?: Point) {
     const { placement } = getShape(type);
-    if (placement === "pick-image") return pickImage(null);
-    if (placement === "pick-asset") return setAssetPicker({ replaceId: null });
-    const node = addNode(type);
+    if (placement === "pick-image") return pickImage(null, at);
+    if (placement === "pick-asset") return setAssetPicker({ replaceId: null, at });
+    const node = addNode(type, at);
     if (placement === "edit") setEditingNodeId(node.id);
+  }
+
+  function addFromLibrary(type: NodeType) {
+    if (isPhoneLayout()) setIsLibraryOpen(false);
+    addShape(type);
+  }
+
+  function openQuickAdd() {
+    const pointer = hoverPoint.current;
+    setQuickAddAt(pointer ? toBoard(pointer.x, pointer.y) : viewportCenter());
+  }
+
+  function closeQuickAdd() {
+    setQuickAddAt(null);
+    rootRef.current?.focus({ preventScroll: true });
   }
 
   async function addImages(files: File[], at: Point) {
@@ -343,9 +370,10 @@ export default function DiagramsPage() {
   function pickAsset(ref: AssetRef) {
     const name = getAsset(projectId, ref.type, ref.id)?.name ?? ASSET_KINDS[ref.type].label;
     const replaceId = assetPicker?.replaceId;
+    const at = assetPicker?.at;
     setAssetPicker(null);
     if (replaceId) updateNode(replaceId, { label: name, data: { asset: ref } });
-    else addNode("asset", undefined, { label: name, data: { asset: ref } });
+    else addNode("asset", at, { label: name, data: { asset: ref } });
   }
 
   function selectNodes(ids: string[]) {
@@ -626,6 +654,7 @@ export default function DiagramsPage() {
   }
 
   function handlePointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    hoverPoint.current = { x: e.clientX, y: e.clientY };
     if (pointers.current.has(e.pointerId)) pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     longPress.move({ x: e.clientX, y: e.clientY });
     const point = toBoard(e.clientX, e.clientY);
@@ -686,6 +715,10 @@ export default function DiagramsPage() {
     if (editingNodeId || editingEdgeId) return;
     if (isTextField(e.target)) return;
     if (handleShortcut(e)) return;
+    if (e.key === "/" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      e.preventDefault();
+      return openQuickAdd();
+    }
     if (e.key === "Delete" || e.key === "Backspace") deleteSelection();
     if (e.key === "Escape") {
       changeTool("select");
@@ -711,6 +744,8 @@ export default function DiagramsPage() {
   function handleDrop(e: React.DragEvent<HTMLDivElement>) {
     // Always swallow the drop, so a dropped PDF or other file never navigates away from the board.
     e.preventDefault();
+    const shapeType = e.dataTransfer.getData(SHAPE_DRAG_TYPE);
+    if (shapeType) return addShape(getShape(shapeType).type, toBoard(e.clientX, e.clientY));
     const files = imageFilesFrom(e.dataTransfer);
     const text = e.dataTransfer.getData("text/uri-list") || e.dataTransfer.getData("text/plain");
     if (!files.length && !text) return;
@@ -729,13 +764,12 @@ export default function DiagramsPage() {
     resetView();
   }
 
-  function newDiagram() {
+  function newDiagram(template: CanvasTemplate) {
     const d: Diagram = {
       id: uuid(),
       projectId,
-      name: "Untitled canvas",
-      nodes: [],
-      edges: [],
+      name: template.id === "blank" ? "Untitled canvas" : template.name,
+      ...template.build(uuid),
       tags: [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -743,6 +777,8 @@ export default function DiagramsPage() {
     storage.save("diagrams", d, projectId);
     setDiagrams(storage.getAll("diagrams", projectId));
     loadDiagram(d);
+    // Once the board has mounted, frame the template's cards so they fit on small screens too.
+    if (d.nodes.length) requestAnimationFrame(() => fitTo(boundsOf(d.nodes)));
   }
 
   function deleteDiagram(id: string) {
@@ -786,6 +822,8 @@ export default function DiagramsPage() {
   };
   const isBack = (node: DiagramNode) => getShape(node.type).layer === "back";
   const groups = current?.nodes.filter(isBack) ?? [];
+  const showContextBar = selectedNodes.length > 0 && !editingNodeId && !isInteracting && !selectionBox && (mode === "select" || mode === "area");
+  const contextBounds = showContextBar ? boundsOf(selectedNodes.map(rectOf)) : null;
   const cards = current?.nodes.filter((n) => !isBack(n)) ?? [];
   const renderCard = (node: DiagramNode) => (
     <DiagramCard
@@ -806,7 +844,7 @@ export default function DiagramsPage() {
 
   // --- Editor view ---
   return (
-    <div className="flex flex-col h-full" onKeyDown={handleKeyDown} tabIndex={0}>
+    <div ref={rootRef} className="flex flex-col h-full" onKeyDown={handleKeyDown} tabIndex={0}>
       <CanvasToolbar
         projectId={projectId}
         diagram={current}
@@ -818,7 +856,7 @@ export default function DiagramsPage() {
         onBack={() => { autosave.flush(); setShowList(true); }}
         onRename={(name) => updateCurrent((d) => ({ ...d, name }))}
         onTool={changeTool}
-        onAdd={addFromMenu}
+        onAdd={(type) => addShape(type)}
         onToggleEdgeType={toggleEdgeType}
         onZoomIn={() => zoomBy(1.2)}
         onZoomOut={() => zoomBy(1 / 1.2)}
@@ -828,89 +866,120 @@ export default function DiagramsPage() {
         onExportJson={() => current && exportJson(current)}
       />
 
-      {/* Board */}
-      <div
-        ref={viewportRef}
-        className="flex-1 relative overflow-hidden select-none outline-none"
-        style={{
-          cursor: mode === "connect" || mode === "draw" ? "crosshair" : isInteracting ? "grabbing" : "default",
-          touchAction: "none",
-          background: "var(--bg-primary)",
-          backgroundImage: "linear-gradient(#1a1a28 1px, transparent 1px), linear-gradient(90deg, #1a1a28 1px, transparent 1px)",
-          backgroundSize: `${GRID * zoom}px ${GRID * zoom}px`,
-          backgroundPosition: `${pan.x}px ${pan.y}px`,
-        }}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerEnd}
-        onPointerCancel={handlePointerEnd}
-        onContextMenu={openNodeMenu}
-        onDragOver={(e) => e.preventDefault()}
-        onDrop={handleDrop}
-      >
-        <div className="absolute left-0 top-0" style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: "0 0" }}>
-          {groups.map(renderCard)}
-          {current && (
-            <EdgeLayer
-              nodes={current.nodes}
-              edges={current.edges}
-              rectOf={rectOf}
-              selectedEdgeId={selectedEdgeId}
-              editingEdgeId={editingEdgeId}
-              draft={connectDraft}
-              onLabelCommit={(edgeId, label) => {
-                updateCurrent((d) => ({ ...d, edges: d.edges.map((edge) => (edge.id === edgeId ? { ...edge, label } : edge)) }));
-                setEditingEdgeId(null);
-              }}
-              onLabelCancel={() => setEditingEdgeId(null)}
-            />
-          )}
-          {cards.map(renderCard)}
-          {penDraft && (
-            <svg className="absolute left-0 top-0 overflow-visible pointer-events-none" width="1" height="1" aria-hidden>
-              <path d={smoothPath(penDraft)} fill="none" stroke={getShape("drawing").color} strokeWidth={DRAWING_STROKE} strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          )}
-          {selectionBox && (
-            <div
-              className="absolute pointer-events-none rounded-sm"
-              style={{
-                left: selectionBox.x,
-                top: selectionBox.y,
-                width: selectionBox.width,
-                height: selectionBox.height,
-                border: `${1 / zoom}px solid var(--accent)`,
-                background: "color-mix(in srgb, var(--accent) 10%, transparent)",
-              }}
-            />
-          )}
-        </div>
+      <div className="flex-1 flex min-h-0">
+        {isLibraryOpen && <ShapeLibrary onPick={addFromLibrary} onClose={() => setIsLibraryOpen(false)} />}
+        {/* Board */}
+        <div
+          ref={viewportRef}
+          className="flex-1 min-w-0 relative overflow-hidden select-none outline-none"
+          style={{
+            cursor: mode === "connect" || mode === "draw" ? "crosshair" : isInteracting ? "grabbing" : "default",
+            touchAction: "none",
+            background: "var(--bg-primary)",
+            backgroundImage: "linear-gradient(#1a1a28 1px, transparent 1px), linear-gradient(90deg, #1a1a28 1px, transparent 1px)",
+            backgroundSize: `${GRID * zoom}px ${GRID * zoom}px`,
+            backgroundPosition: `${pan.x}px ${pan.y}px`,
+          }}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerEnd}
+          onPointerCancel={handlePointerEnd}
+          onPointerLeave={() => { hoverPoint.current = null; }}
+          onContextMenu={openNodeMenu}
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={handleDrop}
+        >
+          <div className="absolute left-0 top-0" style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: "0 0" }}>
+            {groups.map(renderCard)}
+            {current && (
+              <EdgeLayer
+                nodes={current.nodes}
+                edges={current.edges}
+                rectOf={rectOf}
+                selectedEdgeId={selectedEdgeId}
+                editingEdgeId={editingEdgeId}
+                draft={connectDraft}
+                onLabelCommit={(edgeId, label) => {
+                  updateCurrent((d) => ({ ...d, edges: d.edges.map((edge) => (edge.id === edgeId ? { ...edge, label } : edge)) }));
+                  setEditingEdgeId(null);
+                }}
+                onLabelCancel={() => setEditingEdgeId(null)}
+              />
+            )}
+            {cards.map(renderCard)}
+            {penDraft && (
+              <svg className="absolute left-0 top-0 overflow-visible pointer-events-none" width="1" height="1" aria-hidden>
+                <path d={smoothPath(penDraft)} fill="none" stroke={getShape("drawing").color} strokeWidth={DRAWING_STROKE} strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            )}
+            {selectionBox && (
+              <div
+                className="absolute pointer-events-none rounded-sm"
+                style={{
+                  left: selectionBox.x,
+                  top: selectionBox.y,
+                  width: selectionBox.width,
+                  height: selectionBox.height,
+                  border: `${1 / zoom}px solid var(--accent)`,
+                  background: "color-mix(in srgb, var(--accent) 10%, transparent)",
+                }}
+              />
+            )}
+          </div>
 
-        {selectedNode && !editingNodeId && (
-          <SelectionPanel
-            node={selectedNode}
-            projectId={projectId}
-            {...arrangeHandlers}
-            onColor={(color) => updateNode(selectedNode.id, { color })}
-            onLinkAsset={(value) => setNodeAsset(selectedNode.id, value)}
-            onStack={() => stackGroup(selectedNode.id)}
-            onEdit={() => startEditing(selectedNode.id)}
-            onReplaceImage={() => pickImage(selectedNode.id)}
-            onChangeAsset={() => setAssetPicker({ replaceId: selectedNode.id })}
-            onDelete={deleteSelection}
+          {selectedNode && !editingNodeId && (
+            <SelectionPanel
+              node={selectedNode}
+              projectId={projectId}
+              {...arrangeHandlers}
+              onColor={(color) => updateNode(selectedNode.id, { color })}
+              onLinkAsset={(value) => setNodeAsset(selectedNode.id, value)}
+              onStack={() => stackGroup(selectedNode.id)}
+              onEdit={() => startEditing(selectedNode.id)}
+              onReplaceImage={() => pickImage(selectedNode.id)}
+              onChangeAsset={() => setAssetPicker({ replaceId: selectedNode.id })}
+              onDelete={deleteSelection}
+            />
+          )}
+          {selectedNodes.length > 1 && !editingNodeId && (
+            <MultiSelectionPanel nodes={selectedNodes} {...arrangeHandlers} onColor={recolorSelection} onDelete={deleteSelection} />
+          )}
+
+          <BoardHints
+            isEmpty={Boolean(current && current.nodes.length === 0)}
+            tool={mode}
+            hasSelection={selectedIds.length > 0}
+            isConnecting={Boolean(connectFrom)}
+            zoom={zoom}
           />
-        )}
-        {selectedNodes.length > 1 && !editingNodeId && (
-          <MultiSelectionPanel nodes={selectedNodes} {...arrangeHandlers} onColor={recolorSelection} onDelete={deleteSelection} />
-        )}
 
-        <BoardHints
-          isEmpty={Boolean(current && current.nodes.length === 0)}
-          tool={mode}
-          hasSelection={selectedIds.length > 0}
-          isConnecting={Boolean(connectFrom)}
-          zoom={zoom}
-        />
+          {contextBounds && (
+            <SelectionContextBar
+              bounds={contextBounds}
+              pan={pan}
+              zoom={zoom}
+              canConnect={Boolean(selectedNodeId)}
+              onDuplicate={duplicateSelection}
+              onConnect={() => {
+                changeTool("connect");
+                setConnectFrom(selectedNodeId);
+              }}
+              onBringToFront={() => arrangeSelection("front")}
+              onDelete={deleteSelection}
+            />
+          )}
+          {quickAddAt && (
+            <QuickAdd
+              onPick={(type) => {
+                const at = quickAddAt;
+                closeQuickAdd();
+                addShape(type, at);
+              }}
+              onClose={closeQuickAdd}
+            />
+          )}
+          {!isLibraryOpen && <ShapeLibraryToggle onOpen={() => setIsLibraryOpen(true)} />}
+        </div>
       </div>
 
       <input

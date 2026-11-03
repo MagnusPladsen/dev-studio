@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, Plus } from "lucide-react";
-import { shapesInSection, type LibrarySection, type ShapeDefinition } from "@/lib/canvas-shapes";
+import type { LibrarySection, ShapeDefinition } from "@/lib/canvas-shapes";
+import { shapesInSection } from "@/lib/canvas-shapes/library";
 import type { NodeType } from "@/lib/diagrams/cards";
 
 const SECTIONS: { section: LibrarySection; title: string }[] = [

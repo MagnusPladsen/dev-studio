@@ -5,7 +5,7 @@ import type { ShapeOutline } from "@/lib/diagrams/shapes";
 import { BASIC_SHAPES } from "./basic-shapes";
 import { BOARD_CARDS } from "./board-cards";
 import { FLOW_SHAPES } from "./flow-shapes";
-import type { LibrarySection, ShapeDefinition } from "./types";
+import type { ShapeDefinition } from "./types";
 
 export type { BodyKind, LibrarySection, Placement, ShapeDefinition } from "./types";
 
@@ -33,8 +33,4 @@ export function shapeColor(node: DiagramNode): string {
 export function outlineOf(type: NodeType, r: Rect): ShapeOutline {
   const outline = getShape(type).outline;
   return outline ? outline(r) : { kind: "rect", ...r, radius: 4 };
-}
-
-export function shapesInSection(section: LibrarySection): ShapeDefinition[] {
-  return SHAPE_LIST.filter((shape) => shape.library?.section === section);
 }

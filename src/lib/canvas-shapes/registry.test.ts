@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { DiagramNode } from "@/types";
 import type { NodeType } from "@/lib/diagrams/cards";
-import { getShape, outlineOf, shapeColor, SHAPE_LIST, SHAPES, shapesInSection } from "./index";
+import { getShape, outlineOf, shapeColor, SHAPE_LIST, SHAPES } from "./index";
+import { shapesInSection } from "./library";
 import { createNode, insertNode } from "./create";
 
 /** Sizes saved canvases were made with; changing one would move cards on boards people already have. */

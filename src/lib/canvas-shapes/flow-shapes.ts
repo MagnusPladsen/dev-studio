@@ -49,7 +49,7 @@ export const FLOW_SHAPES = [
     size: FLOW_SIZE,
     shapeStyle: "flow",
     outline: hexagonOutline,
-    library: { section: "flow", keywords: ["trigger", "signal", "start", "input"] },
+    library: { section: "flow", keywords: ["trigger", "signal", "start", "input", "hexagon"] },
   }),
   defineOutlineShape({
     type: "custom",
