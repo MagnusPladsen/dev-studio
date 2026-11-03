@@ -57,6 +57,9 @@ tools comes from `COPY.help`. `npm test` checks both objects have the same keys 
 - **Shared editor pieces**: `useAutosave` + `SaveIndicator`, `ExportMenu`, `ExamplesBar`, `useHistory` +
   `UndoRedoButtons` (Ctrl/⌘+Z, Ctrl/⌘+Shift+Z, Ctrl+Y; text fields keep native undo), `VolumeControl`,
   `src/lib/pixels.ts` (decoded image cache), `src/lib/gif.ts` (GIF89a encoder).
+- **Import**: `src/lib/import/` (contract + how to add one in its `README.md`). One file per `Importer` (`parse` →
+  items with fresh ids + warnings) listed in the tool's array (`CANVAS_IMPORTERS`…); `useImport` + `<ImportMenu>`
+  (right before `ExportMenu`) + `<ImportDropZone>`; `jsonReimporter` re-imports a tool's own JSON export.
 
 ## Conventions (agreed with the owner)
 

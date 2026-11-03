@@ -35,6 +35,11 @@ import { useAssetMenu } from "@/components/AssetContextMenu";
 import { MarkdownPreview, toggleChecklistLine, type RenderCtx, type WikiTarget } from "@/components/MarkdownPreview";
 import { AssetMenuButton, AssetPinButton, PasteButton } from "@/components/AssetMenuButton";
 import { COPY } from "@/copy";
+import { ImportMenu } from "@/components/ImportMenu";
+import { ImportDropZone } from "@/components/ImportDropZone";
+import { useImport } from "@/hooks/useImport";
+import { importAsNewAssets } from "@/lib/import";
+import { NOTEBOOK_IMPORTERS } from "@/lib/import/notebook";
 
 const ACCENT = "#a3e635";
 const SAVE_DELAY = 600;
@@ -219,6 +224,20 @@ export default function NotebookPage() {
     },
     [flush, projectId]
   );
+
+  const rootRef = useRef<HTMLDivElement>(null);
+  const imports = useImport<Note>({
+    importers: NOTEBOOK_IMPORTERS,
+    noun: ["note", "notes"],
+    history,
+    openId: draft?.id ?? null,
+    apply: ({ items }) =>
+      importAsNewAssets("notes", projectId, items, {
+        previousId: draft?.id ?? null,
+        open: (note) => select(note.id),
+        back: (previous) => select(previous?.id ?? null),
+      }),
+  });
 
   useOpenParam((id) => select(id));
   useTrackOpenAsset(draft?.id ? { type: "note", id: draft?.id } : null);
@@ -410,7 +429,8 @@ export default function NotebookPage() {
 
   // ── render ──
   return (
-    <div className="flex h-full overflow-hidden" style={{ background: "var(--bg-primary)" }}>
+    <div ref={rootRef} className="flex h-full overflow-hidden" style={{ background: "var(--bg-primary)" }}>
+      <ImportDropZone imports={imports} target={rootRef} />
       {/* Note list */}
       <aside
         className={`${draft ? "hidden md:flex" : "flex"} w-full md:w-72 shrink-0 flex-col border-r`}
@@ -481,6 +501,7 @@ export default function NotebookPage() {
                 </div>
               )}
             </div>
+            <ImportMenu imports={imports} />
             <PasteButton type="note" />
           </div>
         </div>
@@ -597,7 +618,7 @@ export default function NotebookPage() {
                   style={{ color: "var(--text-primary)" }}
                 />
                 <SaveIndicator state={saveState === "saving" ? "saving" : "saved"} className="hidden sm:inline-flex shrink-0" />
-                <UndoRedoButtons history={history} />
+                <UndoRedoButtons history={imports.history} />
                 <button
                   onClick={() => update({ pinned: !draft.pinned })}
                   className="p-1.5 rounded-md"

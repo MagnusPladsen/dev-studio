@@ -1,0 +1,4 @@
+ID,Team,Title,Description,Status,Estimate,Priority,Labels,Cycle Name,Due Date,Archived
+TID-4,Tidepool,Streak counter resets at midnight UTC,Should use the device time zone.,In Progress,2,Urgent,"Bug, Mobile",Cycle 7,2026-04-02,
+TID-5,Tidepool,Weekly summary email,,Todo,3,No priority,Feature,,,
+TID-2,Tidepool,Old onboarding copy,,Canceled,,Low,,Cycle 6,,2026-02-11T09:12:00.000Z

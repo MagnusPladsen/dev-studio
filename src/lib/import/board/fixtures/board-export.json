@@ -1,0 +1,25 @@
+{
+  "board": {
+    "id": "b-old",
+    "projectId": "p-old",
+    "name": "Task Board",
+    "keyPrefix": "OLD",
+    "nextNumber": 4,
+    "columns": [
+      { "id": "todo", "name": "To Do", "color": "#94a3b8", "category": "todo" },
+      { "id": "blocked", "name": "Blocked", "color": "#f472b6", "category": "doing" },
+      { "id": "done", "name": "Done", "color": "#34d399", "category": "done" }
+    ],
+    "sprints": [
+      { "id": "s1", "name": "Sprint 1", "state": "closed", "closedAt": "2026-01-20T10:00:00.000Z" },
+      { "id": "s2", "name": "Sprint 2", "goal": "Playable menu", "state": "active" }
+    ],
+    "createdAt": "2026-01-01T00:00:00.000Z",
+    "updatedAt": "2026-01-01T00:00:00.000Z"
+  },
+  "issues": [
+    { "id": "i3", "projectId": "p-old", "key": "OLD-3", "title": "Menu music loops badly", "description": "", "type": "bug", "priority": "high", "status": "blocked", "sprintId": "s2", "labels": ["audio"], "order": 1000, "tags": [], "createdAt": "2026-01-02T00:00:00.000Z", "updatedAt": "2026-01-02T00:00:00.000Z" },
+    { "id": "i1", "projectId": "p-old", "key": "OLD-1", "title": "Main menu layout", "description": "Buttons: play, options, quit.", "type": "feature", "priority": "medium", "status": "done", "sprintId": "s1", "points": 3, "labels": ["ui"], "order": 1000, "archived": true, "tags": [], "createdAt": "2026-01-02T00:00:00.000Z", "updatedAt": "2026-01-02T00:00:00.000Z" },
+    { "id": "i2", "projectId": "p-old", "key": "OLD-2", "title": "Options screen", "description": "", "type": "task", "priority": "low", "status": "todo", "sprintId": null, "dueDate": "2026-03-01", "labels": [], "order": 2000, "tags": [], "createdAt": "2026-01-02T00:00:00.000Z", "updatedAt": "2026-01-02T00:00:00.000Z" }
+  ]
+}

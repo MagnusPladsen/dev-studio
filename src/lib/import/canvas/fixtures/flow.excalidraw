@@ -1,0 +1,27 @@
+{
+  "type": "excalidraw",
+  "version": 2,
+  "source": "https://excalidraw.com",
+  "elements": [
+    { "id": "start", "type": "ellipse", "x": -200, "y": -100, "width": 140, "height": 70, "angle": 0, "strokeColor": "#1e1e1e", "backgroundColor": "#b2f2bb", "boundElements": [{ "id": "start-text", "type": "text" }, { "id": "go", "type": "arrow" }] },
+    { "id": "start-text", "type": "text", "x": -170, "y": -75, "width": 80, "height": 25, "text": "Title screen", "originalText": "Title screen", "containerId": "start" },
+    { "id": "ask", "type": "diamond", "x": 40, "y": -110, "width": 150, "height": 90, "angle": 0.3, "strokeColor": "#1971c2", "backgroundColor": "transparent", "boundElements": [{ "id": "ask-text", "type": "text" }] },
+    { "id": "ask-text", "type": "text", "x": 70, "y": -80, "width": 90, "height": 25, "text": "Has a save?", "originalText": "Has a save?", "containerId": "ask" },
+    { "id": "box", "type": "rectangle", "x": 300, "y": -100, "width": 40, "height": 20, "strokeColor": "#1e1e1e", "backgroundColor": "transparent" },
+    { "id": "go", "type": "arrow", "x": -60, "y": -65, "width": 100, "height": 0, "points": [[0, 0], [100, 0]], "strokeStyle": "solid", "startBinding": { "elementId": "start", "focus": 0, "gap": 1 }, "endBinding": { "elementId": "ask", "focus": 0, "gap": 1 }, "startArrowhead": null, "endArrowhead": "arrow" },
+    { "id": "go-label", "type": "text", "x": -30, "y": -80, "width": 30, "height": 20, "text": "Start", "originalText": "Start", "containerId": "go" },
+    { "id": "back", "type": "arrow", "x": 190, "y": -60, "width": 110, "height": 0, "points": [[0, 0], [110, 0]], "strokeStyle": "dashed", "startBinding": { "elementId": "box", "focus": 0, "gap": 1 }, "endBinding": { "elementId": "ask", "focus": 0, "gap": 1 }, "startArrowhead": null, "endArrowhead": null },
+    { "id": "stray", "type": "arrow", "x": 0, "y": 100, "width": 50, "height": 30, "points": [[0, 0], [25, 10], [50, 30]], "startBinding": null, "endBinding": null, "endArrowhead": "arrow", "strokeColor": "#e03131" },
+    { "id": "note", "type": "text", "x": -200, "y": 60, "width": 120, "height": 25, "text": "Loose note", "originalText": "Loose note", "containerId": null },
+    { "id": "scribble", "type": "freedraw", "x": 100, "y": 120, "width": 40, "height": 20, "points": [[0, 0], [10, 5], [20, 18], [40, 20]], "strokeColor": "#1e1e1e" },
+    { "id": "pic", "type": "image", "x": 300, "y": 50, "width": 120, "height": 60, "fileId": "f1" },
+    { "id": "lost-pic", "type": "image", "x": 300, "y": 150, "width": 120, "height": 60, "fileId": "gone" },
+    { "id": "area", "type": "frame", "x": -220, "y": -130, "width": 600, "height": 360, "name": "Menu flow" },
+    { "id": "web", "type": "embeddable", "x": 500, "y": 0, "width": 200, "height": 100 },
+    { "id": "deleted", "type": "rectangle", "x": 0, "y": 0, "width": 50, "height": 50, "isDeleted": true }
+  ],
+  "appState": { "viewBackgroundColor": "#ffffff" },
+  "files": {
+    "f1": { "mimeType": "image/png", "id": "f1", "dataURL": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==" }
+  }
+}

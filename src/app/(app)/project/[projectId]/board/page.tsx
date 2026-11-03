@@ -34,6 +34,12 @@ import { useOpenParam, useTrackOpenAsset, useStorageVersion } from "@/hooks/useS
 import { useHistory } from "@/hooks/useHistory";
 import { UndoRedoButtons } from "@/components/UndoRedoButtons";
 import { ExportMenu } from "@/components/ExportMenu";
+import { ImportMenu } from "@/components/ImportMenu";
+import { ImportDropZone } from "@/components/ImportDropZone";
+import { useImport } from "@/hooks/useImport";
+import type { ImportResult } from "@/lib/import";
+import { BOARD_IMPORTERS, mergeIntoBoard, type CsvSource, type IssueDraft } from "@/lib/import/board";
+import { CsvImportDialog } from "@/components/board/CsvImportDialog";
 import { HelpButton } from "@/components/HelpButton";
 import { ExamplesBar } from "@/components/ExamplesBar";
 import { SaveIndicator } from "@/components/SaveIndicator";
@@ -112,6 +118,8 @@ export default function TaskBoardPage() {
   const [openId, setOpenId] = useState<string | null>(null);
   const [creating, setCreating] = useState<null | Partial<Issue>>(null);
   const [completing, setCompleting] = useState<Sprint | null>(null);
+  const [csvReview, setCsvReview] = useState<{ source: CsvSource; resolve(result: ImportResult<IssueDraft> | null): void } | null>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
 
   // the project's one board, created on first visit
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -154,6 +162,31 @@ export default function TaskBoardPage() {
     [projectId]
   );
   const history = useHistory(snapshot, restore, board?.id);
+
+  // Imported issues join this board (one per project): CSV files first go through the column-matching step.
+  const imports = useImport<IssueDraft>({
+    importers: BOARD_IMPORTERS,
+    noun: ["issue", "issues"],
+    history,
+    openId: board?.id ?? null,
+    review: async (result) => {
+      const source = result.items[0]?.csv;
+      const reviewed = source ? await new Promise<ImportResult<IssueDraft> | null>((resolve) => setCsvReview({ source, resolve })) : result;
+      setCsvReview(null);
+      const current = storage.getAll("boards", projectId)[0];
+      if (!reviewed || !current) return null;
+      const { warnings } = mergeIntoBoard(current, storage.getAll("issues", projectId), reviewed.items, TYPES);
+      return { items: reviewed.items, warnings: [...reviewed.warnings, ...warnings] };
+    },
+    apply: ({ items }) => {
+      const current = storage.getAll("boards", projectId)[0];
+      if (!current) return;
+      const merged = mergeIntoBoard(current, storage.getAll("issues", projectId), items, TYPES);
+      storage.save("boards", merged.board, projectId);
+      for (const issue of merged.issues) storage.save("issues", issue, projectId);
+      setOpenId(merged.issues[0]?.id ?? null);
+    },
+  });
 
   useOpenParam((id) => {
     if (storage.getById("issues", id, projectId)) setOpenId(id);
@@ -199,10 +232,11 @@ export default function TaskBoardPage() {
   }
 
   return (
-    <div className="relative h-full flex flex-col min-h-0">
+    <div ref={rootRef} className="relative h-full flex flex-col min-h-0">
+      <ImportDropZone imports={imports} target={rootRef} />
       {/* Header */}
       <div className="shrink-0 border-b px-3 md:px-4 py-2 flex flex-wrap items-center gap-2" style={{ borderColor: "var(--border)", background: "var(--bg-secondary)" }}>
-        <UndoRedoButtons history={history} />
+        <UndoRedoButtons history={imports.history} />
         <div className="flex items-center gap-2 mr-1">
           <SquareKanban className="w-4 h-4" style={{ color: "var(--tool-color, var(--accent))" }} />
           <h1 className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
@@ -232,6 +266,7 @@ export default function TaskBoardPage() {
         <div className="ml-auto flex items-center gap-2 flex-wrap">
           <SaveIndicator state="saved" className="hidden sm:inline-flex" />
           <HelpButton topic="board" />
+          <ImportMenu imports={imports} />
           <ExportMenu
             items={[
               { label: "CSV (all issues)", description: "Opens in any spreadsheet", onClick: exportCsv },
@@ -296,6 +331,8 @@ export default function TaskBoardPage() {
           }}
         />
       )}
+
+      {csvReview && <CsvImportDialog source={csvReview.source} onDone={csvReview.resolve} />}
 
       {completing && <CompleteSprintDialog projectId={projectId} board={board} sprint={completing} issues={issues} onClose={() => setCompleting(null)} />}
     </div>

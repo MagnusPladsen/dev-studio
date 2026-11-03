@@ -8,6 +8,8 @@ import { useAssetMenu } from "@/components/AssetContextMenu";
 import { AssetMenuButton, AssetPinButton, PasteButton } from "@/components/AssetMenuButton";
 import { ExamplesBar } from "@/components/ExamplesBar";
 import { HelpButton } from "@/components/HelpButton";
+import { ImportMenu } from "@/components/ImportMenu";
+import type { ImportController } from "@/hooks/useImport";
 import { StatusBadge } from "./StatusBadge";
 
 export type StatusFilter = DecisionStatus | "all";
@@ -23,12 +25,13 @@ interface Props {
   onFilter(filter: StatusFilter): void;
   onOpen(id: string): void;
   onCreate(): void;
+  imports: ImportController;
 }
 
 const inputStyle = { background: "var(--bg-primary)", color: "var(--text-primary)", border: "1px solid var(--border)" };
 
 /** Left column of the Decision log: search, status filter and the numbered records, newest first. */
-export function DecisionList({ projectId, decisions, openId, query, filter, className, onQuery, onFilter, onOpen, onCreate }: Props): React.JSX.Element {
+export function DecisionList({ projectId, decisions, openId, query, filter, className, onQuery, onFilter, onOpen, onCreate, imports }: Props): React.JSX.Element {
   const { pasteTriggerProps } = useAssetMenu();
   const counts = useMemo(() => {
     const byStatus = new Map<StatusFilter, number>([["all", decisions.length]]);
@@ -55,6 +58,10 @@ export function DecisionList({ projectId, decisions, openId, query, filter, clas
             {decisions.length}
           </span>
           <HelpButton topic="decisions" />
+          {/* on desktop the empty editor beside the list has Import */}
+          <div className="md:hidden">
+            <ImportMenu imports={imports} />
+          </div>
         </div>
         <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg" style={inputStyle}>
           <Search className="w-3.5 h-3.5 shrink-0" style={{ color: "var(--text-muted)" }} />

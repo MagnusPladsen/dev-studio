@@ -6,6 +6,10 @@ import { useAutosave } from "@/hooks/useAutosave";
 import { useBoardView, clampZoom } from "@/hooks/useBoardView";
 import { useBoardClipboard } from "@/hooks/useBoardClipboard";
 import { useToast } from "@/components/Toast";
+import { ImportDropZone } from "@/components/ImportDropZone";
+import { useImport } from "@/hooks/useImport";
+import { importAsNewAssets } from "@/lib/import";
+import { CANVAS_IMPORTERS } from "@/lib/import/canvas";
 import { useParams, useRouter } from "next/navigation";
 import { v4 as uuid } from "uuid";
 import { storage } from "@/lib/storage";
@@ -137,6 +141,7 @@ export default function DiagramsPage() {
   const { showToast } = useToast();
 
   const rootRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -230,6 +235,30 @@ export default function DiagramsPage() {
     },
     { resetKey: current?.id, enabled: !isInteracting }
   );
+
+  // An imported canvas opens straight away; undo deletes it and goes back to what was open before.
+  const imports = useImport<Diagram>({
+    importers: CANVAS_IMPORTERS,
+    noun: ["canvas", "canvases"],
+    history,
+    openId: showList ? null : (current?.id ?? null),
+    apply: ({ items }) => {
+      autosave.flush();
+      return importAsNewAssets("diagrams", projectId, items, {
+        previousId: showList ? null : (current?.id ?? null),
+        open: (diagram) => {
+          setDiagrams(storage.getAll("diagrams", projectId));
+          loadDiagram(diagram);
+          if (diagram.nodes.length) requestAnimationFrame(() => fitTo(boundsOf(diagram.nodes)));
+        },
+        back: (previous) => {
+          setDiagrams(storage.getAll("diagrams", projectId));
+          if (previous) loadDiagram(previous);
+          else setShowList(true);
+        },
+      });
+    },
+  });
 
   const flushSave = autosave.flush;
   useEffect(() => {
@@ -1132,7 +1161,12 @@ export default function DiagramsPage() {
 
   // --- List view ---
   if (showList) {
-    return <CanvasList projectId={projectId} diagrams={diagrams} onOpen={loadDiagram} onNew={newDiagram} onDelete={deleteDiagram} />;
+    return (
+      <div ref={listRef} className="min-h-full">
+        <CanvasList projectId={projectId} diagrams={diagrams} onOpen={loadDiagram} onNew={newDiagram} onDelete={deleteDiagram} imports={imports} />
+        <ImportDropZone imports={imports} target={listRef} />
+      </div>
+    );
   }
 
   const selectedNode = current?.nodes.find((n) => n.id === selectedNodeId) ?? null;
@@ -1171,11 +1205,13 @@ export default function DiagramsPage() {
   // --- Editor view ---
   return (
     <div ref={rootRef} className="flex flex-col h-full" onKeyDown={handleKeyDown} tabIndex={0}>
+      <ImportDropZone imports={imports} target={rootRef} />
       <CanvasToolbar
         projectId={projectId}
         diagram={current}
         isSaved={Boolean(current && diagrams.some((d) => d.id === current.id))}
-        history={history}
+        history={imports.history}
+        imports={imports}
         saveState={autosave.state}
         tool={mode}
         hasSelectedEdge={Boolean(selectedEdgeId)}

@@ -40,6 +40,11 @@ import { useAssetMenu } from "@/components/AssetContextMenu";
 import { AssetMenuButton, AssetPinButton, PasteButton } from "@/components/AssetMenuButton";
 import { useToast } from "@/components/Toast";
 import { COPY } from "@/copy";
+import { ImportMenu } from "@/components/ImportMenu";
+import { ImportDropZone } from "@/components/ImportDropZone";
+import { useImport } from "@/hooks/useImport";
+import { importAsNewAssets } from "@/lib/import";
+import { STORY_IMPORTERS } from "@/lib/import/story";
 
 const ENTRY_TYPES = [
   { value: "character" as const, label: COPY.story.entryTypes.character, icon: User, color: "#a78bfa" },
@@ -198,6 +203,22 @@ export default function StoryPage() {
     setSelectedId(id);
     setMobileView("entry");
   }
+
+  const rootRef = useRef<HTMLDivElement>(null);
+  const imports = useImport<StoryEntry>({
+    importers: STORY_IMPORTERS,
+    noun: ["entry", "entries"],
+    history,
+    openId: stored?.id ?? null,
+    apply: ({ items }) => {
+      flushDraft();
+      return importAsNewAssets("stories", projectId, items, {
+        previousId: stored?.id ?? null,
+        open: (entry) => selectEntry(entry.id),
+        back: (previous) => setSelectedId(previous?.id ?? null),
+      });
+    },
+  });
 
   function createEntry(title = newTitle, type: EntryType = newType) {
     if (!title.trim()) return;
@@ -408,7 +429,8 @@ export default function StoryPage() {
   }
 
   return (
-    <div className="flex h-full" style={{ background: "var(--bg-primary)" }}>
+    <div ref={rootRef} className="flex h-full" style={{ background: "var(--bg-primary)" }}>
+      <ImportDropZone imports={imports} target={rootRef} />
       {/* Sidebar */}
       <div
         className={`w-64 max-md:w-full shrink-0 border-r max-md:border-r-0 flex flex-col ${mobileView === "entry" ? "max-md:hidden" : ""}`}
@@ -450,6 +472,7 @@ export default function StoryPage() {
               <Plus className="w-3.5 h-3.5" />
               New entry
             </button>
+            <ImportMenu imports={imports} />
             <PasteButton type="story" />
           </div>
         </div>
@@ -550,7 +573,7 @@ export default function StoryPage() {
               >
                 <ArrowLeft className="w-4 h-4" />
               </button>
-              <UndoRedoButtons history={history} />
+              <UndoRedoButtons history={imports.history} />
               {(() => {
                 const meta = getTypeMeta(selected.type);
                 return (
