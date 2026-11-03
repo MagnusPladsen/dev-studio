@@ -15,6 +15,10 @@ begin
   if caller is null then
     raise exception 'Not signed in';
   end if;
+  -- Tokens issued to OAuth clients (the MCP server) promise "no deletes"; only the app itself may delete an account.
+  if auth.jwt() ->> 'client_id' is not null then
+    raise exception using errcode = '42501', message = 'Accounts can only be deleted from the app';
+  end if;
   delete from public.assets where user_id = caller;
   delete from public.projects where user_id = caller;
   delete from auth.users where id = caller;

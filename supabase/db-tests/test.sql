@@ -183,6 +183,12 @@ begin
   get diagnostics n = row_count;
   assert n = 0, 'OAuth client cannot delete projects';
   assert exists (select 1 from public.assets where id = 'n3'), 'asset still there';
+  begin
+    perform public.delete_own_account();
+    raise exception 'OAuth client deleted the account';
+  exception when insufficient_privilege then null;
+  end;
+  assert exists (select 1 from public.assets where id = 'n3'), 'account data still there';
 end $$;
 
 -- ── back in the browser: deletes work as before ──
