@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { Plus, Trash2, Copy, Palette as PaletteIcon, Check, Paintbrush, Library } from "lucide-react";
+import { Plus, Trash2, Copy, Palette as PaletteIcon, Check, Paintbrush, Library, Globe } from "lucide-react";
 import { storage } from "@/lib/storage";
 import type { Palette } from "@/types";
 import { v4 as uuid } from "uuid";
@@ -13,6 +13,12 @@ import { useHistory } from "@/hooks/useHistory";
 import { useAutosave } from "@/hooks/useAutosave";
 import { UndoRedoButtons } from "@/components/UndoRedoButtons";
 import { ExportMenu } from "@/components/ExportMenu";
+import { ImportDropZone } from "@/components/ImportDropZone";
+import { ImportMenu } from "@/components/ImportMenu";
+import { LospecDialog } from "@/components/palettes/LospecDialog";
+import { useImport } from "@/hooks/useImport";
+import { importAsNewAssets } from "@/lib/import";
+import { lospecJsonImporter, PALETTE_IMPORTERS } from "@/lib/import/palettes";
 import { HelpButton } from "@/components/HelpButton";
 import { SaveIndicator } from "@/components/SaveIndicator";
 import { ExamplesBar } from "@/components/ExamplesBar";
@@ -95,6 +101,8 @@ export default function PalettesPage() {
   const [copied, setCopied] = useState<string | null>(null);
   // phones only: the palette list is a panel you can open and close
   const [mobileList, setMobileList] = useState(true);
+  const [isLospecOpen, setIsLospecOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
 
   const history = useHistory(
     selected,
@@ -137,6 +145,19 @@ export default function PalettesPage() {
     setSelected(p);
     setMobileList(false);
   }
+
+  const imports = useImport<Palette>({
+    importers: PALETTE_IMPORTERS,
+    noun: ["palette", "palettes"],
+    history,
+    openId: selected?.id ?? null,
+    apply: ({ items }) =>
+      importAsNewAssets("palettes", projectId, items, {
+        previousId: selected?.id ?? null,
+        open: select,
+        back: (previous) => (previous ? select(previous) : setSelected(null)),
+      }),
+  });
 
   const defaultName = () => `Palette ${palettes.length + 1}`;
 
@@ -209,7 +230,9 @@ export default function PalettesPage() {
   }
 
   return (
-    <div className="flex max-md:flex-col h-full max-md:h-auto max-md:min-h-full" style={{ background: "var(--bg-primary)" }}>
+    <div ref={rootRef} className="flex max-md:flex-col h-full max-md:h-auto max-md:min-h-full" style={{ background: "var(--bg-primary)" }}>
+      <ImportDropZone imports={imports} target={rootRef} />
+      {isLospecOpen && <LospecDialog onImport={(file) => imports.importFile(file, lospecJsonImporter)} onClose={() => setIsLospecOpen(false)} />}
       {/* Phones: toggle for the palette list */}
       <div className="md:hidden flex items-center gap-2 px-3 py-2 border-b" style={{ borderColor: "var(--border)", background: "var(--bg-secondary)" }}>
         <button
@@ -327,6 +350,15 @@ export default function PalettesPage() {
                 <span>{preset.name}</span>
               </button>
             ))}
+            <button
+              onClick={() => setIsLospecOpen(true)}
+              className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs text-left transition-colors hover:bg-[var(--bg-hover)]"
+              style={{ color: "var(--text-primary)" }}
+              title="Import any palette from lospec.com by its name or link"
+            >
+              <Globe className="w-3.5 h-3.5 shrink-0" style={{ color: "var(--accent)" }} />
+              <span>From Lospec…</span>
+            </button>
           </div>
         </div>
       </div>
@@ -337,7 +369,7 @@ export default function PalettesPage() {
           <div className="max-w-2xl">
             <div className="flex items-center justify-between gap-3 mb-6 flex-wrap">
               <div className="flex items-center gap-3 min-w-0">
-                <UndoRedoButtons history={history} />
+                <UndoRedoButtons history={imports.history} />
                 <input
                   value={selected.name}
                   onChange={(e) => update({ name: e.target.value })}
@@ -360,6 +392,7 @@ export default function PalettesPage() {
                   <Paintbrush className="w-3.5 h-3.5" />
                   Use in Pixel Art
                 </Link>
+                <ImportMenu imports={imports} />
                 <ExportMenu
                   items={[
                     { label: "Text (.txt hex list)", description: "One hex colour per line", onClick: exportText },
@@ -451,6 +484,9 @@ export default function PalettesPage() {
               <Plus className="w-4 h-4" />
               New palette
             </button>
+            <div className="mt-3">
+              <ImportMenu imports={imports} />
+            </div>
           </div>
         )}
       </div>

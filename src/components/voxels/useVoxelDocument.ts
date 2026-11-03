@@ -34,6 +34,8 @@ export interface VoxelDocument {
   saveState: SaveState;
   flush(): void;
   openModel(model: VoxelModel): void;
+  /** Shows no model, e.g. after undoing the import of the only one. */
+  closeModel(): void;
   createModel(doc: VoxelDoc): VoxelModel;
   deleteModel(id: string): void;
   updateDoc(patch: Partial<VoxelDoc>): void;
@@ -101,6 +103,11 @@ export function useVoxelDocument(projectId: string): VoxelDocument {
     setDoc(modelToDoc(model));
   }
 
+  function closeModel(): void {
+    setActiveModelId(null);
+    setDoc(null);
+  }
+
   function createModel(initial: VoxelDoc): VoxelModel {
     const now = new Date().toISOString();
     const model: VoxelModel = { id: uuid(), projectId, ...docFields(initial), tags: [], createdAt: now, updatedAt: now };
@@ -112,14 +119,12 @@ export function useVoxelDocument(projectId: string): VoxelDocument {
   function deleteModel(id: string): void {
     deletedRef.current.add(id);
     storage.delete("models", id, projectId);
-    if (activeModelId !== id) return;
-    setActiveModelId(null);
-    setDoc(null);
+    if (activeModelId === id) closeModel();
   }
 
   function updateDoc(patch: Partial<VoxelDoc>): void {
     setDoc((current) => current && { ...current, ...patch });
   }
 
-  return { activeModelId, doc, history, saveState, flush, openModel, createModel, deleteModel, updateDoc };
+  return { activeModelId, doc, history, saveState, flush, openModel, closeModel, createModel, deleteModel, updateDoc };
 }

@@ -103,3 +103,16 @@ Round-trip test: export with the tool's own code, import, and compare with `diff
 | Task Board | Issues CSV (Jira, Linear, GitHub Projects, Trello presets), Board JSON (merged into the board) |
 | Wiki / Story | Markdown files or folder (Obsidian vault) |
 | Notebook | Markdown files or folder (sub-folders become note folders) |
+| Pixel Art | PNG / JPG / WebP, animated GIF (a dialog first asks: new sprite or layer, shrink, snap to palette) |
+| Sprite Sheets | Sheet image cut on a grid (dialog with live preview), atlas JSON + its PNG |
+| Palettes | GIMP `.gpl`, `.hex` / `.txt` lists (Lospec, Paint.NET), JASC `.pal`, Adobe `.ase`, Lospec JSON (also fetched by name) |
+| 3D Pixel Art | MagicaVoxel `.vox` |
+
+### Images and options
+
+- `image/`: `ImageCodec` (decode a file to pixels, encode pixels as a PNG data URL; tests pass `fakeCodec` from
+  `image/test-images.ts`), size caps in `image/limits.ts`, `readGif` and pixel helpers (crop, fit, palette snap).
+- Importers that need choices first are factories (`pixelArtImporters(options)`, `sheetSliceImporter(grid)`,
+  `atlasImporter(image)`). The tool's array holds default instances for the menu and drops; the page wraps
+  `importFile` to show its dialog, then calls the real `importFile` with the configured importer, so undo and toasts
+  still come from `useImport`.
