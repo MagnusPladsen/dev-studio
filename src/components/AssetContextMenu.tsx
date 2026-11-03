@@ -37,7 +37,7 @@ import { assetHref } from "@/lib/assets";
 import { decideEditorRefresh, editorListFollowsStorage, willOpenParamChange } from "@/lib/editor-refresh";
 import { flushAllAutosaves } from "@/lib/autosave-registry";
 import { downloadBlob } from "@/lib/download";
-import { addLink, getRelated } from "@/lib/links";
+import { addLink, getRelated, refLabel, relatedRef } from "@/lib/links";
 import { createLongPress, type LongPress } from "@/lib/long-press";
 import { getPreviewing, playPreview, stopPreview } from "@/lib/audio/preview";
 import { anchorPoint, contextMenuDecision, shouldUseNativeMenu, type Point } from "@/lib/menu-position";
@@ -74,6 +74,8 @@ export interface PickerRequest {
   title: string;
   types?: AssetType[];
   exclude: AssetRef[];
+  hiddenIds?: string[];
+  allowElements?: boolean;
   createLabel?: string;
   onCreate?(): void;
   onPick(ref: AssetRef): void;
@@ -233,7 +235,7 @@ function created(ref: AssetRef | null): MutationOutcome {
 }
 
 function toastWithOpen(services: MenuServices, message: string, ref: AssetRef): void {
-  services.showToast({ message, action: { label: "Open", href: assetHref(services.projectId, ref.type, ref.id) } });
+  services.showToast({ message, action: { label: "Open", href: assetHref(services.projectId, ref.type, ref.id, ref.elementId) } });
 }
 
 function nameOf(projectId: string, ref: AssetRef): string {
@@ -256,11 +258,12 @@ async function spritePngBlob(sprite: Sprite): Promise<Blob | null> {
   return new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
 }
 
+/** What the asset already links to directly; links of a canvas's own elements don't count, so the canvas can still pick those. */
 function relatedRefs(projectId: string, ref: AssetRef): AssetRef[] {
-  return [ref, ...getRelated(projectId, ref.type, ref.id).map(({ type, id }) => ({ type, id }))];
+  return [ref, ...getRelated(projectId, ref.type, ref.id).filter((related) => !related.viaElementId).map(relatedRef)];
 }
 
-function openLinkPicker(run: ActionRun, title: string, types?: AssetType[]): void {
+function openLinkPicker(run: ActionRun, title: string, types?: AssetType[], allowElements = false): void {
   const { services, context } = run;
   const { projectId } = services;
   services.openPicker(
@@ -268,9 +271,11 @@ function openLinkPicker(run: ActionRun, title: string, types?: AssetType[]): voi
       title,
       types,
       exclude: relatedRefs(projectId, context.ref),
+      hiddenIds: [context.ref.id],
+      allowElements,
       onPick: (picked) => {
         addLink(projectId, context.ref, picked);
-        toastWithOpen(services, `Linked to ${nameOf(projectId, picked)}`, picked);
+        toastWithOpen(services, `Linked to ${refLabel(projectId, picked) ?? nameOf(projectId, picked)}`, picked);
       },
     },
     run.opener,
@@ -393,7 +398,7 @@ const ACTION_HANDLERS: Record<AssetActionId, ActionHandler> = {
   "new-note": pushTo(({ services, context }) => assetHref(services.projectId, "note", createNoteAbout(services.projectId, context.ref).id)),
   "add-to-diagram": openDiagramPicker,
   "create-task": pushTo(({ services, context }) => assetHref(services.projectId, "issue", createTaskFor(services.projectId, context.ref).id)),
-  "link-to-asset": (run) => openLinkPicker(run, "Link to asset"),
+  "link-to-asset": (run) => openLinkPicker(run, "Link to", undefined, true),
   "show-links": pushTo(({ services, context }) => `/project/${services.projectId}/assets?links=${context.ref.type}:${encodeURIComponent(context.ref.id)}`),
   duplicate,
   copy: copyInApp,
@@ -687,6 +692,8 @@ function OpenPicker({ projectId, request, onClose }: { projectId: string; reques
       title={request.title}
       types={request.types}
       exclude={request.exclude}
+      hiddenIds={request.hiddenIds}
+      allowElements={request.allowElements}
       createLabel={request.createLabel}
       onCreate={onCreate ? handleCreate : undefined}
       onPick={handlePick}

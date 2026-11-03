@@ -6,17 +6,35 @@ import { useAutosave } from "@/hooks/useAutosave";
 import { useBoardView, clampZoom } from "@/hooks/useBoardView";
 import { useBoardClipboard } from "@/hooks/useBoardClipboard";
 import { useToast } from "@/components/Toast";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { v4 as uuid } from "uuid";
 import { storage } from "@/lib/storage";
-import type { Diagram, DiagramNode, AssetRef } from "@/types";
-import { useOpenParam, useTrackOpenAsset } from "@/hooks/useStorage";
+import type { AssetRef, AssetRelation, Cardinality, Diagram, DiagramEdge, DiagramNode } from "@/types";
+import { useConsumedParam, useOpenParam, useStorageVersion, useTrackOpenAsset } from "@/hooks/useStorage";
 import { useAssetMenu } from "@/components/AssetContextMenu";
 import { AssetPickerModal } from "@/components/AssetPickerModal";
+import type { ContextMenuEntry } from "@/components/ContextMenu";
 import { createLongPress } from "@/lib/long-press";
 import type { Point as MenuPoint } from "@/lib/menu-position";
-import { ASSET_KINDS, getAsset } from "@/lib/assets";
+import { ASSET_KINDS, assetHref, getAsset } from "@/lib/assets";
 import { linkCardSize, linkPreview, linkUrl, nodeAsset, type NodeType } from "@/lib/diagrams/cards";
+import {
+  addLink as addAssetLink,
+  countElementLinks,
+  getElementLinks,
+  linksTouchingElements,
+  refLabel,
+  relatedKey,
+  relatedLabel,
+  relatedRef,
+  removeElementLinks,
+  removeLink,
+  restoreLinks,
+} from "@/lib/links";
+import { migrateElementAssetLinks } from "@/lib/diagrams/element-links";
+import { elementName } from "@/lib/diagrams/elements";
+import { boardMenuEntries, edgeMenuEntries, elementMenuEntries, type MenuLink } from "@/lib/diagrams/canvas-menu";
+import { GROUP_HEADER } from "@/lib/diagrams/geometry";
 import { newLine, nextCardinality, pruneRowLinks, tableColumns, type LineEnd } from "@/lib/diagrams/tables";
 import { getShape } from "@/lib/canvas-shapes";
 import { createNode, insertNode } from "@/lib/canvas-shapes/create";
@@ -35,7 +53,7 @@ import {
   type Alignment,
   type Axis,
 } from "@/lib/diagrams/arrange";
-import { cloneCards, copyCards, serializeCards, type CopiedCards } from "@/lib/diagrams/clipboard";
+import { cloneCards, copyCards, parseCards, serializeCards, type CopiedCards } from "@/lib/diagrams/clipboard";
 import { drawingData, smoothPath, strokeFromPoints, DRAWING_STROKE, SIMPLIFY_TOLERANCE } from "@/lib/diagrams/freehand";
 import { exportJson, exportPng, exportSvg } from "@/lib/diagrams/export-files";
 import { imageFilesFrom, readImageFile } from "@/lib/diagrams/image-file";
@@ -67,6 +85,31 @@ const GRID = 30;
 const PASTE_OFFSET = 24;
 /** Screen pixels the pen must travel before another point is recorded. */
 const PEN_STEP_PX = 2;
+/** Room left around an element the canvas zooms to from a link. */
+const FOCUS_MARGIN = 120;
+/** Space a new group leaves around the cards it wraps. */
+const GROUP_PADDING = 24;
+
+/** What a right-click or long-press landed on. */
+type MenuTarget = { kind: "node"; id: string } | { kind: "edge"; id: string } | { kind: "board" };
+
+function isMacPlatform(): boolean {
+  return /Mac|iPhone|iPad/.test(navigator.platform);
+}
+
+/** The element or line under a pointer; null on a control inside a card, a handle or a text field, which keep their own behaviour. */
+function menuTargetAt(target: EventTarget | null): MenuTarget | null {
+  if (isTextField(target) || closestData(target, "data-card-control") !== null) return null;
+  if (closestData(target, "data-resize-handle") !== null || closestData(target, "data-connect-handle") !== null) return null;
+  const nodeId = closestData(target, "data-node-id");
+  if (nodeId) return { kind: "node", id: nodeId };
+  const edgeId = closestData(target, "data-edge-id");
+  return edgeId ? { kind: "edge", id: edgeId } : { kind: "board" };
+}
+
+function padRect(rect: Rect, margin: number): Rect {
+  return { x: rect.x - margin, y: rect.y - margin, width: rect.width + margin * 2, height: rect.height + margin * 2 };
+}
 
 /** A card's height on the board: tables follow their rows, notes and media their measured content. */
 function rectHeight(node: DiagramNode, measured: Record<string, number>): number {
@@ -131,14 +174,21 @@ export default function DiagramsPage() {
   /** The pointer's last screen position over the board, for placing quick-add shapes under it. */
   const hoverPoint = useRef<Point | null>(null);
 
-  const { openAssetMenu } = useAssetMenu();
-  const pressedNode = useRef<{ node: DiagramNode; asset: AssetRef } | null>(null);
+  const router = useRouter();
+  const version = useStorageVersion();
+  const { openAssetMenu, openMenu } = useAssetMenu();
+  const pressedTarget = useRef<MenuTarget | null>(null);
   const hasPressFired = useRef(false);
+  /** The cards last copied or cut on this board, so the menus know there is something to paste. */
+  const copiedCards = useRef<string | null>(null);
+  const [linkPickerFor, setLinkPickerFor] = useState<string | null>(null);
+  /** An element a link asked to show (`?element=`), waiting for its canvas to open. */
+  const [pendingFocus, setPendingFocus] = useState<{ diagramId: string | null; elementId: string } | null>(null);
   const fireLongPress = useRef<(point: MenuPoint) => void>(() => {});
   const [longPress] = useState(() => createLongPress((point) => fireLongPress.current(point)));
   useEffect(() => {
     fireLongPress.current = (point) => {
-      const pressed = pressedNode.current;
+      const pressed = pressedTarget.current;
       if (!pressed) return;
       hasPressFired.current = true;
       lastTap.current = { key: "", time: 0 };
@@ -146,7 +196,7 @@ export default function DiagramsPage() {
       if (drag?.kind === "drag") restorePositions(drag.origins);
       interaction.current = null;
       setIsInteracting(false);
-      openAssetMenu(point, pressed.asset, null);
+      openMenuFor(pressed, point);
     };
   });
   useEffect(() => () => longPress.cancel(), [longPress]);
@@ -194,6 +244,7 @@ export default function DiagramsPage() {
   }, [flushSave]);
 
   useEffect(() => {
+    migrateElementAssetLinks(projectId);
     const all = storage.getAll("diagrams", projectId);
     setDiagrams(all);
     if (all.length > 0) {
@@ -208,6 +259,47 @@ export default function DiagramsPage() {
     if (d) loadDiagram(d);
   }, loaded);
   useTrackOpenAsset(current?.id ? { type: "diagram", id: current?.id } : null);
+  useConsumedParam("element", (elementId) => setPendingFocus({ diagramId: new URLSearchParams(window.location.search).get("open"), elementId }));
+
+  // Once the linked element's canvas is on screen, select the element and bring it into view.
+  useEffect(() => {
+    if (!pendingFocus || !current || showList || (pendingFocus.diagramId && pendingFocus.diagramId !== current.id)) return;
+    const node = current.nodes.find((n) => n.id === pendingFocus.elementId);
+    const frame = requestAnimationFrame(() => {
+      setPendingFocus(null);
+      if (!node) return showToast({ message: "That element is no longer on this canvas" });
+      selectNodes([node.id]);
+      fitTo(padRect(rectOf(node), FOCUS_MARGIN));
+    });
+    return () => cancelAnimationFrame(frame);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs when the request or the open canvas changes
+  }, [pendingFocus, current?.id, showList]);
+
+  // Taking an element off the board (delete, cut, undo) removes its links; bringing it back (undo, redo) restores them.
+  const elementLinks = useRef<{ diagramId: string; nodeIds: Set<string>; links: Map<string, AssetRelation[]> } | null>(null);
+  useEffect(() => {
+    if (!current) return;
+    const ids = current.nodes.map((n) => n.id);
+    const previous = elementLinks.current?.diagramId === current.id ? elementLinks.current : null;
+    if (previous) {
+      const present = new Set(ids);
+      const gone = [...previous.nodeIds].filter((id) => !present.has(id));
+      if (gone.length) removeElementLinks(projectId, current.id, gone);
+      const revived = ids.filter((id) => !previous.nodeIds.has(id)).flatMap((id) => previous.links.get(id) ?? []);
+      if (revived.length) restoreLinks(projectId, revived, current);
+    }
+    const links = new Map(previous?.links ?? []);
+    const touching = linksTouchingElements(projectId, current.id, ids);
+    for (const id of ids) links.set(id, touching.get(id) ?? []);
+    elementLinks.current = { diagramId: current.id, nodeIds: new Set(ids), links };
+  }, [projectId, current, version]);
+
+  const linkCounts = useMemo(
+    () => (current ? countElementLinks(projectId, current) : new Map<string, number>()),
+    // version: links live in storage, so recount when it changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [projectId, current?.id, current?.nodes, version]
+  );
 
   // --- Geometry ---
   const rectOf = useCallback(
@@ -395,20 +487,28 @@ export default function DiagramsPage() {
     setSelectedEdgeId(null);
   }
 
-  function deleteSelection() {
-    if (!selectedIds.length && !selectedEdgeId) return;
-    const ids = new Set(selectedIds);
+  function deleteNodes(nodeIds: string[], edgeId: string | null = null) {
+    if (!nodeIds.length && !edgeId) return;
+    const ids = new Set(nodeIds);
     updateCurrent((d) => ({
       ...d,
       nodes: d.nodes.filter((n) => !ids.has(n.id)),
-      edges: d.edges.filter((edge) => !ids.has(edge.from) && !ids.has(edge.to) && edge.id !== selectedEdgeId),
+      edges: d.edges.filter((edge) => !ids.has(edge.from) && !ids.has(edge.to) && edge.id !== edgeId),
     }));
     selectNodes([]);
   }
 
-  function recolorSelection(color: string | undefined) {
-    const ids = new Set(selectedIds);
+  function deleteSelection() {
+    deleteNodes(selectedIds, selectedEdgeId);
+  }
+
+  function recolorNodes(nodeIds: string[], color: string | undefined) {
+    const ids = new Set(nodeIds);
     updateCurrent((d) => ({ ...d, nodes: d.nodes.map((n) => (ids.has(n.id) ? { ...n, color } : n)) }));
+  }
+
+  function recolorSelection(color: string | undefined) {
+    recolorNodes(selectedIds, color);
   }
 
   function pasteCards(cards: CopiedCards, offset: number) {
@@ -417,17 +517,85 @@ export default function DiagramsPage() {
     selectNodes(pasted.nodes.map((n) => n.id));
   }
 
+  function duplicateNodes(nodeIds: string[]) {
+    if (current && nodeIds.length) pasteCards(copyCards(current, nodeIds), PASTE_OFFSET);
+  }
+
   function duplicateSelection() {
-    if (current && selectedIds.length) pasteCards(copyCards(current, selectedIds), PASTE_OFFSET);
+    duplicateNodes(selectedIds);
+  }
+
+  function arrangeNodes(nodeIds: string[], direction: "front" | "back") {
+    const reorder = direction === "front" ? bringToFront : sendToBack;
+    updateCurrent((d) => ({ ...d, nodes: reorder(d.nodes, nodeIds) }));
   }
 
   function arrangeSelection(direction: "front" | "back") {
-    const reorder = direction === "front" ? bringToFront : sendToBack;
-    updateCurrent((d) => ({ ...d, nodes: reorder(d.nodes, selectedIds) }));
+    arrangeNodes(selectedIds, direction);
   }
 
-  function selectedRects() {
-    return (current?.nodes ?? []).filter((n) => selectedIds.includes(n.id)).map((n) => ({ id: n.id, ...rectOf(n) }));
+  function rectsOf(nodeIds: string[]) {
+    return (current?.nodes ?? []).filter((n) => nodeIds.includes(n.id)).map((n) => ({ id: n.id, ...rectOf(n) }));
+  }
+
+  /** Copy from a menu: the same marked JSON the keyboard copy writes, so it pastes into any board. */
+  async function copyNodes(nodeIds: string[]): Promise<boolean> {
+    if (!current || !nodeIds.length) return false;
+    const text = serializeCards(copyCards(current, nodeIds));
+    copiedCards.current = text;
+    pasteCount.current = 0;
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      // Clipboard blocked: the board still pastes its own last copy.
+    }
+    return true;
+  }
+
+  async function cutNodes(nodeIds: string[]) {
+    if (await copyNodes(nodeIds)) deleteNodes(nodeIds);
+  }
+
+  async function readClipboardText(): Promise<string> {
+    try {
+      return await navigator.clipboard.readText();
+    } catch {
+      return "";
+    }
+  }
+
+  /** Paste from a menu: cards copied on any board, otherwise text, a link or an image address. */
+  async function pasteFromMenu() {
+    const text = (await readClipboardText()) || copiedCards.current || "";
+    const cards = parseCards(text);
+    if (cards) {
+      pasteCount.current += 1;
+      return pasteCards(cards, PASTE_OFFSET * pasteCount.current);
+    }
+    if (text.trim()) addFromText(text, viewportCenter());
+  }
+
+  /** Wraps cards in a new group sized to hold them, under its header. */
+  function groupNodes(nodeIds: string[]) {
+    const bounds = boundsOf(rectsOf(nodeIds));
+    if (!bounds) return;
+    const group: DiagramNode = {
+      ...createNode("group", viewportCenter(), { id: uuid() }),
+      x: Math.round(bounds.x - GROUP_PADDING),
+      y: Math.round(bounds.y - GROUP_PADDING - GROUP_HEADER),
+      width: Math.round(bounds.width + GROUP_PADDING * 2),
+      height: Math.round(bounds.height + GROUP_PADDING * 2 + GROUP_HEADER),
+    };
+    updateCurrent((d) => ({ ...d, nodes: insertNode(d.nodes, group) }));
+    selectNodes([group.id]);
+  }
+
+  /** Takes the groups out of the selection and leaves the cards that were inside them where they are. */
+  function ungroupNodes(nodeIds: string[]) {
+    const groups = (current?.nodes ?? []).filter((n) => nodeIds.includes(n.id) && getShape(n.type).isContainer);
+    const members = groups.flatMap((group) => membersOf(group, current?.nodes ?? []));
+    deleteNodes(groups.map((g) => g.id));
+    selectNodes(members);
   }
 
   /** Moves nodes to new positions; a moved group takes the cards inside it along. */
@@ -445,12 +613,12 @@ export default function DiagramsPage() {
     updateCurrent((d) => ({ ...d, nodes: d.nodes.map((n) => (moves.has(n.id) ? { ...n, ...moves.get(n.id)! } : n)) }));
   }
 
-  function alignSelection(edge: Alignment) {
-    moveNodesTo(alignRects(selectedRects(), edge));
+  function alignSelection(edge: Alignment, nodeIds = selectedIds) {
+    moveNodesTo(alignRects(rectsOf(nodeIds), edge));
   }
 
-  function distributeSelection(axis: Axis) {
-    moveNodesTo(distributeRects(selectedRects(), axis));
+  function distributeSelection(axis: Axis, nodeIds = selectedIds) {
+    moveNodesTo(distributeRects(rectsOf(nodeIds), axis));
   }
 
   function changeTool(tool: BoardTool) {
@@ -483,18 +651,6 @@ export default function DiagramsPage() {
     return idsInside(rectOf(group), others);
   }
 
-  function setNodeAsset(nodeId: string, value: string) {
-    const node = current?.nodes.find((n) => n.id === nodeId);
-    if (!node) return;
-    const data = { ...(node.data ?? {}) };
-    if (value) {
-      const [type, ...rest] = value.split(":");
-      data.asset = { type, id: rest.join(":") };
-    } else {
-      delete data.asset;
-    }
-    updateNode(nodeId, { data });
-  }
 
   // --- Pointer input ---
   function isDoubleTap(key: string): boolean {
@@ -541,9 +697,6 @@ export default function DiagramsPage() {
     const ids = withGroupMembers(selection, current.nodes);
     const origins = new Map(current.nodes.filter((n) => ids.includes(n.id)).map((n) => [n.id, { x: n.x, y: n.y }]));
     interaction.current = { kind: "drag", start: point, origins, hasMoved: false, releaseTo: selectionOnTap(nodeId, isAdditive) };
-    const asset = nodeAsset(node);
-    pressedNode.current = asset ? { node, asset } : null;
-    if (asset) longPress.down({ x: e.clientX, y: e.clientY, pointerType: e.pointerType });
   }
 
   /** A tap on an already selected card: Shift (or the box tool) takes it out, otherwise it becomes the only one. */
@@ -583,7 +736,8 @@ export default function DiagramsPage() {
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pointers.current.size === 2) return startPinch();
     hasPressFired.current = false;
-    pressedNode.current = null;
+    pressedTarget.current = mode === "draw" || mode === "connect" ? null : menuTargetAt(e.target);
+    if (pressedTarget.current) longPress.down({ x: e.clientX, y: e.clientY, pointerType: e.pointerType });
     if (editingNodeId || editingEdgeId) (document.activeElement as HTMLElement | null)?.blur();
     e.currentTarget.setPointerCapture?.(e.pointerId);
     const point = toBoard(e.clientX, e.clientY);
@@ -712,13 +866,150 @@ export default function DiagramsPage() {
     setIsInteracting(false);
   }
 
-  function openNodeMenu(e: React.MouseEvent<HTMLDivElement>) {
-    const nodeId = closestData(e.target, "data-node-id");
-    const node = nodeId ? current?.nodes.find((n) => n.id === nodeId) : undefined;
-    const asset = node && nodeAsset(node);
-    if (!asset || closestData(e.target, "data-card-control") !== null) return;
+  // --- Menus and element links ---
+  function elementRef(nodeId: string): AssetRef {
+    return { type: "diagram", id: current?.id ?? "", elementId: nodeId };
+  }
+
+  function menuLinks(nodeId: string): MenuLink[] {
+    if (!current) return [];
+    return getElementLinks(projectId, current.id, nodeId).map((related) => ({
+      key: relatedKey(related),
+      label: `${relatedLabel(related)} · ${ASSET_KINDS[related.type].label}`,
+      open: () => router.push(assetHref(projectId, related.type, related.id, related.elementId)),
+      remove: () => removeLink(projectId, elementRef(nodeId), relatedRef(related)),
+    }));
+  }
+
+  /** What "Open" does for a card that stands for something else: the asset it shows, or the web page it links to. */
+  function openTarget(node: DiagramNode): { label: string; open(): void } | null {
+    const asset = getShape(node.type).body === "asset" ? nodeAsset(node) : undefined;
+    if (asset && getAsset(projectId, asset.type, asset.id)) {
+      return { label: `Open ${ASSET_KINDS[asset.type].label.toLowerCase()}`, open: () => router.push(assetHref(projectId, asset.type, asset.id)) };
+    }
+    const url = node.type === "link" ? linkUrl(node) : undefined;
+    return url ? { label: "Open link", open: () => void window.open(url, "_blank", "noopener") } : null;
+  }
+
+  function elementMenu(nodeId: string, anchor: MenuPoint): ContextMenuEntry[] {
+    const ids = selectedIds.includes(nodeId) ? selectedIds : [nodeId];
+    const nodes = (current?.nodes ?? []).filter((n) => ids.includes(n.id));
+    const node = nodes.find((n) => n.id === nodeId)!;
+    const target = openTarget(node);
+    const asset = getShape(node.type).body === "asset" ? nodeAsset(node) : undefined;
+    const assetName = asset ? getAsset(projectId, asset.type, asset.id)?.name ?? null : null;
+    const isGroup = (n: DiagramNode) => getShape(n.type).isContainer;
+    const sharedColor = nodes.every((n) => n.color === node.color) ? node.color : null;
+    const state = {
+      count: nodes.length,
+      links: ids.length === 1 ? menuLinks(nodeId) : [],
+      openLabel: target?.label ?? null,
+      assetName,
+      canEditText: getShape(node.type).canEditText,
+      color: sharedColor ?? undefined,
+      hasGroups: nodes.some(isGroup),
+      canGroup: !nodes.some(isGroup),
+      canPaste: copiedCards.current !== null,
+      isMac: isMacPlatform(),
+    };
+    return elementMenuEntries(state, {
+      linkTo: () => setLinkPickerFor(nodeId),
+      open: () => target?.open(),
+      openAssetMenu: () => asset && openAssetMenu(anchor, { type: asset.type, id: asset.id }, rootRef.current),
+      editText: () => setTimeout(() => startEditing(nodeId)),
+      color: (value) => recolorNodes(ids, value),
+      duplicate: () => duplicateNodes(ids),
+      copy: () => void copyNodes(ids),
+      cut: () => void cutNodes(ids),
+      paste: () => void pasteFromMenu(),
+      bringToFront: () => arrangeNodes(ids, "front"),
+      sendToBack: () => arrangeNodes(ids, "back"),
+      align: (edge) => alignSelection(edge, ids),
+      distribute: (axis) => distributeSelection(axis, ids),
+      group: () => groupNodes(ids),
+      ungroup: () => ungroupNodes(ids),
+      remove: () => deleteNodes(ids),
+    });
+  }
+
+  function updateEdge(edgeId: string, patch: Partial<DiagramEdge>) {
+    updateCurrent((d) => ({ ...d, edges: d.edges.map((edge) => (edge.id === edgeId ? { ...edge, ...patch } : edge)) }));
+  }
+
+  function edgeMenu(edge: DiagramEdge): ContextMenuEntry[] {
+    return edgeMenuEntries(edge, {
+      editLabel: () => setTimeout(() => setEditingEdgeId(edge.id)),
+      lineStyle: (type) => updateEdge(edge.id, { type }),
+      cardinality: (cardinality: Cardinality) => updateEdge(edge.id, { cardinality }),
+      remove: () => deleteNodes([], edge.id),
+    });
+  }
+
+  function boardMenu(anchor: MenuPoint): ContextMenuEntry[] {
+    const at = toBoard(anchor.x, anchor.y);
+    return boardMenuEntries(
+      { canPaste: copiedCards.current !== null, hasElements: Boolean(current?.nodes.length), isMac: isMacPlatform() },
+      {
+        paste: () => void pasteFromMenu(),
+        addShape: () => setQuickAddAt(at),
+        selectAll: () => selectNodes(current?.nodes.map((n) => n.id) ?? []),
+      }
+    );
+  }
+
+  /** Opens the menu of whatever was right-clicked or long-pressed; an element outside the selection becomes the selection. */
+  function openMenuFor(target: MenuTarget, anchor: MenuPoint) {
+    if (!current) return;
+    if (target.kind === "node" && current.nodes.some((n) => n.id === target.id)) {
+      if (!selectedIds.includes(target.id)) selectNodes([target.id]);
+      const node = current.nodes.find((n) => n.id === target.id)!;
+      return openMenu(anchor, elementMenu(target.id, anchor), elementName(node), rootRef.current);
+    }
+    const edge = target.kind === "edge" ? current.edges.find((e) => e.id === target.id) : undefined;
+    if (edge) {
+      setSelectedEdgeId(edge.id);
+      setSelectedIds([]);
+      return openMenu(anchor, edgeMenu(edge), "Line", rootRef.current);
+    }
+    openMenu(anchor, boardMenu(anchor), "Canvas", rootRef.current);
+  }
+
+  function handleContextMenu(e: React.MouseEvent<HTMLDivElement>) {
+    const target = menuTargetAt(e.target);
+    if (!target) return;
     e.preventDefault();
-    if (!hasPressFired.current) openAssetMenu({ x: e.clientX, y: e.clientY }, asset, null);
+    // A touch long-press already opened the menu; the browser's own contextmenu event follows it.
+    if (!hasPressFired.current) openMenuFor(target, { x: e.clientX, y: e.clientY });
+  }
+
+  /** Menu key or Shift+F10: the menu of the selection, the selected line, or the board, at the middle of it. */
+  function openMenuFromKeyboard() {
+    const rect = viewportRef.current?.getBoundingClientRect();
+    if (!rect || !current) return;
+    const toScreen = (p: Point): MenuPoint => ({ x: rect.left + pan.x + p.x * zoom, y: rect.top + pan.y + p.y * zoom });
+    const bounds = selectedIds.length ? boundsOf(rectsOf(selectedIds)) : null;
+    const middle = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+    if (bounds) return openMenuFor({ kind: "node", id: selectedIds[0] }, toScreen({ x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 }));
+    openMenuFor(selectedEdgeId ? { kind: "edge", id: selectedEdgeId } : { kind: "board" }, middle);
+  }
+
+  /** The badge on a linked element: its links, each one click away, and a way to add another. */
+  function openLinksBadge(nodeId: string, badge: HTMLElement) {
+    const node = current?.nodes.find((n) => n.id === nodeId);
+    if (!node) return;
+    const box = badge.getBoundingClientRect();
+    const entries: ContextMenuEntry[] = [
+      ...menuLinks(nodeId).map((link): ContextMenuEntry => ({ kind: "item", key: link.key, label: link.label, onSelect: link.open })),
+      { kind: "separator", key: "separator" },
+      { kind: "item", key: "link-to", label: "Link to…", onSelect: () => setLinkPickerFor(nodeId) },
+    ];
+    openMenu({ x: box.left, y: box.bottom + 4 }, entries, `Links of ${elementName(node)}`, badge);
+  }
+
+  function linkElementTo(nodeId: string, ref: AssetRef) {
+    setLinkPickerFor(null);
+    addAssetLink(projectId, elementRef(nodeId), ref);
+    showToast({ message: `Linked to ${refLabel(projectId, ref) ?? ASSET_KINDS[ref.type].label}` });
   }
 
   function handleShortcut(e: React.KeyboardEvent): boolean {
@@ -734,6 +1025,10 @@ export default function DiagramsPage() {
   function handleKeyDown(e: React.KeyboardEvent) {
     if (editingNodeId || editingEdgeId) return;
     if (isTextField(e.target)) return;
+    if (e.key === "ContextMenu" || (e.key === "F10" && e.shiftKey)) {
+      e.preventDefault();
+      return openMenuFromKeyboard();
+    }
     if (handleShortcut(e)) return;
     if (e.key === "/" && !e.ctrlKey && !e.metaKey && !e.altKey) {
       e.preventDefault();
@@ -750,7 +1045,8 @@ export default function DiagramsPage() {
     copySelection: () => {
       if (!current || !selectedIds.length) return null;
       pasteCount.current = 0;
-      return serializeCards(copyCards(current, selectedIds));
+      copiedCards.current = serializeCards(copyCards(current, selectedIds));
+      return copiedCards.current;
     },
     deleteSelection,
     pasteCards: (cards) => {
@@ -841,6 +1137,7 @@ export default function DiagramsPage() {
 
   const selectedNode = current?.nodes.find((n) => n.id === selectedNodeId) ?? null;
   const selectedNodes = current?.nodes.filter((n) => selectedIds.includes(n.id)) ?? [];
+  const linkPickerNode = linkPickerFor ? current?.nodes.find((n) => n.id === linkPickerFor) : undefined;
   const arrangeHandlers = {
     onDuplicate: duplicateSelection,
     onArrange: arrangeSelection,
@@ -862,6 +1159,8 @@ export default function DiagramsPage() {
       isEditing={node.id === editingNodeId}
       isConnectSource={node.id === connectFrom || node.id === connectDraft?.fromId}
       isLoading={loadingPreviews.has(node.id) && !linkPreview(node).title && Boolean(linkUrl(node))}
+      linkCount={linkCounts.get(node.id) ?? 0}
+      onOpenLinks={openLinksBadge}
       onMeasure={onMeasure}
       onCommit={commitNode}
       onStopEditing={stopEditing}
@@ -914,7 +1213,7 @@ export default function DiagramsPage() {
           onPointerUp={handlePointerEnd}
           onPointerCancel={handlePointerEnd}
           onPointerLeave={() => { hoverPoint.current = null; }}
-          onContextMenu={openNodeMenu}
+          onContextMenu={handleContextMenu}
           onDragOver={(e) => e.preventDefault()}
           onDrop={handleDrop}
         >
@@ -962,7 +1261,7 @@ export default function DiagramsPage() {
               projectId={projectId}
               {...arrangeHandlers}
               onColor={(color) => updateNode(selectedNode.id, { color })}
-              onLinkAsset={(value) => setNodeAsset(selectedNode.id, value)}
+              diagramId={current!.id}
               onStack={() => stackGroup(selectedNode.id)}
               onEdit={() => startEditing(selectedNode.id)}
               onReplaceImage={() => pickImage(selectedNode.id)}
@@ -1029,6 +1328,17 @@ export default function DiagramsPage() {
           exclude={[{ type: "diagram", id: current.id }]}
           onPick={pickAsset}
           onClose={() => setAssetPicker(null)}
+        />
+      )}
+      {linkPickerNode && current && (
+        <AssetPickerModal
+          projectId={projectId}
+          title={`Link ${elementName(linkPickerNode)} to…`}
+          exclude={getElementLinks(projectId, current.id, linkPickerNode.id).map(relatedRef)}
+          hiddenIds={[current.id]}
+          allowElements
+          onPick={(ref) => linkElementTo(linkPickerNode.id, ref)}
+          onClose={() => setLinkPickerFor(null)}
         />
       )}
     </div>

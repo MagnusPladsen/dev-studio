@@ -15,6 +15,8 @@ export type ContextMenuEntry =
       onSelect?: () => void;
       disabled?: boolean;
       hint?: string;
+      /** The keyboard shortcut for the same action, shown at the right, e.g. "⌘D". */
+      shortcut?: string;
       danger?: boolean;
       submenu?: ContextMenuEntry[];
     }
@@ -170,6 +172,11 @@ function MenuPanel({ entries, label, place, isDrillIn, autoFocus, onCloseAll, on
                   </span>
                 )}
               </span>
+              {entry.shortcut && (
+                <kbd className="shrink-0 pl-4 font-sans text-[11px] max-md:hidden" style={{ color: "var(--text-muted)" }}>
+                  {entry.shortcut}
+                </kbd>
+              )}
               {entry.submenu && <ChevronRight className="h-3 w-3 shrink-0" style={{ color: "var(--text-muted)" }} aria-hidden="true" />}
             </button>
             {!isDrillIn && entry.submenu && openKey === entry.key && (

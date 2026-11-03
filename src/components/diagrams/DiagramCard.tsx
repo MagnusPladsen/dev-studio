@@ -1,6 +1,7 @@
 "use client";
 
 import { memo, useEffect, useRef } from "react";
+import { Link2 } from "lucide-react";
 import type { DiagramNode } from "@/types";
 import { getShape, type BodyKind } from "@/lib/canvas-shapes";
 import {
@@ -25,6 +26,9 @@ interface DiagramCardProps {
   isEditing: boolean;
   isConnectSource: boolean;
   isLoading: boolean;
+  /** How many things this element links to; a badge shows the count when there are any. */
+  linkCount: number;
+  onOpenLinks(id: string, badge: HTMLElement): void;
   onMeasure(id: string, height: number): void;
   onCommit(id: string, patch: Partial<DiagramNode>): void;
   onStopEditing(): void;
@@ -42,6 +46,26 @@ const BODIES: Record<BodyKind, (props: BodyProps) => React.ReactNode> = {
   note: NoteBody,
   table: TableBody,
 };
+
+/** The corner chip on a linked element. Only the live board draws it: exports and thumbnails render their own way. */
+function LinkBadge({ count, onOpen }: { count: number; onOpen(badge: HTMLElement): void }) {
+  const label = count === 1 ? "1 link" : `${count} links`;
+  return (
+    <button
+      type="button"
+      data-card-control=""
+      data-link-badge=""
+      onClick={(e) => onOpen(e.currentTarget)}
+      className="absolute -top-2.5 -right-2.5 z-10 flex items-center gap-0.5 h-5 min-w-5 px-1.5 rounded-full text-[10px] font-semibold shadow-sm pointer-events-auto max-md:h-6 max-md:min-w-6 max-md:-top-3 max-md:-right-3"
+      style={{ background: "var(--accent)", color: "var(--on-accent)", border: "1.5px solid var(--bg-primary)" }}
+      title={`${label}: show them`}
+      aria-label={`Show ${label}`}
+    >
+      <Link2 className="w-3 h-3" aria-hidden="true" />
+      {count}
+    </button>
+  );
+}
 
 function Body(props: BodyProps) {
   const Component = BODIES[getShape(props.node.type).body];
@@ -93,6 +117,7 @@ export const DiagramCard = memo(function DiagramCard(props: DiagramCardProps) {
         onCancel={props.onStopEditing}
         onPickImage={() => props.onPickImage(node.id)}
       />
+      {props.linkCount > 0 && <LinkBadge count={props.linkCount} onOpen={(badge) => props.onOpenLinks(node.id, badge)} />}
       {hasHandles && !isEditing && (
         <>
           {!shape.anchorY && (

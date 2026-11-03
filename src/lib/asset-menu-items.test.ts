@@ -64,7 +64,7 @@ describe("getAssetMenuEntries", () => {
     const entries = getAssetMenuEntries({ ref: { type: "sprite", id: "s" }, name: "Pip", isPinnedToSidebar: false });
     expect(labels(entries)).toEqual([
       "Open", "Open in new tab", "—", "Use in Tilemap", "Make 3D model", "Export PNG", "—", "Link to note…", "New note about Pip", "Add to canvas…",
-      "Create task", "Link to asset…", "Show links", "—", "Duplicate", "Copy", "Copy as PNG", "Copy name", "Copy link",
+      "Create task", "Link to…", "Show links", "—", "Duplicate", "Copy", "Copy as PNG", "Copy name", "Copy link",
       "—", "Pin to sidebar", "Rename…", "Delete…",
     ]);
   });

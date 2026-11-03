@@ -81,6 +81,8 @@ export function listAssets(projectId: string, type?: AssetType): AssetSummary[] 
   return types.flatMap((t) => storage.getAll(ASSET_KINDS[t].collection, projectId).map((i) => summarize(t, i)));
 }
 
-export function assetHref(projectId: string, type: AssetType, id: string): string {
-  return `/project/${projectId}/${ASSET_KINDS[type].path}?open=${encodeURIComponent(id)}`;
+/** Opens an asset in its tool; with `elementId` the canvas also selects that element and zooms to it. */
+export function assetHref(projectId: string, type: AssetType, id: string, elementId?: string): string {
+  const element = elementId ? `&element=${encodeURIComponent(elementId)}` : "";
+  return `/project/${projectId}/${ASSET_KINDS[type].path}?open=${encodeURIComponent(id)}${element}`;
 }

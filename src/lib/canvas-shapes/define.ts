@@ -14,7 +14,6 @@ export function defineShape(fields: ShapeFields): ShapeDefinition {
     layer: "front",
     isContainer: false,
     canEditText: true,
-    canLinkAsset: false,
     placement: "place",
     ...fields,
   };
@@ -25,7 +24,6 @@ export function defineOutlineShape(
   fields: Omit<ShapeFields, "body" | "toSvg" | "drawPng"> & Required<Pick<ShapeDefinition, "outline" | "shapeStyle">>
 ): ShapeDefinition {
   const shape: ShapeDefinition = defineShape({
-    canLinkAsset: true,
     labelInset: "px-3",
     ...fields,
     body: "shape",

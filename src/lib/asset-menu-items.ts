@@ -101,7 +101,7 @@ function linkEntries(ctx: AssetMenuContext): AssetMenuEntry[] {
     item("new-note", `New note about ${shortenName(ctx.name)}`),
     item("add-to-diagram", "Add to canvas…"),
     ...(ctx.ref.type === "issue" ? [] : [item("create-task", "Create task")]),
-    item("link-to-asset", "Link to asset…"),
+    item("link-to-asset", "Link to…"),
     item("show-links", "Show links"),
   ];
 }

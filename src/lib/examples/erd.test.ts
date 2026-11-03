@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { Diagram } from "@/types";
 import { tableColumns } from "@/lib/diagrams/tables";
-import { devStudioExamples } from "./dev-studio";
+import { DEV_STUDIO_LINKS, devStudioExamples } from "./dev-studio";
+import { GAME_LINKS, parseExampleEnd } from "./index";
 import { relation, table } from "./erd";
 import { planningExamples } from "./planning";
 import type { ExampleModule } from "./types";
@@ -32,6 +33,14 @@ describe("relation", () => {
 describe("example data-model canvases", () => {
   it("should include a data model for each app", () => {
     expect(canvases.map((c) => c.name)).toEqual(expect.arrayContaining(["Data Model", "Save Data"]));
+  });
+
+  it("should link example elements that are on their canvas", () => {
+    const ends = [...GAME_LINKS, ...DEV_STUDIO_LINKS].flatMap(([, from, , to]) => [from, to]).map(parseExampleEnd).filter((end) => end.elementId);
+    expect(ends.map((end) => `${end.slug}#${end.elementId}`)).toEqual(expect.arrayContaining(["save-data#player", "data-model#users"]));
+    for (const { slug, elementId } of ends) {
+      expect(canvases.find((c) => c.id === ctx.id(slug))?.nodes.map((n) => n.id), `${slug}#${elementId}`).toContain(elementId);
+    }
   });
 
   it("should attach every relation line to a row that exists", () => {
