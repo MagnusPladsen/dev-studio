@@ -22,7 +22,7 @@ This repo builds two apps from the same code:
 | App | Tools | Live |
 | --- | --- | --- |
 | **GameDev Studio** | Every tool below | [gamedev-studio.pladsen.dev](https://gamedev-studio.pladsen.dev) |
-| **Dev Studio** | Task Board, Canvas, Wiki (Story) and Notebook, for any software project | [dev-studio.pladsen.dev](https://dev-studio.pladsen.dev) |
+| **Dev Studio** | Task Board, Canvas, Wiki (Story), Notebook and Decision log, for any software project | [dev-studio.pladsen.dev](https://dev-studio.pladsen.dev) |
 
 The `NEXT_PUBLIC_APP` environment variable picks which one a build is (`dev-studio`, or unset for GameDev Studio).
 Each app has its own landing page, name, examples and help text; the editors, storage and sync are shared, so a
@@ -49,6 +49,7 @@ fix lands in both. Signed in with the same account, each app can list your proje
 | **Sprite sheets** | Pack sprites and their animation frames into one PNG plus a JSON atlas |
 | **3D Pixel Art** | Pixel art with depth (voxel art): build 3D models with add, erase, paint, eyedropper, fill, box and select tools, X/Y/Z mirror and a flat Slice view. Turn a sprite into a 3D model (flat or puffy), or render a model back into 8-direction sprites for 2D games. Export .glb, .obj + .mtl, MagicaVoxel .vox and .png. Free, no watermark |
 | **Notebook** | Ideas, to-do lists, design docs and bug lists, with clickable checklists and `[[links]]` |
+| **Decision log** | Architecture decision records: numbered ADR-001, ADR-002…, with status (proposed, accepted, superseded, deprecated, rejected), date, context, options, decision and consequences in Markdown. Supersede a decision in one click. Export one ADR or the whole log as Markdown, or JSON |
 
 Everything saves automatically. New projects can start with **Pip's Quest**, a small sample game spread across every
 tool that you can learn from, edit, or remove in one click.

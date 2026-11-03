@@ -9,13 +9,14 @@ import { planningExamples } from "./planning";
 import { writingExamples } from "./writing";
 import { boardExamples, removeExampleSprints } from "./board";
 import { modelExamples } from "./models";
+import { decisionExamples } from "./decisions";
 import { devStudioExamples, DEV_STUDIO_LINKS } from "./dev-studio";
 import { isDevStudio } from "../app-config";
 
 export type { ExampleModule, ExampleContext } from "./types";
 export { EXAMPLE_SLUGS } from "./types";
 
-const GAME_MODULES: ExampleModule[] = [...artExamples, ...audioExamples, ...levelExamples, ...planningExamples, ...writingExamples, ...boardExamples, ...modelExamples];
+const GAME_MODULES: ExampleModule[] = [...artExamples, ...audioExamples, ...levelExamples, ...planningExamples, ...writingExamples, ...boardExamples, ...modelExamples, ...decisionExamples];
 
 export const exampleId = (projectId: string, slug: string) => `${projectId}--ex--${slug}`;
 
@@ -48,6 +49,12 @@ const GAME_LINKS: [AssetRef["type"], string, AssetRef["type"], string][] = [
   ["issue", "i-dialogue-ui", "dialogue", "elder-quest"],
   ["issue", "i-sword-sprite", "sprite", "sword"],
   ["issue", "i-jump-feel", "diagram", "player-states"],
+  ["decision", "adr-pixel-scale", "sprite", "hero"],
+  ["decision", "adr-pixel-scale", "palette", "meadow-palette"],
+  ["decision", "adr-pixel-scale", "tilemap", "meadow"],
+  ["decision", "adr-checkpoint-saves", "issue", "i-save-system"],
+  ["decision", "adr-autosave", "issue", "i-save-system"],
+  ["decision", "adr-autosave", "decision", "adr-checkpoint-saves"],
 ];
 
 const MODULES = isDevStudio ? devStudioExamples : GAME_MODULES;
@@ -132,6 +139,7 @@ const COLLECTION_OF: Record<AssetRef["type"], ProjectCollection> = {
   note: "notes",
   issue: "issues",
   model: "models",
+  decision: "decisions",
 };
 
 function assetExists(projectId: string, ref: AssetRef) {

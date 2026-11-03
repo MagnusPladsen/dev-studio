@@ -27,7 +27,7 @@ const GAMEDEV_STUDIO: AppConfig = {
   accent: "#7c5cfc",
   accentHover: "#6a4ae0",
   subject: "game",
-  assetTypes: ["sprite", "sound", "music", "tilemap", "diagram", "story", "dialogue", "palette", "spritesheet", "note", "issue", "model"],
+  assetTypes: ["sprite", "sound", "music", "tilemap", "diagram", "story", "dialogue", "palette", "spritesheet", "note", "issue", "model", "decision"],
 };
 
 const DEV_STUDIO: AppConfig = {
@@ -38,7 +38,7 @@ const DEV_STUDIO: AppConfig = {
   accent: "#0d9488",
   accentHover: "#0f766e",
   subject: "project",
-  assetTypes: ["issue", "diagram", "story", "note"],
+  assetTypes: ["issue", "diagram", "story", "note", "decision"],
 };
 
 export function appConfigFor(flag: string | undefined): AppConfig {

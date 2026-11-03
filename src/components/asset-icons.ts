@@ -9,6 +9,7 @@ import {
   Package,
   Paintbrush,
   Palette,
+  Scale,
   SquareKanban,
   Volume2,
   type LucideIcon,
@@ -28,4 +29,5 @@ export const ASSET_ICONS: Record<AssetType, LucideIcon> = {
   note: NotebookPen,
   issue: SquareKanban,
   model: Box,
+  decision: Scale,
 };

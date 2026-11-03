@@ -2,13 +2,15 @@ import type { AssetRef } from "@/types";
 import type { ExampleModule } from "./types";
 import { issuesModule, type ExampleSprint, type IssueDraft } from "./board";
 import { diagram } from "./planning";
+import { decisionsModule, type DecisionDraft } from "./decisions";
 
 // Dev Studio's example project: "Tidepool", a small habit-tracker app heading for its public beta.
 
 export const DEV_STUDIO_SLUGS = {
   diagrams: ["architecture", "signup-flow"],
-  stories: ["ava", "jonas", "sync-api", "streak-engine", "beta-launch", "adr-offline"],
+  stories: ["ava", "jonas", "sync-api", "streak-engine", "beta-launch"],
   notes: ["welcome", "spec-reminders", "kickoff", "bugs"],
+  decisions: ["adr-offline", "adr-server-wins", "adr-conflict-rules", "adr-usage-stats"],
   issues: ["i-onboarding", "i-streaks", "i-reminders", "i-sync-conflicts", "i-dark-mode", "i-crash-bug", "i-analytics", "i-beta-invites"],
 } as const;
 
@@ -89,7 +91,7 @@ Best on the #tidepool channel. Mornings are for focus time.`,
       type: "character",
       links: [],
       tags: ["team", "backend"],
-      content: `Backend developer. Built the [[Sync API]] and wrote [[ADR-001: Offline first]].
+      content: `Backend developer. Built the [[Sync API]] and wrote ADR-001, *Offline first*, in the Decision log.
 
 ## Owns
 - [[Sync API]]
@@ -115,7 +117,7 @@ Let people track habits offline on several devices without losing a tick.
 - Reminder scheduler that calls the push service
 
 ## Owners
-[[Jonas Berg]]. Design decision in [[ADR-001: Offline first]].`,
+[[Jonas Berg]]. Why it works this way: ADR-001 and ADR-003 in the Decision log.`,
     },
     {
       id: id("streak-engine"),
@@ -158,25 +160,6 @@ People can sign up, track habits for two weeks and tell us what they think.
 
 ## Done when
 All 500 invites are out and the feedback form is live.`,
-    },
-    {
-      id: id("adr-offline"),
-      title: "ADR-001: Offline first",
-      type: "lore",
-      links: [],
-      tags: ["decision", "architecture"],
-      content: `**Status:** accepted
-
-## Context
-People tick habits on the bus, on planes and in the gym basement. Waiting for the network made the app feel broken.
-
-## Decision
-The app writes every change to its local store first and syncs in the background through the [[Sync API]].
-
-## Consequences
-- The app is instant, online or not
-- We need conflict rules for two devices editing the same habit
-- The [[Streak engine]] has to run on the device`,
     },
   ],
 };
@@ -261,6 +244,68 @@ Tip: write *what you did*, *what happened* and *what you expected*.
 
 const BETA_PREP: ExampleSprint = { slug: "sprint-beta-prep", name: "Beta prep", goal: "Ready for the first beta batch", current: true };
 const BETA_LAUNCH: ExampleSprint = { slug: "sprint-beta-launch", name: "Beta launch", goal: "Invite testers and watch the numbers" };
+
+const DECISIONS: DecisionDraft[] = [
+  {
+    slug: "adr-offline",
+    title: "Offline first",
+    status: "accepted",
+    daysAgo: 60,
+    tags: ["architecture", "sync"],
+    context: `People tick habits on the bus, on planes and in the gym basement. In the first prototype every tick waited for the network, and testers said the app "felt broken" whenever the signal dropped.`,
+    options: `- **Online only**: simplest server, but the app is useless without signal
+- **Cache reads, queue writes**: works offline, but the app still waits for the server to show a streak
+- **Local store first, sync in the background**: instant everywhere, but two devices can disagree`,
+    decision: `The app writes every change to its local store (SQLite) first and syncs in the background through the [[Sync API]]. The device is the source of truth for what the person sees.`,
+    consequences: `- The app is instant, online or not
+- We need conflict rules for two devices editing the same habit (see ADR-003)
+- The [[Streak engine]] has to run on the device, not the server`,
+  },
+  {
+    slug: "adr-server-wins",
+    title: "The server copy wins sync conflicts",
+    status: "superseded",
+    daysAgo: 45,
+    supersededBy: "adr-conflict-rules",
+    tags: ["sync"],
+    context: `With offline first, a phone and a tablet can both change the same habit before they sync. We need a rule for which change survives.`,
+    options: `- **Server wins**: whatever reached the server first stays
+- **Ask the person**: a dialog on every conflict`,
+    decision: `Whatever the server already has wins. The other device's change is dropped on its next sync.`,
+    consequences: `- Simple to build on the server
+- A tick made offline can disappear without a word`,
+  },
+  {
+    slug: "adr-conflict-rules",
+    title: "Latest tick wins, deletes always win",
+    status: "accepted",
+    daysAgo: 12,
+    tags: ["sync", "backend"],
+    context: `Replaces ADR-002. Beta testers lost ticks they made on the plane: the server copy won, and the offline tick vanished. Losing a tick breaks a streak, which is the one thing the app must never do.`,
+    options: `- **Server wins** (ADR-002): loses offline ticks
+- **Latest change wins, by device clock**: keeps the newest tick, but a phone with a wrong clock can win every time
+- **Merge per tick**: ticks are only ever added, so keep every tick from every device; deletes win over edits`,
+    decision: `Ticks are merged: a tick from any device is kept. For edits to the same habit, the latest change wins, using the time the server received it. A deleted habit stays deleted.`,
+    consequences: `- No more lost ticks, so streaks survive a flight
+- A habit deleted on one device disappears everywhere, even if it was edited elsewhere
+- [x] Agreed in the beta kickoff
+- [ ] Jonas: build it in the Sync API before the first invite batch`,
+  },
+  {
+    slug: "adr-usage-stats",
+    title: "Count usage without third-party trackers",
+    status: "proposed",
+    daysAgo: 2,
+    tags: ["privacy", "backend"],
+    context: `For the [[Public beta]] we want to know how many people tick a habit each day. Our privacy promise says we never share data with anyone.`,
+    options: `- **A hosted analytics SDK**: quick to add, but sends data to a third party
+- **Self-hosted analytics**: one more server to run
+- **Counters in the Sync API**: it already sees every tick, so count there`,
+    decision: `Count daily active people and ticks per day inside the Sync API, as totals only. No events, no device ids, no third-party code in the app.`,
+    consequences: `- Nothing new to install in the app
+- We can't see where in the app people get stuck; we'll ask beta testers instead`,
+  },
+];
 
 const ISSUES: IssueDraft[] = [
   {
@@ -355,7 +400,7 @@ const ISSUES: IssueDraft[] = [
   },
 ];
 
-export const devStudioExamples: ExampleModule[] = [diagrams, stories, notes, issuesModule(ISSUES)];
+export const devStudioExamples: ExampleModule[] = [diagrams, stories, notes, decisionsModule(DECISIONS), issuesModule(ISSUES)];
 
 /** Links between the example assets, so the sample project shows how everything connects. */
 export const DEV_STUDIO_LINKS: [AssetRef["type"], string, AssetRef["type"], string][] = [
@@ -367,5 +412,12 @@ export const DEV_STUDIO_LINKS: [AssetRef["type"], string, AssetRef["type"], stri
   ["issue", "i-crash-bug", "note", "bugs"],
   ["issue", "i-beta-invites", "story", "beta-launch"],
   ["note", "kickoff", "story", "beta-launch"],
-  ["diagram", "architecture", "story", "adr-offline"],
+  ["diagram", "architecture", "decision", "adr-offline"],
+  ["decision", "adr-offline", "story", "sync-api"],
+  ["decision", "adr-offline", "story", "streak-engine"],
+  ["decision", "adr-conflict-rules", "decision", "adr-server-wins"],
+  ["decision", "adr-conflict-rules", "issue", "i-sync-conflicts"],
+  ["decision", "adr-conflict-rules", "story", "sync-api"],
+  ["decision", "adr-conflict-rules", "note", "kickoff"],
+  ["decision", "adr-usage-stats", "issue", "i-analytics"],
 ];

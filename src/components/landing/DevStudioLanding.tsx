@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, BookOpen, Download, GitBranch, Globe, Link2, NotebookPen, Sparkles, SquareKanban, Clapperboard, PenTool, LayoutGrid, Network } from "lucide-react";
+import { ArrowRight, BookOpen, Download, GitBranch, Globe, Link2, NotebookPen, Scale, Sparkles, SquareKanban, Clapperboard, PenTool, LayoutGrid, Network } from "lucide-react";
 import type { AssetType } from "@/types";
 import { AssetChip, GITHUB_URL, GithubIcon, LandingFooter, LandingNav, OtherAppPromo, ToolCard } from "./LandingParts";
 
@@ -8,6 +8,7 @@ const tools = [
   { icon: GitBranch, name: "Canvas", description: "Architecture sketches, flow charts, moodboards and reference boards with notes, images, videos, links and to-dos." },
   { icon: BookOpen, name: "Wiki", description: "Pages for people, systems, components, goals and decisions, joined with [[wiki links]] and a graph of how it all connects." },
   { icon: NotebookPen, name: "Notebook", description: "Ideas, specs, meeting notes and bug lists, with checklists, folders, templates and links to anything." },
+  { icon: Scale, name: "Decision log", description: "Architecture decision records (ADR-001, ADR-002…) with status, context, options and consequences. Supersede old ones and export to Markdown." },
 ];
 
 const linkedExample: { type: AssetType; name: string }[] = [
@@ -15,6 +16,7 @@ const linkedExample: { type: AssetType; name: string }[] = [
   { type: "story", name: "Sync API" },
   { type: "diagram", name: "Architecture" },
   { type: "note", name: "Beta kickoff meeting" },
+  { type: "decision", name: "ADR-003 Latest tick wins" },
 ];
 
 const canvasFeatures = [
@@ -79,7 +81,7 @@ export function DevStudioLanding() {
             <span style={{ color: "var(--accent)" }}>your next project</span>
           </h1>
           <p className="text-lg sm:text-xl max-w-2xl mx-auto mb-10 animate-fade-in stagger-2 opacity-0 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-            A task board, a canvas, a linked wiki and a notebook — all connected in one free toolkit. Every issue, diagram
+            A task board, a canvas, a linked wiki, a notebook and a decision log — all connected in one free toolkit. Every issue, diagram
             and doc can link to the others.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 animate-fade-in stagger-3 opacity-0">
@@ -129,15 +131,18 @@ export function DevStudioLanding() {
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-14">
             <h2 className="text-3xl sm:text-4xl font-bold mb-4" style={{ color: "var(--text-primary)" }}>
-              Four tools. One project.
+              Five tools. One project.
             </h2>
             <p className="text-lg max-w-xl mx-auto" style={{ color: "var(--text-secondary)" }}>
-              Stop juggling a ticket tracker, a whiteboard and a wiki. Keep them in one place, connected to each other.
+              Stop juggling a ticket tracker, a whiteboard, a wiki and a folder of ADRs. Keep them in one place, connected to each other.
             </p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {tools.map((tool) => (
-              <ToolCard key={tool.name} {...tool} />
+            {tools.map((tool, index) => (
+              // an odd last card spans both columns instead of sitting alone
+              <div key={tool.name} className={`grid ${index === tools.length - 1 && tools.length % 2 === 1 ? "sm:col-span-2" : ""}`}>
+                <ToolCard {...tool} />
+              </div>
             ))}
           </div>
         </div>

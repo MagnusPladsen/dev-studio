@@ -229,7 +229,7 @@ export interface SpriteSheet {
   createdAt: string;
 }
 
-export type AssetType = "sprite" | "sound" | "music" | "diagram" | "story" | "tilemap" | "dialogue" | "palette" | "spritesheet" | "note" | "issue" | "model";
+export type AssetType = "sprite" | "sound" | "music" | "diagram" | "story" | "tilemap" | "dialogue" | "palette" | "spritesheet" | "note" | "issue" | "model" | "decision";
 
 /** "todo" / "doing" / "done" decides what counts as finished, whatever the column is called. */
 export type ColumnCategory = "todo" | "doing" | "done";
@@ -313,6 +313,27 @@ export interface Note {
   folder?: string;
   pinned?: boolean;
   tags: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type DecisionStatus = "proposed" | "accepted" | "superseded" | "deprecated" | "rejected";
+
+/** One architecture decision record in the Decision log. The Markdown fields follow the usual ADR layout. */
+export interface Decision {
+  id: string;
+  projectId: string;
+  number: number; // shown as ADR-001
+  title: string;
+  status: DecisionStatus;
+  date: string; // yyyy-mm-dd, when it was decided (or proposed)
+  context: string; // markdown
+  options: string; // markdown: the options considered
+  decision: string; // markdown
+  consequences: string; // markdown
+  supersededBy?: string; // id of the decision that replaces this one
+  tags: string[];
+  example?: boolean;
   createdAt: string;
   updatedAt: string;
 }
