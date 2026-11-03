@@ -255,4 +255,8 @@ export const GAMEDEV_STUDIO_COPY = {
   wikiLinks: {
     storyTarget: "story entry",
   },
+  claude: {
+    pitch:
+      "Ask Claude to plan tasks, write your story and dialogue, sketch canvases and search your notes. Your art and audio stay yours: Claude sees their names, never changes them.",
+  },
 } satisfies AppCopy;

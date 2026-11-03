@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import type { Issue } from "@/types";
-import { isOverdue } from "@/components/board/meta";
+import { isOverdue } from "@/lib/board";
 import { replaceCache, storage } from "../storage";
 import { boardExamples, removeExampleSprints } from "./board";
 import { devStudioExamples } from "./dev-studio";

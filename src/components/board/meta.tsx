@@ -15,13 +15,10 @@ import {
   Wrench,
   type LucideIcon,
 } from "lucide-react";
-import { v4 as uuid } from "uuid";
-import type { Board, BoardColumn, ColumnCategory, Issue, IssuePriority, IssueType } from "@/types";
-import { storage } from "@/lib/storage";
-import { issueKeyPrefix, issueNumber } from "@/lib/examples/board";
+import type { ColumnCategory, IssuePriority, IssueType } from "@/types";
+import { issueTypeLabel, issueTypesFor } from "@/lib/board";
 import { parseTask } from "@/lib/task-list";
-import { isDevStudio } from "@/lib/app-config";
-import { COPY } from "@/copy";
+import { APP } from "@/lib/app-config";
 
 export const TYPE_META: Record<IssueType, { icon: LucideIcon; color: string }> = {
   feature: { icon: Sparkles, color: "#34d399" },
@@ -35,15 +32,12 @@ export const TYPE_META: Record<IssueType, { icon: LucideIcon; color: string }> =
   docs: { icon: FileText, color: "#fb923c" },
 };
 
-const GAME_TYPES: IssueType[] = ["feature", "bug", "task", "art", "audio", "design", "writing"];
-const DEV_TYPES: IssueType[] = ["feature", "bug", "task", "design", "chore", "docs"];
-
 /** The types this app offers when creating or filtering issues. Saved issues keep whatever type they have. */
-export const TYPES = isDevStudio ? DEV_TYPES : GAME_TYPES;
+export const TYPES = issueTypesFor(APP.id);
 
 /** A type's label, or the raw value for a type this version doesn't know. */
 export function typeLabel(type: string): string {
-  return Object.hasOwn(COPY.board.issueTypes, type) ? COPY.board.issueTypes[type as IssueType] : type;
+  return issueTypeLabel(type, APP.id);
 }
 
 /** `TYPES`, plus `current` when an issue already has a type this app doesn't offer, so the picker still shows it. */
@@ -58,30 +52,8 @@ export const PRIORITY_META: Record<IssuePriority, { label: string; icon: LucideI
   low: { label: "Low", icon: ChevronDown, color: "#60a5fa", rank: 2 },
   lowest: { label: "Lowest", icon: ChevronsDown, color: "#94a3b8", rank: 1 },
 };
-export const PRIORITIES = Object.keys(PRIORITY_META) as IssuePriority[];
 
 export const CATEGORY_LABEL: Record<ColumnCategory, string> = { todo: "To do", doing: "In progress", done: "Done" };
-
-export const COLUMN_COLORS = ["#94a3b8", "#60a5fa", "#fbbf24", "#a78bfa", "#f472b6", "#fb923c", "#34d399", "#2dd4bf"];
-
-export const DEFAULT_COLUMNS: BoardColumn[] = [
-  { id: "todo", name: "To Do", color: "#94a3b8", category: "todo" },
-  { id: "in-progress", name: "In Progress", color: "#60a5fa", category: "doing" },
-  { id: "testing", name: "Testing", color: "#fbbf24", category: "doing" },
-  { id: "done", name: "Done", color: "#34d399", category: "done" },
-];
-
-export const DAY = 86_400_000;
-
-/** The local calendar date as YYYY-MM-DD (not UTC, so it matches the user's own day). */
-export function today(now = new Date()): string {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-}
-
-export function isOverdue(issue: Pick<Issue, "dueDate" | "resolvedAt">): boolean {
-  return !!issue.dueDate && !issue.resolvedAt && issue.dueDate < today();
-}
 
 /** Quotes a CSV cell and defuses leading = + - @ so spreadsheets don't run it as a formula. */
 export function csvCell(value: unknown): string {
@@ -92,11 +64,6 @@ export function csvCell(value: unknown): string {
 
 /** Byte order mark so Excel reads the CSV as UTF-8. */
 export const CSV_BOM = "\uFEFF";
-
-export function daysLeft(end?: string): number | null {
-  if (!end) return null;
-  return Math.ceil((Date.parse(end + "T23:59:59") - Date.now()) / DAY);
-}
 
 export function formatDate(iso?: string): string {
   if (!iso) return "";
@@ -112,105 +79,6 @@ export function relativeTime(iso?: string): string {
   if (s < 86400) return `${Math.floor(s / 3600)} h ago`;
   if (s < 86400 * 30) return `${Math.floor(s / 86400)} d ago`;
   return formatDate(iso);
-}
-
-export function createDefaultBoard(projectId: string): Board {
-  const now = new Date().toISOString();
-  const prefix = issueKeyPrefix(storage.getById("projects", projectId)?.name);
-  const board: Board = {
-    id: uuid(),
-    projectId,
-    name: "Task Board",
-    keyPrefix: prefix,
-    nextNumber: 1,
-    columns: DEFAULT_COLUMNS.map((c) => ({ ...c })),
-    sprints: [],
-    createdAt: now,
-    updatedAt: now,
-  };
-  storage.save("boards", board, projectId);
-  return board;
-}
-
-export function saveBoard(projectId: string, board: Board, patch: Partial<Board>): Board {
-  const next = { ...board, ...patch, updatedAt: new Date().toISOString() };
-  storage.save("boards", next, projectId);
-  return next;
-}
-
-export function columnOf(board: Board, id: string): BoardColumn | undefined {
-  return board.columns.find((c) => c.id === id);
-}
-
-/** Saves an issue; keeps `resolvedAt` in step with whether its column counts as done. */
-export function saveIssue(projectId: string, board: Board | undefined, issue: Issue, patch: Partial<Issue>): Issue {
-  const next: Issue = { ...issue, ...patch, updatedAt: new Date().toISOString() };
-  if (board && patch.status !== undefined && patch.status !== issue.status) {
-    const done = columnOf(board, next.status)?.category === "done";
-    next.resolvedAt = done ? issue.resolvedAt ?? new Date().toISOString() : undefined;
-  }
-  storage.save("issues", next, projectId);
-  return next;
-}
-
-/** Next free key number, never reusing a number already taken by an issue. */
-export function takeIssueKey(projectId: string, board: Board): { key: string; board: Board } {
-  const max = storage
-    .getAll("issues", projectId)
-    .filter((i) => i.key.startsWith(board.keyPrefix + "-"))
-    .reduce((m, i) => Math.max(m, issueNumber(i.key)), 0);
-  const n = Math.max(board.nextNumber, max + 1);
-  const updated = saveBoard(projectId, board, { nextNumber: n + 1 });
-  return { key: `${board.keyPrefix}-${n}`, board: updated };
-}
-
-export function createIssue(
-  projectId: string,
-  board: Board,
-  fields: Partial<Issue> & Pick<Issue, "title">
-): { issue: Issue; board: Board } {
-  const { key, board: b } = takeIssueKey(projectId, board);
-  const status = fields.status ?? b.columns[0]?.id ?? "todo";
-  const siblings = storage.getAll("issues", projectId).filter((i) => i.status === status);
-  const now = new Date().toISOString();
-  const issue: Issue = {
-    id: uuid(),
-    projectId,
-    key,
-    description: "",
-    type: "task",
-    priority: "medium",
-    sprintId: null,
-    labels: [],
-    tags: [],
-    order: siblings.reduce((m, i) => Math.max(m, i.order), 0) + 1000,
-    createdAt: now,
-    updatedAt: now,
-    ...fields,
-    status,
-    resolvedAt: columnOf(b, status)?.category === "done" ? now : undefined,
-  };
-  storage.save("issues", issue, projectId);
-  return { issue, board: b };
-}
-
-/** Closes a sprint: done issues are archived, open ones move to `targetSprintId` (null = backlog). */
-export function completeSprint(projectId: string, board: Board, sprintId: string, targetSprintId: string | null): Board {
-  const doneIds = new Set(board.columns.filter((c) => c.category === "done").map((c) => c.id));
-  for (const issue of storage.getAll("issues", projectId)) {
-    if (issue.sprintId !== sprintId || issue.archived) continue;
-    if (doneIds.has(issue.status)) saveIssue(projectId, board, issue, { archived: true });
-    else saveIssue(projectId, board, issue, { sprintId: targetSprintId });
-  }
-  const closedAt = new Date().toISOString();
-  return saveBoard(projectId, board, { sprints: board.sprints.map((s) => (s.id === sprintId ? { ...s, state: "closed", closedAt } : s)) });
-}
-
-/** Brings a closed sprint back as a planned one, ready to start again. */
-export function reopenSprint(projectId: string, board: Board, sprintId: string): Board {
-  return saveBoard(projectId, board, {
-    sprints: board.sprints.map((s) => (s.id === sprintId ? { ...s, state: "planned", closedAt: undefined } : s)),
-  });
 }
 
 export const fieldStyle: React.CSSProperties = {

@@ -1,12 +1,16 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   cacheKey,
+  getSnapshot,
   PROJECT_COLLECTIONS,
   parseCacheKey,
   type ChangeEvent,
   type Persister,
+  type ProjectCollection,
   type Snapshot,
 } from "../storage";
+import { mergeBodies } from "./merge";
+import { nextFreeIssueKey, nextFreeNumber } from "./renumber";
 
 export type CloudTable = "projects" | "assets";
 export type CloudRow = {
@@ -16,19 +20,29 @@ export type CloudRow = {
   collection?: string;
   data?: Record<string, unknown>;
   updated_at?: string;
+  /** Server revision, bumped on every write; compare-and-swap writes send the one they last saw. */
+  rev?: number;
 };
 /** A row the server confirmed writing (or deleting), with the server's `updated_at`. */
 export type WrittenRow = { table: CloudTable; id: string; updatedAt?: string };
-type Op =
-  | { kind: "upsertProject"; id: string; data: Record<string, unknown> }
-  | { kind: "deleteProject"; id: string }
-  | { kind: "upsertAsset"; id: string; projectId: string; collection: string; data: Record<string, unknown> }
-  | { kind: "deleteAsset"; id: string };
+type UpsertProject = { kind: "upsertProject"; id: string; data: Record<string, unknown> };
+type UpsertAsset = { kind: "upsertAsset"; id: string; projectId: string; collection: string; data: Record<string, unknown> };
+type Upsert = UpsertProject | UpsertAsset;
+type Op = Upsert | { kind: "deleteProject"; id: string } | { kind: "deleteAsset"; id: string };
+/** One row's outcome from the save_projects / save_assets RPCs (see the rev migration). */
+type SaveResult = {
+  id: string;
+  rev: number | null;
+  updated_at: string | null;
+  status: "ok" | "conflict" | "missing" | "duplicate" | "orphan";
+};
+/** The last version of a row we know the server holds: its rev, and its body as the base for merges. */
+type Known = { rev: number; base?: Record<string, unknown> };
 
 const PAGE = 500;
 const ROW_COLUMNS: Record<CloudTable, string> = {
-  projects: "id, data, updated_at",
-  assets: "id, project_id, collection, data, updated_at",
+  projects: "id, data, updated_at, rev",
+  assets: "id, project_id, collection, data, updated_at, rev",
 };
 
 async function selectAll(supabase: SupabaseClient, table: CloudTable, columns = ROW_COLUMNS[table], since?: string): Promise<CloudRow[]> {
@@ -73,7 +87,9 @@ export function newestUpdate(rows: CloudRow[]): string | null {
   return newest ? new Date(newest).toISOString() : null;
 }
 
-export async function loadCloudSnapshot(supabase: SupabaseClient): Promise<{ snapshot: Snapshot; cursor: string | null }> {
+export async function loadCloudSnapshot(
+  supabase: SupabaseClient
+): Promise<{ snapshot: Snapshot; cursor: string | null; rows: Record<CloudTable, CloudRow[]> }> {
   const [projects, assets] = await Promise.all([selectAll(supabase, "projects"), selectAll(supabase, "assets")]);
   const snap: Snapshot = new Map();
   snap.set(cacheKey("projects"), projects.map((r) => ({ ...r.data, id: r.id })));
@@ -84,7 +100,7 @@ export async function loadCloudSnapshot(supabase: SupabaseClient): Promise<{ sna
     list.push({ ...a.data, id: a.id });
     snap.set(key, list);
   }
-  return { snapshot: snap, cursor: newestUpdate([...projects, ...assets]) };
+  return { snapshot: snap, cursor: newestUpdate([...projects, ...assets]), rows: { projects, assets } };
 }
 
 /** Upload a whole snapshot (used once when a guest signs in with local data). */
@@ -126,21 +142,32 @@ export type SyncStatus = { state: "idle" | "saving" | "saved" | "error"; message
 /**
  * Mirrors cache changes to Supabase. Writes are coalesced per item (rapid edits become one
  * request), flushed in order — projects before assets, so foreign keys hold — and retried.
+ *
+ * Saves are compare-and-swap: each row goes out with the rev we last saw and is written only if the
+ * server still holds it. On a conflict the server's copy is fetched and merged with ours
+ * (`mergeBodies`), the merge goes into the cache through `applyLocally` and is saved again. A row
+ * deleted elsewhere stays deleted; a taken issue key or ADR number moves to the next free one.
  */
 export function createCloudPersister(
   supabase: SupabaseClient,
   userId: string,
   onStatus: (s: SyncStatus) => void,
-  onWritten: (rows: WrittenRow[]) => void = () => {}
+  onWritten: (rows: WrittenRow[]) => void = () => {},
+  applyLocally: (changes: ChangeEvent[]) => void = () => {}
 ): Persister & {
   flush(): Promise<void>;
   /** Whether a write for this row is queued or in flight (live updates hold off on it until it lands). */
   isBusy(table: CloudTable, id: string): boolean;
   /** Forget queued writes for a project that was deleted elsewhere. */
   dropProject(projectId: string): void;
+  /** Rows as the server holds them (initial load, live updates): their rev is what the next save expects. */
+  remember(table: CloudTable, rows: CloudRow[]): void;
+  forget(table: CloudTable, id: string): void;
 } {
   const pending = new Map<string, Op>();
   let inFlight = new Map<string, Op>();
+  const known = new Map<string, Known>();
+  const reader = createCloudReader(supabase);
   let timer: ReturnType<typeof setTimeout> | null = null;
   let running: Promise<void> | null = null;
   let failures = 0;
@@ -149,43 +176,137 @@ export function createCloudPersister(
     if (timer) clearTimeout(timer);
     timer = setTimeout(() => void flush(), delay);
   };
+  const keyOf = (table: CloudTable, id: string) => `${table === "projects" ? "p" : "a"}:${id}`;
+  const tableOf = (op: Op): CloudTable => (op.kind === "upsertProject" || op.kind === "deleteProject" ? "projects" : "assets");
+
+  function remember(table: CloudTable, rows: CloudRow[]) {
+    for (const row of rows) {
+      if (typeof row.rev === "number") known.set(keyOf(table, row.id), { rev: row.rev, base: row.data });
+    }
+  }
+
+  function saveRow(op: Upsert) {
+    const rev = known.get(keyOf(tableOf(op), op.id))?.rev ?? null;
+    const data = { ...op.data, id: op.id };
+    return op.kind === "upsertProject"
+      ? { id: op.id, name: String(op.data.name ?? ""), data, rev }
+      : { id: op.id, project_id: op.projectId, collection: op.collection, data, rev };
+  }
+
+  /** The newest local version of a row: a later edit queued while this one was in flight wins. */
+  function latest(op: Upsert): Upsert {
+    const queued = pending.get(keyOf(tableOf(op), op.id));
+    return queued?.kind === op.kind ? (queued as Upsert) : op;
+  }
+
+  function requeue(op: Upsert, data: Record<string, unknown>) {
+    const key = keyOf(tableOf(op), op.id);
+    const queued = pending.get(key);
+    if (queued && queued.kind !== op.kind) return; // deleted locally meanwhile
+    pending.set(key, { ...op, data });
+    applyLocally([
+      op.kind === "upsertProject"
+        ? { op: "put", collection: "projects", item: { ...data, id: op.id } }
+        : { op: "put", collection: op.collection as ProjectCollection, projectId: op.projectId, item: { ...data, id: op.id } },
+    ]);
+  }
+
+  /** Deleted on the server since we last saw it: deletes win, so drop our edit and the cached copy. */
+  function deletedElsewhere(op: Upsert) {
+    const key = keyOf(tableOf(op), op.id);
+    known.delete(key);
+    if (pending.get(key)?.kind === op.kind) pending.delete(key);
+    applyLocally([
+      op.kind === "upsertProject"
+        ? { op: "deleteProject", projectId: op.id }
+        : { op: "delete", collection: op.collection as ProjectCollection, projectId: op.projectId, id: op.id },
+    ]);
+  }
+
+  async function resolveConflicts(table: CloudTable, ops: Upsert[]) {
+    if (!ops.length) return;
+    const theirs = new Map((await reader.rows(table, ops.map((o) => o.id))).map((r) => [r.id, r]));
+    for (const op of ops) {
+      const row = theirs.get(op.id);
+      if (!row?.data) {
+        deletedElsewhere(op);
+        continue;
+      }
+      const key = keyOf(table, op.id);
+      const merged = mergeBodies(known.get(key)?.base, latest(op).data, row.data);
+      known.set(key, { rev: row.rev ?? 0, base: row.data });
+      requeue(op, { ...merged, id: op.id });
+    }
+  }
+
+  async function takenValues(projectId: string, collection: string, field: string, exceptId: string): Promise<unknown[]> {
+    const values: unknown[] = [];
+    for (let from = 0; ; from += PAGE) {
+      const { data, error } = await supabase
+        .from("assets")
+        .select(`id, value:data->>${field}`)
+        .eq("project_id", projectId)
+        .eq("collection", collection)
+        .order("id")
+        .range(from, from + PAGE - 1);
+      if (error) throw error;
+      const rows = (data ?? []) as unknown as { id: string; value: unknown }[];
+      values.push(...rows.filter((r) => r.id !== exceptId).map((r) => r.value));
+      if (rows.length < PAGE) break;
+    }
+    const cached = (getSnapshot().get(cacheKey(collection as ProjectCollection, projectId)) ?? []) as Record<string, unknown>[];
+    return [...values, ...cached.filter((i) => i.id !== exceptId).map((i) => i[field])];
+  }
+
+  async function renumberDuplicates(ops: UpsertAsset[]) {
+    for (const op of ops) {
+      const field = op.collection === "issues" ? "key" : op.collection === "decisions" ? "number" : null;
+      if (!field) throw new Error(`Could not save ${op.id}: it clashes with another row`);
+      const taken = await takenValues(op.projectId, op.collection, field, op.id);
+      const data = latest(op).data;
+      const value = field === "key" ? nextFreeIssueKey(String(data.key ?? ""), taken.map(String)) : nextFreeNumber(taken);
+      requeue(op, { ...data, [field]: value, updatedAt: new Date().toISOString() });
+    }
+  }
+
+  async function save(table: CloudTable, ops: Upsert[]) {
+    for (let i = 0; i < ops.length; i += 100) {
+      const chunk = new Map(ops.slice(i, i + 100).map((o) => [o.id, o]));
+      const { data, error } = await supabase.rpc(table === "projects" ? "save_projects" : "save_assets", {
+        p_rows: [...chunk.values()].map(saveRow),
+      });
+      if (error) throw error;
+      const results = (data ?? []) as SaveResult[];
+      const outcome = (status: SaveResult["status"]) =>
+        results.filter((r) => r.status === status).flatMap((r) => chunk.get(r.id) ?? []);
+      for (const r of results.filter((r) => r.status === "ok")) {
+        known.set(keyOf(table, r.id), { rev: r.rev ?? 0, base: { ...chunk.get(r.id)?.data, id: r.id } });
+      }
+      for (const r of results.filter((r) => r.status === "orphan")) known.delete(keyOf(table, r.id));
+      onWritten(results.filter((r) => r.status === "ok").map((r) => ({ table, id: r.id, updatedAt: r.updated_at ?? undefined })));
+      outcome("missing").forEach(deletedElsewhere);
+      await resolveConflicts(table, outcome("conflict"));
+      await renumberDuplicates(outcome("duplicate") as UpsertAsset[]);
+    }
+  }
+
+  async function remove(table: CloudTable, ids: string[]) {
+    if (!ids.length) return;
+    const { data, error } = await supabase.from(table).delete().eq("user_id", userId).in("id", ids).select("id, updated_at");
+    if (error) throw error;
+    for (const id of ids) known.delete(keyOf(table, id));
+    onWritten(((data ?? []) as CloudRow[]).map((r) => ({ table, id: r.id, updatedAt: r.updated_at })));
+  }
 
   async function run(ops: Op[]) {
     const order = { upsertProject: 0, upsertAsset: 1, deleteAsset: 2, deleteProject: 3 } as const;
     ops.sort((a, b) => order[a.kind] - order[b.kind]);
+    const ofKind = <K extends Op["kind"]>(kind: K) => ops.filter((o): o is Extract<Op, { kind: K }> => o.kind === kind);
 
-    const confirm = (table: CloudTable, rows: unknown) =>
-      onWritten(((rows ?? []) as CloudRow[]).map((r) => ({ table, id: r.id, updatedAt: r.updated_at })));
-
-    const projectUpserts = ops.filter((o) => o.kind === "upsertProject").map((o) => projectRow(userId, { ...o.data, id: o.id }));
-    if (projectUpserts.length) {
-      const { data, error } = await supabase.from("projects").upsert(projectUpserts, { onConflict: "user_id,id" }).select("id, updated_at");
-      if (error) throw error;
-      confirm("projects", data);
-    }
-    const assetUpserts = ops
-      .filter((o): o is Extract<Op, { kind: "upsertAsset" }> => o.kind === "upsertAsset")
-      .map((o) => assetRow(userId, { ...o.data, id: o.id }, o.projectId, o.collection));
-    for (let i = 0; i < assetUpserts.length; i += 100) {
-      const { data, error } = await supabase
-        .from("assets")
-        .upsert(assetUpserts.slice(i, i + 100), { onConflict: "user_id,id" })
-        .select("id, updated_at");
-      if (error) throw error;
-      confirm("assets", data);
-    }
-    const assetDeletes = ops.filter((o) => o.kind === "deleteAsset").map((o) => o.id);
-    if (assetDeletes.length) {
-      const { data, error } = await supabase.from("assets").delete().eq("user_id", userId).in("id", assetDeletes).select("id, updated_at");
-      if (error) throw error;
-      confirm("assets", data);
-    }
-    const projectDeletes = ops.filter((o) => o.kind === "deleteProject").map((o) => o.id);
-    if (projectDeletes.length) {
-      const { data, error } = await supabase.from("projects").delete().eq("user_id", userId).in("id", projectDeletes).select("id, updated_at");
-      if (error) throw error;
-      confirm("projects", data);
-    }
+    await save("projects", ofKind("upsertProject"));
+    await save("assets", ofKind("upsertAsset"));
+    await remove("assets", ofKind("deleteAsset").map((o) => o.id));
+    await remove("projects", ofKind("deleteProject").map((o) => o.id));
   }
 
   async function flush(): Promise<void> {
@@ -222,8 +343,10 @@ export function createCloudPersister(
   return {
     name: "cloud",
     flush,
+    remember,
+    forget: (table, id) => known.delete(keyOf(table, id)),
     isBusy(table, id) {
-      const key = `${table === "projects" ? "p" : "a"}:${id}`;
+      const key = keyOf(table, id);
       return pending.has(key) || inFlight.has(key);
     },
     dropProject(projectId) {

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowUpRight, LogIn } from "lucide-react";
 import { BetaBadge } from "@/components/BetaBadge";
+import { PrivacySettingsButton } from "@/components/ConsentBanner";
 import { APP, OTHER_APP } from "@/lib/app-config";
 import { COPY } from "@/copy";
 import { supabaseEnabled } from "@/lib/supabase";
@@ -138,7 +139,7 @@ export function LandingFooter() {
             {APP.name} — Free &amp; Open Source
           </span>
         </div>
-        <div className="flex items-center gap-4 text-sm" style={{ color: "var(--text-muted)" }}>
+        <div className="flex items-center gap-4 text-sm max-md:flex-wrap max-md:justify-center max-md:gap-y-2" style={{ color: "var(--text-muted)" }}>
           <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer" className="hover:underline" style={{ color: "var(--text-secondary)" }}>
             GitHub
           </a>
@@ -147,6 +148,10 @@ export function LandingFooter() {
           <a href="https://pladsen.dev" target="_blank" rel="noopener noreferrer" className="hover:underline" style={{ color: "var(--text-secondary)" }}>
             pladsen.dev
           </a>
+          <Link href="/privacy" className="hover:underline" style={{ color: "var(--text-secondary)" }}>
+            Privacy
+          </Link>
+          <PrivacySettingsButton className="hover:underline" style={{ color: "var(--text-secondary)" }} />
         </div>
       </div>
     </footer>

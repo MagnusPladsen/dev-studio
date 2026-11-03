@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { v4 as uuid } from "uuid";
 import { storage } from "@/lib/storage";
+import { normalizeTag } from "@/lib/tags";
 import { assetHref } from "@/lib/assets";
 import { registerAutosaveFlush } from "@/lib/autosave-registry";
 import { useOpenParam, useTrackOpenAsset, useStorageVersion } from "@/hooks/useStorage";
@@ -395,7 +396,7 @@ export default function NotebookPage() {
 
   // ── tags ──
   function addTag() {
-    const t = tagInput.trim().replace(/^#/, "");
+    const t = normalizeTag("note", tagInput);
     if (!draft || !t || draft.tags.includes(t)) {
       setTagInput("");
       return;

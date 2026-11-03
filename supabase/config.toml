@@ -166,6 +166,11 @@ additional_redirect_urls = [
   "https://*-magnus-pladsens-projects.vercel.app/auth/callback",
   "http://localhost:3000/auth/callback",
   "http://127.0.0.1:3000/auth/callback",
+  # dev-studio-mcp's /auth/cli fallback sign-in returns to its loopback listener (src/lib/mcp-auth.ts).
+  "http://127.0.0.1:53682/callback**",
+  "http://127.0.0.1:53683/callback**",
+  "http://127.0.0.1:53684/callback**",
+  "http://127.0.0.1:53685/callback**",
 ]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
@@ -371,8 +376,8 @@ enabled = false
 
 # OAuth server configuration
 [auth.oauth_server]
-# Enable OAuth server functionality
-enabled = false
+# Enable OAuth server functionality. dev-studio-mcp signs in through it (docs/mcp-auth-setup.md).
+enabled = true
 # Path for OAuth consent flow UI
 authorization_url_path = "/oauth/consent"
 # Allow dynamic client registration

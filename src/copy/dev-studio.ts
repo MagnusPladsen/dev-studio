@@ -243,4 +243,8 @@ export const DEV_STUDIO_COPY = {
   wikiLinks: {
     storyTarget: "wiki page",
   },
+  claude: {
+    pitch:
+      "Ask Claude to plan sprints, file issues, draw canvases, write wiki pages and decisions, and search your notes.",
+  },
 } satisfies AppCopy;

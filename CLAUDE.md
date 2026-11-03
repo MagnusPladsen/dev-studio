@@ -50,9 +50,15 @@ tools comes from `COPY.help`. `npm test` checks both objects have the same keys 
   otherwise the remote copy replaces the open asset (selection/view kept) and undo history restarts, so undo never
   reverts someone else's change. Canvas, Task Board, Notebook, Wiki/Story and Decision log do this; other editors
   are re-mounted on their open asset by `<LiveRefresh>`, which also shows the "deleted elsewhere" notice.
+- **Compare-and-swap saves**: rows carry a server `rev` (bumped by trigger). The cloud persister saves through the
+  `save_projects` / `save_assets` RPCs with the rev it last saw; on a conflict it fetches the server copy, merges
+  (`src/lib/sync/merge.ts`: per field, canvas elements by id, tags as sets, text by line; deletes win) and saves
+  again. Issue keys and ADR numbers are unique per project (DB index); a clash moves ours to the next free one.
+  `search_assets` RPC searches the `asset_search` table (kept by trigger). OAuth clients (the MCP) cannot delete.
 - **Supabase**: tables `projects` and `assets` (JSON bodies, row level security per user). Schema lives in
   `supabase/migrations/` and is applied by Supabase's GitHub integration. Adding a collection means a new migration
-  that widens `assets_collection_check`. Env: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+  that widens `assets_collection_check` (and, if its text should be searchable, a case in `asset_search_text`).
+  `supabase/db-tests/run.sh` applies every migration to Postgres 17 in Docker and runs SQL checks with two users. Env: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
 - **Assets & links**: `src/lib/assets.ts` (`ASSET_KINDS` registry: collection, label, tool path, colour) and
   `src/lib/links.ts` (`getRelated`, `addLink`, `removeLink`). Any asset can link to any other; story `[[wiki links]]`
   count too. `<LinkedAssets>` is the shared panel; `assetHref()` + `useOpenParam()` open an asset via `?open=<id>`.
@@ -60,6 +66,10 @@ tools comes from `COPY.help`. `npm test` checks both objects have the same keys 
   Deleting an element drops its links and undo restores them; `src/lib/diagrams/element-links.ts` migrates the old
   one-way `node.data.asset` on load. `<AssetPickerList allowElements>` picks a whole asset or a canvas element.
   Canvas right-click/long-press menus are built in `src/lib/diagrams/canvas-menu.ts` on the shared `ContextMenu`.
+- **Claude (MCP) sign-in**: `/oauth/consent` is the consent page of Supabase's OAuth 2.1 server (`src/lib/oauth-consent.ts`);
+  the sidebar's **Use with Claude** (`src/components/UseWithClaude.tsx`) shows setup and Connected apps
+  (`src/lib/oauth-grants.ts`). `/auth/cli` is a fallback behind `NEXT_PUBLIC_MCP_CLI_AUTH=on`. Owner setup and the
+  round-trip test: `docs/mcp-auth-setup.md`.
 - **Examples**: `src/lib/examples/` — one module per tool group; items get `example: true` and ids
   `ctx.id(slug)`; `addExamples` / `removeExamples` only ever touch flagged items. Slugs in `types.ts`.
 - **Shared editor pieces**: `useAutosave` + `SaveIndicator`, `ExportMenu`, `ExamplesBar`, `useHistory` +
@@ -73,6 +83,7 @@ tools comes from `COPY.help`. `npm test` checks both objects have the same keys 
 
 - Everything is free, no watermark, no sign-up required; keep saying so where people export.
 - Never generate assets with AI. Examples are hand-made data in code that users edit and make their own.
+- Privacy: `/privacy` (EN + NO, unconfirmed facts in `src/lib/privacy-facts.ts`), Export all and Delete account / Clear data in the Account panel (`AccountPrivacy`, `delete_own_account` SQL function). Analytics loads only after opt-in via `<ConsentBanner>`; any new tracking or third-party script must be gated the same way and added to the policy.
 - Each tool has its own colour (`ASSET_KINDS[type].color`). The layout tints the workspace and sets `--accent` /
   `--on-accent` to it, so primary buttons are written as `background: var(--accent)`; never hardcode purple.
 - Desktop layout is considered done. Phone fixes use `max-md:` classes (or mobile base classes restored by `md:`) so

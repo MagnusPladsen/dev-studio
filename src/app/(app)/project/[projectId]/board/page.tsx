@@ -25,7 +25,6 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { v4 as uuid } from "uuid";
 import type { AssetRelation, Board, BoardColumn, ColumnCategory, Issue, IssuePriority, IssueType, Sprint } from "@/types";
 import { storage } from "@/lib/storage";
 import { countRelated, linksTouching, restoreLinks, type RelatedCount } from "@/lib/links";
@@ -50,30 +49,44 @@ import { IssueDetail } from "@/components/board/IssueDetail";
 import { positionMenu, type MenuPlacement } from "@/lib/menu-position";
 import {
   CATEGORY_LABEL,
-  COLUMN_COLORS,
   CSV_BOM,
-  DAY,
-  PRIORITIES,
   PRIORITY_META,
   PriorityIcon,
   TYPES,
   TypeIcon,
   typeLabel,
+  csvCell,
+  fieldStyle,
+  formatDate,
+  relativeTime,
+  secondaryBtn,
+} from "@/components/board/meta";
+import {
+  COLUMN_COLORS,
+  PRIORITIES,
+  addColumn,
+  archiveDoneIssues,
+  archiveIssue,
+  byOrder,
   createDefaultBoard,
   completeSprint,
   createIssue,
-  csvCell,
+  createSprint,
   daysLeft,
-  fieldStyle,
-  formatDate,
+  deleteSprint,
   isOverdue,
-  relativeTime,
+  issuesOnBoard,
+  moveIssueToColumn,
+  moveIssueToSprint,
+  patchColumn,
+  patchSprint,
+  removeColumn,
   reopenSprint,
-  saveBoard,
-  saveIssue,
-  secondaryBtn,
-  today,
-} from "@/components/board/meta";
+  restoreIssue,
+  setColumnCategory,
+  shiftColumn,
+  startSprint,
+} from "@/lib/board";
 import { COPY } from "@/copy";
 
 const MOVE_MENU_WIDTH = 176;
@@ -84,8 +97,6 @@ type View = "board" | "backlog" | "all";
 /** `labels`: show issues with any of these labels (none picked = any label). */
 type Filters = { q: string; type: IssueType | ""; priority: IssuePriority | ""; labels: string[] };
 const NO_FILTERS: Filters = { q: "", type: "", priority: "", labels: [] };
-
-const byOrder = (a: Issue, b: Issue) => a.order - b.order || a.createdAt.localeCompare(b.createdAt);
 
 function matches(i: Issue, f: Filters): boolean {
   if (f.type && i.type !== f.type) return false;
@@ -470,39 +481,13 @@ function BoardView({
   const dragId = useRef<string | null>(null);
   const [dropAt, setDropAt] = useState<{ col: string; before: string | null } | null>(null);
 
-  const onBoard = issues.filter((i) => !i.archived && (activeSprint ? i.sprintId === activeSprint.id : true));
+  const onBoard = issuesOnBoard(board, issues);
   const shown = onBoard.filter((i) => matches(i, filters));
   const doneIds = new Set(board.columns.filter((c) => c.category === "done").map((c) => c.id));
   const doneOnBoard = onBoard.filter((i) => doneIds.has(i.status));
   const relatedCounts = countRelated(projectId, shown.map((i) => i.id));
 
-  function move(id: string, status: string, before: string | null) {
-    const moving = storage.getById("issues", id, projectId);
-    if (!moving) return;
-    const list = onBoard.filter((i) => i.status === status && i.id !== id).sort(byOrder);
-    let at = before ? list.findIndex((i) => i.id === before) : list.length;
-    if (at < 0) at = list.length;
-    list.splice(at, 0, moving);
-    list.forEach((issue, idx) => {
-      const order = (idx + 1) * 1000;
-      if (issue.id === id) saveIssue(projectId, board, issue, { status, order });
-      else if (issue.order !== order) storage.save("issues", { ...issue, order }, projectId);
-    });
-  }
-
-  function addColumn() {
-    const used = new Set(board.columns.map((c) => c.color));
-    const col: BoardColumn = {
-      id: uuid(),
-      name: "New column",
-      color: COLUMN_COLORS.find((c) => !used.has(c)) ?? COLUMN_COLORS[0],
-      category: "doing",
-    };
-    const doneAt = board.columns.findIndex((c) => c.category === "done");
-    const columns = [...board.columns];
-    columns.splice(doneAt === -1 ? columns.length : doneAt, 0, col);
-    saveBoard(projectId, board, { columns });
-  }
+  const move = (id: string, status: string, before: string | null) => moveIssueToColumn(projectId, board, id, status, before);
 
   const stats = activeSprint ? sprintStats(board, onBoard) : null;
   const left = activeSprint ? daysLeft(activeSprint.endDate) : null;
@@ -558,7 +543,7 @@ function BoardView({
           </span>
           {doneOnBoard.length > 0 && (
             <button
-              onClick={() => doneOnBoard.forEach((i) => saveIssue(projectId, board, i, { archived: true }))}
+              onClick={() => archiveDoneIssues(projectId, board)}
               className="ml-auto inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md"
               style={secondaryBtn}
               title="Take finished issues off the board. They stay in All issues, searchable and linkable."
@@ -635,7 +620,7 @@ function BoardView({
           );
         })}
         <button
-          onClick={addColumn}
+          onClick={() => addColumn(projectId, board)}
           className="shrink-0 w-[60vw] max-w-[220px] md:w-48 h-11 snap-start rounded-xl inline-flex items-center justify-center gap-1.5 text-xs"
           style={{ border: "1px dashed var(--border-hover)", color: "var(--text-secondary)" }}
         >
@@ -715,42 +700,20 @@ function ColumnHeader({
     };
   }, [menu]);
 
-  const patch = (p: Partial<BoardColumn>) => saveBoard(projectId, board, { columns: board.columns.map((c) => (c.id === column.id ? { ...c, ...p } : c)) });
-  const doneCount = board.columns.filter((c) => c.category === "done").length;
+  const patch = (p: Partial<BoardColumn>) => patchColumn(projectId, board, column.id, p);
   const inColumn = issues.filter((i) => i.status === column.id);
   const others = board.columns.filter((c) => c.id !== column.id);
 
   function setCategory(category: ColumnCategory) {
-    if (column.category === "done" && category !== "done" && doneCount === 1) {
-      setError("Keep at least one Done column, so finished work can be counted.");
-      return;
-    }
-    setError(null);
-    patch({ category });
-    const done = category === "done";
-    for (const i of inColumn) {
-      if (done && !i.resolvedAt) storage.save("issues", { ...i, resolvedAt: new Date().toISOString() }, projectId);
-      if (!done && i.resolvedAt) storage.save("issues", { ...i, resolvedAt: undefined }, projectId);
-    }
+    const change = setColumnCategory(projectId, board, column.id, category);
+    setError(change.ok ? null : change.error);
   }
 
-  function shift(dir: -1 | 1) {
-    const j = index + dir;
-    if (j < 0 || j >= board.columns.length) return;
-    const columns = [...board.columns];
-    [columns[index], columns[j]] = [columns[j], columns[index]];
-    saveBoard(projectId, board, { columns });
-  }
+  const shift = (direction: -1 | 1) => shiftColumn(projectId, board, column.id, direction);
 
   function remove() {
-    if (board.columns.length === 1) return setError("A board needs at least one column.");
-    if (column.category === "done" && doneCount === 1) return setError("Keep at least one Done column.");
-    if (inColumn.length) {
-      const target = board.columns.find((c) => c.id === moveTo);
-      if (!target) return setError("Choose where its issues should go.");
-      for (const i of inColumn) saveIssue(projectId, board, i, { status: target.id });
-    }
-    saveBoard(projectId, board, { columns: board.columns.filter((c) => c.id !== column.id) });
+    const change = removeColumn(projectId, board, column.id, moveTo);
+    if (!change.ok) setError(change.error);
   }
 
   return (
@@ -1016,7 +979,7 @@ function IssueCard({
           {done && (
             <button
               onClick={() => {
-                saveIssue(projectId, board, issue, { archived: true });
+                archiveIssue(projectId, board, issue);
                 setMenu(null);
               }}
               className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs text-left hover:bg-[var(--bg-hover)]"
@@ -1057,38 +1020,12 @@ function BacklogView({
   const planned = board.sprints.filter((s) => s.state === "planned");
   const sections: { sprint: Sprint | null }[] = [...(active ? [{ sprint: active }] : []), ...planned.map((s) => ({ sprint: s })), { sprint: null }];
 
-  function moveTo(issueId: string, sprintId: string | null, before: string | null) {
-    const moving = storage.getById("issues", issueId, projectId);
-    if (!moving) return;
-    const list = open.filter((i) => i.sprintId === sprintId && i.id !== issueId).sort(byOrder);
-    let at = before ? list.findIndex((i) => i.id === before) : list.length;
-    if (at < 0) at = list.length;
-    list.splice(at, 0, moving);
-    list.forEach((issue, idx) => {
-      const order = (idx + 1) * 1000;
-      if (issue.id === issueId) saveIssue(projectId, board, issue, { sprintId, order });
-      else if (issue.order !== order) storage.save("issues", { ...issue, order }, projectId);
-    });
-  }
+  const moveTo = (issueId: string, sprintId: string | null, before: string | null) => moveIssueToSprint(projectId, board, issueId, sprintId, before);
+  const patchSprintFields = (id: string, p: Partial<Sprint>) => patchSprint(projectId, board, id, p);
 
-  function createSprint() {
-    const n = board.sprints.length + 1;
-    const sprint: Sprint = { id: uuid(), name: `Sprint ${n}`, state: "planned" };
-    saveBoard(projectId, board, { sprints: [...board.sprints, sprint] });
-  }
-
-  const patchSprint = (id: string, p: Partial<Sprint>) => saveBoard(projectId, board, { sprints: board.sprints.map((s) => (s.id === id ? { ...s, ...p } : s)) });
-
-  function startSprint(s: Sprint) {
-    const start = s.startDate || today();
-    const end = s.endDate || new Date(Date.parse(start) + 13 * DAY).toISOString().slice(0, 10);
-    patchSprint(s.id, { state: "active", startDate: start, endDate: end });
-  }
-
-  function deleteSprint(s: Sprint) {
+  function confirmDeleteSprint(s: Sprint) {
     if (!confirm(`Delete "${s.name}"? Its issues go back to the backlog.`)) return;
-    for (const i of issues.filter((x) => x.sprintId === s.id)) saveIssue(projectId, board, i, { sprintId: null });
-    saveBoard(projectId, board, { sprints: board.sprints.filter((x) => x.id !== s.id) });
+    deleteSprint(projectId, board, s.id);
   }
 
   const closed = board.sprints.filter((s) => s.state === "closed");
@@ -1099,7 +1036,7 @@ function BacklogView({
         <p className="text-xs flex-1 min-w-60" style={{ color: "var(--text-muted)" }}>
           Plan work in sprints: drag issues from the backlog into a sprint, start it, and the board shows only that sprint. Completing a sprint archives what&rsquo;s done.
         </p>
-        <button onClick={createSprint} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs" style={secondaryBtn}>
+        <button onClick={() => createSprint(projectId, board)} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs" style={secondaryBtn}>
           <Plus className="w-3.5 h-3.5" /> Create sprint
         </button>
       </div>
@@ -1132,7 +1069,7 @@ function BacklogView({
                 <>
                   <input
                     defaultValue={sprint.name}
-                    onBlur={(e) => e.target.value.trim() && e.target.value !== sprint.name && patchSprint(sprint.id, { name: e.target.value.trim() })}
+                    onBlur={(e) => e.target.value.trim() && e.target.value !== sprint.name && patchSprintFields(sprint.id, { name: e.target.value.trim() })}
                     className="bg-transparent text-sm font-semibold outline-none w-36 rounded px-1 focus:bg-[var(--bg-primary)]"
                     style={{ color: "var(--text-primary)" }}
                     aria-label="Sprint name"
@@ -1145,7 +1082,7 @@ function BacklogView({
                   <input
                     type="date"
                     value={sprint.startDate ?? ""}
-                    onChange={(e) => patchSprint(sprint.id, { startDate: e.target.value || undefined })}
+                    onChange={(e) => patchSprintFields(sprint.id, { startDate: e.target.value || undefined })}
                     className="px-1.5 py-0.5 rounded text-[11px] outline-none"
                     style={{ ...fieldStyle, colorScheme: "dark" }}
                     aria-label="Start date"
@@ -1156,7 +1093,7 @@ function BacklogView({
                   <input
                     type="date"
                     value={sprint.endDate ?? ""}
-                    onChange={(e) => patchSprint(sprint.id, { endDate: e.target.value || undefined })}
+                    onChange={(e) => patchSprintFields(sprint.id, { endDate: e.target.value || undefined })}
                     className="px-1.5 py-0.5 rounded text-[11px] outline-none"
                     style={{ ...fieldStyle, colorScheme: "dark" }}
                     aria-label="End date"
@@ -1172,7 +1109,7 @@ function BacklogView({
                     ) : (
                       <>
                         <button
-                          onClick={() => startSprint(sprint)}
+                          onClick={() => startSprint(projectId, board, sprint.id)}
                           disabled={!!active}
                           className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-semibold disabled:opacity-40"
                           style={{ background: "var(--accent)" }}
@@ -1180,7 +1117,7 @@ function BacklogView({
                         >
                           <Play className="w-3 h-3" /> Start sprint
                         </button>
-                        <button onClick={() => deleteSprint(sprint)} className="p-1 rounded-md" style={{ color: "var(--text-secondary)" }} aria-label={`Delete ${sprint.name}`} title="Delete sprint (its issues go back to the backlog)">
+                        <button onClick={() => confirmDeleteSprint(sprint)} className="p-1 rounded-md" style={{ color: "var(--text-secondary)" }} aria-label={`Delete ${sprint.name}`} title="Delete sprint (its issues go back to the backlog)">
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </>
@@ -1188,7 +1125,7 @@ function BacklogView({
                   </div>
                   <input
                     defaultValue={sprint.goal ?? ""}
-                    onBlur={(e) => e.target.value !== (sprint.goal ?? "") && patchSprint(sprint.id, { goal: e.target.value || undefined })}
+                    onBlur={(e) => e.target.value !== (sprint.goal ?? "") && patchSprintFields(sprint.id, { goal: e.target.value || undefined })}
                     placeholder={COPY.board.sprintGoalPlaceholder}
                     className="basis-full bg-transparent text-xs outline-none rounded px-1 py-0.5 focus:bg-[var(--bg-primary)]"
                     style={{ color: "var(--text-secondary)" }}
@@ -1469,7 +1406,7 @@ function AllIssuesView({
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          saveIssue(projectId, board, i, { archived: false });
+                          restoreIssue(projectId, board, i);
                         }}
                         className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md whitespace-nowrap"
                         style={secondaryBtn}

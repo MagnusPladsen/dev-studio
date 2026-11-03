@@ -99,4 +99,8 @@ export interface AppCopy {
     /** What a [[link]] to a story entry opens, as in "Open story entry “Pip”". */
     storyTarget: string;
   };
+  claude: {
+    /** First line of the "Use with Claude" dialog: what Claude can do with this app's projects. */
+    pitch: string;
+  };
 }

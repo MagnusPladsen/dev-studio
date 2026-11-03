@@ -19,6 +19,8 @@ import {
   type Persister,
 } from "@/lib/storage";
 import { getSupabase, supabaseEnabled } from "@/lib/supabase";
+import { clearDeviceStorage, deleteOwnAccount } from "@/lib/account";
+import { signInWithEmail, signInWithGitHub } from "@/lib/sign-in";
 import { migrateAllElementAssetLinks } from "@/lib/diagrams/element-links";
 import { createCloudPersister, createCloudReader, loadCloudSnapshot, uploadSnapshot, type SyncStatus } from "@/lib/sync/cloud";
 import { connectRealtime, createRemoteSync, type RemoteSync } from "@/lib/sync/realtime";
@@ -53,6 +55,10 @@ interface SyncContextValue {
   disconnectFolder(): Promise<void>;
   /** Re-mount the open editor so it re-reads storage (after bulk changes like adding examples). */
   reloadView(): void;
+  /** Deletes the signed-in account with all its projects. Returns an error message, or null when done. */
+  deleteAccount(): Promise<string | null>;
+  /** Guests: removes every project and setting this app keeps in this browser, and forgets the local folder. */
+  clearDeviceData(): Promise<void>;
 }
 
 function cachedIds(): { projects: string[]; assets: string[] } {
@@ -135,7 +141,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       const supabase = getSupabase()!;
       userIdRef.current = u.id;
       goLive(() => {});
-      let cursor: string | null = null;
+      let loaded: Awaited<ReturnType<typeof loadCloudSnapshot>>;
       try {
         if (localHasData()) {
           setStatus({ state: "saving", message: "Moving your local projects into your account…" });
@@ -143,9 +149,8 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
           clearLocalData();
         }
         setStatus({ state: "saving", message: "Loading your projects…" });
-        const loaded = await loadCloudSnapshot(supabase);
+        loaded = await loadCloudSnapshot(supabase);
         replaceCache(loaded.snapshot);
-        cursor = loaded.cursor;
       } catch (err) {
         userIdRef.current = null;
         enterLocal();
@@ -154,14 +159,23 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       }
       setUser({ id: u.id, email: u.email });
       let live: RemoteSync | null = null;
-      const persister = createCloudPersister(supabase, u.id, setStatus, (rows) => {
-        live?.written(rows).catch(() => {});
-      });
+      const persister = createCloudPersister(
+        supabase,
+        u.id,
+        setStatus,
+        (rows) => {
+          live?.written(rows).catch(() => {});
+        },
+        (changes) => applyRemote(changes, persister.dropProject)
+      );
+      persister.remember("projects", loaded.rows.projects);
+      persister.remember("assets", loaded.rows.assets);
       usePrimary(persister);
       live = createRemoteSync({
         userId: u.id,
         reader: createCloudReader(supabase),
-        cursor,
+        cursor: loaded.cursor,
+        onServerRow: (table, kind, row) => (kind === "delete" ? persister.forget(table, row.id) : persister.remember(table, [row])),
         apply: (changes) => applyRemote(changes, persister.dropProject),
         isBusy: persister.isBusy,
         locate: locateCached,
@@ -243,24 +257,8 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       status,
       folder,
       folderAvailable,
-      async signInWithEmail(email) {
-        const supabase = getSupabase();
-        if (!supabase) return "Cloud sync is not configured on this server.";
-        const { error } = await supabase.auth.signInWithOtp({
-          email,
-          options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
-        });
-        return error?.message ?? null;
-      },
-      async signInWithGitHub() {
-        const supabase = getSupabase();
-        if (!supabase) return "Cloud sync is not configured on this server.";
-        const { error } = await supabase.auth.signInWithOAuth({
-          provider: "github",
-          options: { redirectTo: `${window.location.origin}/auth/callback` },
-        });
-        return error?.message ?? null;
-      },
+      signInWithEmail,
+      signInWithGitHub,
       async signOut() {
         await primary.current?.persister.flush?.();
         await getSupabase()?.auth.signOut();
@@ -289,8 +287,30 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         await forgetFolder();
         setFolder({ state: "none" });
       },
+      async deleteAccount() {
+        const supabase = getSupabase();
+        if (!supabase || !userIdRef.current) return "You are not signed in.";
+        await primary.current?.persister.flush?.();
+        // the deletes that follow must not reach a connected folder through live updates
+        goLive(() => {});
+        folderRef.current?.detach();
+        const error = await deleteOwnAccount(supabase);
+        if (!error) return null;
+        const { data } = await supabase.auth.getUser();
+        if (data.user) await enterCloud(data.user);
+        return error;
+      },
+      async clearDeviceData() {
+        folderRef.current?.detach();
+        folderRef.current = null;
+        await forgetFolder();
+        setFolder({ state: "none" });
+        clearDeviceStorage(localStorage);
+        replaceCache(new Map());
+        setGeneration((g) => g + 1);
+      },
     }),
-    [ready, generation, user, status, folder, folderAvailable, attachFolder, reportError]
+    [ready, generation, user, status, folder, folderAvailable, attachFolder, enterCloud, goLive, reportError]
   );
 
   return <SyncContext.Provider value={value}>{children}</SyncContext.Provider>;

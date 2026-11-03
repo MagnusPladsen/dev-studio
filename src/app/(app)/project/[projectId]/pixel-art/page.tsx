@@ -55,7 +55,7 @@ import { rowButtonProps } from "@/lib/row-button";
 import { COPY_FAILED_MESSAGE, useAssetMenu } from "@/components/AssetContextMenu";
 import type { ContextMenuEntry } from "@/components/ContextMenu";
 import { useToast } from "@/components/Toast";
-import { copyToSystemClipboard } from "@/lib/asset-actions";
+import { copyToSystemClipboard } from "@/lib/clipboard";
 import { AssetMenuButton, AssetPinButton, PasteButton } from "@/components/AssetMenuButton";
 import type { Sprite, SpriteFrame } from "@/types";
 

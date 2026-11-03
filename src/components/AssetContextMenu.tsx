@@ -7,11 +7,10 @@ import { ContextMenu, type ContextMenuEntry } from "@/components/ContextMenu";
 import { AssetPickerModal } from "@/components/AssetPickerModal";
 import { useSync } from "@/components/SyncProvider";
 import { useToast, type ToastOptions } from "@/components/Toast";
-import { saveIssue } from "@/components/board/meta";
+import { saveIssue } from "@/lib/board";
 import {
   addAssetToDiagram,
   assetUrl,
-  copyToSystemClipboard,
   createDiagramWith,
   createNoteAbout,
   createTaskFor,
@@ -24,6 +23,7 @@ import {
   systemClipboardPayload,
   type StoredAsset,
 } from "@/lib/asset-actions";
+import { copyToSystemClipboard } from "@/lib/clipboard";
 import { getOpenAsset } from "@/lib/open-asset";
 import { canPaste, copyAsset, pasteAsset, readClipboard } from "@/lib/asset-clipboard";
 import {

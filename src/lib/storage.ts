@@ -78,6 +78,9 @@ export type Snapshot = Map<string, Item[]>;
 
 export const LOCAL_PREFIX = "gds:";
 
+/** `format` of an "export everything" file: `{ format, version, exportedAt, projects: [<project file>, …] }`. */
+export const BUNDLE_FORMAT = "gamedev-studio-bundle";
+
 export function cacheKey(collection: CollectionName, projectId?: string): string {
   if (collection === "projects" || !projectId) return `${LOCAL_PREFIX}${collection}`;
   return `${LOCAL_PREFIX}${projectId}:${collection}`;
@@ -186,28 +189,43 @@ export const storage = {
     return () => remoteListeners.delete(listener);
   },
 
-  exportProject(projectId: string): string {
+  exportProjectData(projectId: string): Record<string, unknown> {
     const data: Record<string, unknown> = { format: "gamedev-studio", version: 1 };
     for (const col of PROJECT_COLLECTIONS) data[col] = this.getAll(col, projectId);
     data.project = this.getById("projects", projectId);
-    return JSON.stringify(data, null, 2);
+    return data;
   },
 
+  exportProject(projectId: string): string {
+    return JSON.stringify(this.exportProjectData(projectId), null, 2);
+  },
+
+  /** Reads one project file, or an "export everything" file (every project, each keeping its app). */
   importProject(json: string): Project | null {
     try {
       const data = JSON.parse(json);
-      if (!data.project?.id) return null;
-      // a file exported from the other app becomes a project of this one
-      const project: Project = { ...data.project, app: APP.id };
-      this.save("projects", project);
-      for (const col of PROJECT_COLLECTIONS) {
-        if (!Array.isArray(data[col])) continue;
-        for (const item of data[col]) this.save(col, item, project.id);
+      if (data.format === BUNDLE_FORMAT && Array.isArray(data.projects)) {
+        const imported = data.projects.map((entry: unknown) => this.importProjectData(entry, true));
+        return imported.find(Boolean) ?? null;
       }
-      return project;
+      return this.importProjectData(data, false);
     } catch {
       return null;
     }
+  },
+
+  importProjectData(data: unknown, keepApp: boolean): Project | null {
+    const file = data as Record<string, unknown> & { project?: Project };
+    if (!file?.project?.id) return null;
+    // a single file exported from the other app becomes a project of this one
+    const project: Project = keepApp ? file.project : { ...file.project, app: APP.id };
+    this.save("projects", project);
+    for (const col of PROJECT_COLLECTIONS) {
+      const items = file[col];
+      if (!Array.isArray(items)) continue;
+      for (const item of items) this.save(col, item, project.id);
+    }
+    return project;
   },
 };
 
