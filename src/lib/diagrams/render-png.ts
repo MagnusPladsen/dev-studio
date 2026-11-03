@@ -1,7 +1,10 @@
 import type { Diagram, DiagramEdge, DiagramNode } from "@/types";
 import { getShape } from "@/lib/canvas-shapes";
 import { BOARD_BG, CARD_BORDER, FONT, LABEL_BG, LABEL_TEXT, LINE, PAD } from "./export-style";
-import { boundsOf, edgeEndpoints, edgeLabelPos, type Rect } from "./geometry";
+import { routeFor } from "@/lib/canvas-shapes/routes";
+import { relationMark, type EdgeRoute } from "./edge-route";
+import { boundsOf, type Rect } from "./geometry";
+import { cardinalityEnds } from "./tables";
 import type { Images } from "./png-cards";
 
 export interface AssetLook {
@@ -34,18 +37,32 @@ function imageSources(input: RenderInput): string[] {
   return input.diagram.nodes.flatMap((node) => getShape(node.type).imageSources?.(node, input) ?? []).filter(Boolean);
 }
 
-function drawEdge(ctx: CanvasRenderingContext2D, edge: DiagramEdge, from: Rect, to: Rect) {
-  const { start, end } = edgeEndpoints(from, to);
+function drawRelationEnds(ctx: CanvasRenderingContext2D, edge: DiagramEdge, points: EdgeRoute["points"]) {
+  if (!edge.cardinality) return;
+  const [fromEnd, toEnd] = cardinalityEnds(edge.cardinality);
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  for (const [a, b] of [...relationMark(points, "start", fromEnd), ...relationMark(points, "end", toEnd)]) {
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+  }
+  ctx.stroke();
+  ctx.lineCap = "butt";
+}
+
+function drawEdge(ctx: CanvasRenderingContext2D, edge: DiagramEdge, { points, labelAt: pos }: EdgeRoute) {
+  const start = points[points.length - 2];
+  const end = points[points.length - 1];
   ctx.strokeStyle = LINE;
   ctx.fillStyle = LINE;
   ctx.lineWidth = 1.5;
   ctx.setLineDash(edge.type === "dashed" ? [6, 4] : []);
   ctx.beginPath();
-  ctx.moveTo(start.x, start.y);
-  ctx.lineTo(end.x, end.y);
+  points.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
   ctx.stroke();
   ctx.setLineDash([]);
-  if (edge.type !== "line") {
+  drawRelationEnds(ctx, edge, points);
+  if (edge.type !== "line" && !edge.cardinality) {
     const angle = Math.atan2(end.y - start.y, end.x - start.x);
     ctx.beginPath();
     ctx.moveTo(end.x, end.y);
@@ -55,7 +72,6 @@ function drawEdge(ctx: CanvasRenderingContext2D, edge: DiagramEdge, from: Rect, 
     ctx.fill();
   }
   if (!edge.label) return;
-  const pos = edgeLabelPos(start, end);
   ctx.font = `11px ${FONT}`;
   const width = ctx.measureText(edge.label).width + 12;
   ctx.fillStyle = LABEL_BG;
@@ -100,7 +116,7 @@ export async function renderDiagramPng(input: RenderInput): Promise<HTMLCanvasEl
   for (const edge of diagram.edges) {
     const from = byId.get(edge.from);
     const to = byId.get(edge.to);
-    if (from && to) drawEdge(ctx, edge, input.rectOf(from), input.rectOf(to));
+    if (from && to) drawEdge(ctx, edge, routeFor(edge, from, to, input.rectOf));
   }
   for (const node of diagram.nodes) if (!isBack(node)) drawNode(ctx, node, input, images);
   return canvas;

@@ -22,6 +22,7 @@ const SAVED_SIZES: Record<NodeType, [number, number]> = {
   ellipse: [160, 100],
   diamond: [160, 110],
   drawing: [100, 100],
+  table: [240, 120],
 };
 
 const node = (extra: Partial<DiagramNode>): DiagramNode => ({ id: "n", type: "note", x: 0, y: 0, width: 200, height: 80, label: "", ...extra });
@@ -102,6 +103,23 @@ describe("createNode", () => {
 
   it("should shift the card by the cascade", () => {
     expect(createNode("note", { x: 0, y: 0 }, { id: "a", cascade: 20 })).toMatchObject({ x: -90, y: -28, label: "" });
+  });
+});
+
+describe("table shape", () => {
+  it("should start with an id, a name and a timestamp column", () => {
+    const card = createNode("table", { x: 0, y: 0 }, { id: "t" });
+    expect((card.data?.columns as { id: string }[]).map((c) => c.id)).toEqual(["t-id", "t-name", "t-created"]);
+  });
+
+  it("should size itself to its rows whatever height was saved", () => {
+    const card = createNode("table", { x: 0, y: 0 }, { id: "t" });
+    expect(SHAPES.table.contentHeight!({ ...card, height: 999 })).toBe(SHAPES.table.size.height);
+  });
+
+  it("should anchor lines to the middle of a row", () => {
+    const card = createNode("table", { x: 120, y: 60 }, { id: "t" });
+    expect(SHAPES.table.anchorY!(card, "t-name")).toBe(card.y + 36 + 26 + 13);
   });
 });
 

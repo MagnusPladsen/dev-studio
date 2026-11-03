@@ -10,6 +10,7 @@ const SECTIONS: { section: LibrarySection; title: string }[] = [
   { section: "board", title: "Board cards" },
   { section: "shapes", title: "Shapes" },
   { section: "flow", title: "Flow chart" },
+  { section: "database", title: "Database" },
 ];
 
 function MenuItem({ shape, onPick }: { shape: ShapeDefinition; onPick(type: NodeType): void }) {

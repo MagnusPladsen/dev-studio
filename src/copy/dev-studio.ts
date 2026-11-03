@@ -94,6 +94,7 @@ export const DEV_STUDIO_COPY = {
         "Ctrl/⌘+C, Ctrl/⌘+V and Ctrl/⌘+D copy, paste and duplicate cards, lines included.",
         "Double-click a card or line to edit it. Delete removes the selection; Ctrl/⌘+Z undoes.",
         "Press / on the board to search for a shape and drop it where the pointer is.",
+        "Database tables: double-click to edit columns, then drag a row's dot onto a row of another table. Select the line to switch n–1, 1–1, 1–n and n–n.",
         "Export the board as PNG, SVG or JSON.",
       ],
     },

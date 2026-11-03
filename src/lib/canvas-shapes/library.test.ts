@@ -7,7 +7,7 @@ const types = (shapes: { type: string }[]) => shapes.map((shape) => shape.type);
 
 describe("libraryTabs", () => {
   it("should only show tabs that have shapes", () => {
-    expect(libraryTabs().map((tab) => tab.id)).toEqual(["general", "flow"]);
+    expect(libraryTabs().map((tab) => tab.id)).toEqual(["general", "flow", "database"]);
   });
 });
 

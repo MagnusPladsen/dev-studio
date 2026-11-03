@@ -14,6 +14,7 @@ import {
   ShapeBody,
   type BodyProps,
 } from "./CardBodies";
+import { TableBody } from "./TableBody";
 
 interface DiagramCardProps {
   node: DiagramNode;
@@ -39,6 +40,7 @@ const BODIES: Record<BodyKind, (props: BodyProps) => React.ReactNode> = {
   asset: AssetBody,
   group: GroupBody,
   note: NoteBody,
+  table: TableBody,
 };
 
 function Body(props: BodyProps) {
@@ -72,7 +74,7 @@ export const DiagramCard = memo(function DiagramCard(props: DiagramCardProps) {
         left: node.x,
         top: node.y,
         width: node.width,
-        height: isAuto ? undefined : node.height,
+        height: isAuto ? undefined : shape.contentHeight?.(node) ?? node.height,
         outline,
         outlineOffset: 3,
         borderRadius: isDrawing ? 4 : 12,
@@ -86,18 +88,21 @@ export const DiagramCard = memo(function DiagramCard(props: DiagramCardProps) {
         projectId={props.projectId}
         isEditing={isEditing}
         isLoading={props.isLoading}
+        hasHandles={hasHandles}
         onCommit={(patch) => props.onCommit(node.id, patch)}
         onCancel={props.onStopEditing}
         onPickImage={() => props.onPickImage(node.id)}
       />
       {hasHandles && !isEditing && (
         <>
-          <span
-            data-connect-handle=""
-            className="absolute top-1/2 -right-3 -translate-y-1/2 w-3.5 h-3.5 rounded-full border-2 pointer-events-auto max-md:w-5 max-md:h-5 max-md:-right-4"
-            style={{ background: "var(--accent)", borderColor: "var(--bg-primary)", cursor: "crosshair" }}
-            title="Drag onto another card to connect them"
-          />
+          {!shape.anchorY && (
+            <span
+              data-connect-handle=""
+              className="absolute top-1/2 -right-3 -translate-y-1/2 w-3.5 h-3.5 rounded-full border-2 pointer-events-auto max-md:w-5 max-md:h-5 max-md:-right-4"
+              style={{ background: "var(--accent)", borderColor: "var(--bg-primary)", cursor: "crosshair" }}
+              title="Drag onto another card to connect them"
+            />
+          )}
           <span
             data-resize-handle=""
             className="absolute -bottom-1.5 -right-1.5 w-3.5 h-3.5 rounded-sm border-2 pointer-events-auto max-md:w-5 max-md:h-5 max-md:-bottom-2.5 max-md:-right-2.5"

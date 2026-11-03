@@ -4,6 +4,7 @@ import type { Rect } from "@/lib/diagrams/geometry";
 import type { ShapeOutline } from "@/lib/diagrams/shapes";
 import { BASIC_SHAPES } from "./basic-shapes";
 import { BOARD_CARDS } from "./board-cards";
+import { DATABASE_SHAPES } from "./database-shapes";
 import { FLOW_SHAPES } from "./flow-shapes";
 import type { ShapeDefinition } from "./types";
 
@@ -13,7 +14,7 @@ export type { BodyKind, LibrarySection, Placement, ShapeDefinition } from "./typ
  * Every kind of Canvas card, in the order the Add menu lists them. A new shape is one more definition
  * here (plus a body component if it needs a new `BodyKind`); the page reads everything else from it.
  */
-export const SHAPE_LIST: readonly ShapeDefinition[] = [...BOARD_CARDS, ...BASIC_SHAPES, ...FLOW_SHAPES];
+export const SHAPE_LIST: readonly ShapeDefinition[] = [...BOARD_CARDS, ...BASIC_SHAPES, ...FLOW_SHAPES, ...DATABASE_SHAPES];
 
 export const SHAPES = Object.fromEntries(SHAPE_LIST.map((shape) => [shape.type, shape])) as Record<NodeType, ShapeDefinition>;
 

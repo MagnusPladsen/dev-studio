@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowRight, Maximize, ZoomIn, ZoomOut } from "lucide-react";
-import type { Diagram } from "@/types";
+import type { Cardinality, Diagram } from "@/types";
 import type { History } from "@/hooks/useHistory";
 import type { SaveState } from "@/hooks/useAutosave";
 import { UndoRedoButtons } from "@/components/UndoRedoButtons";
@@ -10,6 +10,7 @@ import { ExportMenu } from "@/components/ExportMenu";
 import { HelpButton } from "@/components/HelpButton";
 import { LinkedAssets } from "@/components/LinkedAssets";
 import type { NodeType } from "@/lib/diagrams/cards";
+import { CARDINALITY_LABELS } from "@/lib/diagrams/tables";
 import { AddCardMenu } from "./AddCardMenu";
 import { ToolPicker, type BoardTool } from "./ToolPicker";
 
@@ -22,11 +23,14 @@ interface CanvasToolbarProps {
   saveState: SaveState;
   tool: BoardTool;
   hasSelectedEdge: boolean;
+  /** Set when the selected line is a table relation. */
+  selectedCardinality?: Cardinality;
   onBack(): void;
   onRename(name: string): void;
   onTool(tool: BoardTool): void;
   onAdd(type: NodeType): void;
   onToggleEdgeType(): void;
+  onToggleCardinality(): void;
   onZoomIn(): void;
   onZoomOut(): void;
   onFit(): void;
@@ -78,6 +82,17 @@ export function CanvasToolbar(props: CanvasToolbarProps) {
             aria-label="Change line style"
           >
             <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        )}
+        {props.selectedCardinality && (
+          <button
+            onClick={props.onToggleCardinality}
+            className="px-2 py-1 rounded text-xs font-mono"
+            style={{ color: "var(--text-primary)", background: "var(--bg-card)", border: "1px solid var(--border)" }}
+            title="Change the relation's ends (n–1, 1–1, 1–n, n–n)"
+            aria-label={`Relation ends: ${CARDINALITY_LABELS[props.selectedCardinality]}. Click to change`}
+          >
+            {CARDINALITY_LABELS[props.selectedCardinality]}
           </button>
         )}
 

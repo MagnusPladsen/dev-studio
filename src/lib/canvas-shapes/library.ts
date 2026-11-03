@@ -20,6 +20,7 @@ const TABS: LibraryTab[] = [
     ],
   },
   { id: "flow", label: "Flow", sections: [{ section: "flow", title: "Flow chart" }] },
+  { id: "database", label: "Database", sections: [{ section: "database", title: "Entity relationship" }] },
 ];
 
 export function shapesInSection(section: LibrarySection): ShapeDefinition[] {

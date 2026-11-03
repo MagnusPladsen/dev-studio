@@ -42,6 +42,8 @@ export interface BodyProps {
   projectId: string;
   isEditing: boolean;
   isLoading: boolean;
+  /** This is the one selected card, so it shows its handles (tables show one per row). */
+  hasHandles: boolean;
   onCommit(patch: Partial<DiagramNode>): void;
   onCancel(): void;
   onPickImage(): void;
@@ -50,7 +52,7 @@ export interface BodyProps {
 /** Marks an element whose clicks belong to it, so pressing it never starts a card drag. */
 export const CONTROL = { "data-card-control": "" };
 
-const FIELD_STYLE: React.CSSProperties = {
+export const FIELD_STYLE: React.CSSProperties = {
   background: "var(--bg-primary)",
   color: "var(--text-primary)",
   border: "1px solid var(--border)",

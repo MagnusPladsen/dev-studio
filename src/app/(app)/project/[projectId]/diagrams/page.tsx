@@ -17,6 +17,7 @@ import { createLongPress } from "@/lib/long-press";
 import type { Point as MenuPoint } from "@/lib/menu-position";
 import { ASSET_KINDS, getAsset } from "@/lib/assets";
 import { linkCardSize, linkPreview, linkUrl, nodeAsset, type NodeType } from "@/lib/diagrams/cards";
+import { newLine, nextCardinality, pruneRowLinks, tableColumns, type LineEnd } from "@/lib/diagrams/tables";
 import { getShape } from "@/lib/canvas-shapes";
 import { createNode, insertNode } from "@/lib/canvas-shapes/create";
 import { SHAPE_DRAG_TYPE } from "@/lib/canvas-shapes/library";
@@ -57,7 +58,7 @@ type Interaction =
   | { kind: "draw"; points: Point[] }
   | { kind: "pan"; start: Point; pan: Point }
   | { kind: "resize"; nodeId: string; start: Point; width: number; height: number }
-  | { kind: "connect"; fromId: string }
+  | { kind: "connect"; fromId: string; fromRow?: string }
   | { kind: "pinch"; distance: number; zoom: number; anchor: Point };
 
 const DOUBLE_TAP_MS = 320;
@@ -66,6 +67,13 @@ const GRID = 30;
 const PASTE_OFFSET = 24;
 /** Screen pixels the pen must travel before another point is recorded. */
 const PEN_STEP_PX = 2;
+
+/** A card's height on the board: tables follow their rows, notes and media their measured content. */
+function rectHeight(node: DiagramNode, measured: Record<string, number>): number {
+  const shape = getShape(node.type);
+  if (shape.contentHeight) return shape.contentHeight(node);
+  return shape.isAutoHeight ? measured[node.id] ?? node.height : node.height;
+}
 
 function closestData(target: EventTarget | null, attribute: string): string | null {
   const element = target instanceof Element ? target.closest(`[${attribute}]`) : null;
@@ -99,7 +107,9 @@ export default function DiagramsPage() {
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const [isInteracting, setIsInteracting] = useState(false);
   const [connectFrom, setConnectFrom] = useState<string | null>(null);
-  const [connectDraft, setConnectDraft] = useState<{ fromId: string; to: Point } | null>(null);
+  const [connectDraft, setConnectDraft] = useState<{ fromId: string; fromRow?: string; to: Point } | null>(null);
+  /** The table row the Connect tool's first click landed on, if any. */
+  const connectFromRow = useRef<string | undefined>(undefined);
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
   const [editingEdgeId, setEditingEdgeId] = useState<string | null>(null);
   const [measured, setMeasured] = useState<Record<string, number>>({});
@@ -205,7 +215,7 @@ export default function DiagramsPage() {
       x: node.x,
       y: node.y,
       width: node.width,
-      height: getShape(node.type).isAutoHeight ? measured[node.id] ?? node.height : node.height,
+      height: rectHeight(node, measured),
     }),
     [measured]
   );
@@ -264,6 +274,10 @@ export default function DiagramsPage() {
     (id: string, patch: Partial<DiagramNode>) => {
       updateNode(id, patch);
       setEditingNodeId(null);
+      if (Array.isArray(patch.data?.columns)) {
+        const columns = tableColumns({ ...(patch as DiagramNode), data: patch.data });
+        setCurrent((prev) => (prev ? { ...prev, edges: pruneRowLinks(prev.edges, id, columns) } : prev));
+      }
       const url = patch.data?.url;
       if (typeof url === "string" && !patch.data?.preview) void fetchPreview(id, url);
     },
@@ -446,9 +460,9 @@ export default function DiagramsPage() {
     if (tool === "draw" || tool === "connect") selectNodes([]);
   }
 
-  function addEdge(from: string, to: string) {
-    if (from === to) return;
-    updateCurrent((d) => ({ ...d, edges: [...d.edges, { id: uuid(), from, to, label: "", type: "arrow" }] }));
+  function addEdge(from: LineEnd, to: LineEnd) {
+    const edge = newLine(uuid(), from, to);
+    if (edge) updateCurrent((d) => ({ ...d, edges: [...d.edges, edge] }));
   }
 
   function stackGroup(groupId: string) {
@@ -506,11 +520,16 @@ export default function DiagramsPage() {
     const node = current?.nodes.find((n) => n.id === nodeId);
     if (!node || !current) return;
     if (mode === "connect") {
-      if (connectFrom && connectFrom !== nodeId) {
-        addEdge(connectFrom, nodeId);
+      const row = closestData(e.target, "data-row-id") ?? undefined;
+      const isSameEnd = connectFrom === nodeId && connectFromRow.current === row;
+      if (connectFrom && !isSameEnd) {
+        addEdge({ id: connectFrom, row: connectFromRow.current }, { id: nodeId, row });
         setConnectFrom(null);
         setConnectDraft(null);
-      } else setConnectFrom(nodeId);
+      } else {
+        setConnectFrom(nodeId);
+        connectFromRow.current = row;
+      }
       return;
     }
     const isAdditive = e.shiftKey || mode === "area";
@@ -545,12 +564,12 @@ export default function DiagramsPage() {
     if (isDoubleTap(`edge:${edgeId}`)) setTimeout(() => setEditingEdgeId(edgeId));
   }
 
-  function startHandleDrag(handle: "resize" | "connect", nodeId: string, point: Point) {
+  function startHandleDrag(handle: "resize" | "connect", nodeId: string, point: Point, fromRow?: string) {
     const node = current?.nodes.find((n) => n.id === nodeId);
     if (!node) return;
     if (handle === "connect") {
-      interaction.current = { kind: "connect", fromId: nodeId };
-      setConnectDraft({ fromId: nodeId, to: point });
+      interaction.current = { kind: "connect", fromId: nodeId, fromRow };
+      setConnectDraft({ fromId: nodeId, fromRow, to: point });
       return;
     }
     const { width, height } = rectOf(node);
@@ -571,7 +590,7 @@ export default function DiagramsPage() {
     if (mode === "draw") return startPen(point);
     const nodeId = closestData(e.target, "data-node-id");
     if (nodeId && closestData(e.target, "data-resize-handle") !== null) return startHandleDrag("resize", nodeId, point);
-    if (nodeId && closestData(e.target, "data-connect-handle") !== null) return startHandleDrag("connect", nodeId, point);
+    if (nodeId && closestData(e.target, "data-connect-handle") !== null) return startHandleDrag("connect", nodeId, point, closestData(e.target, "data-row-id") ?? undefined);
     if (nodeId) return pressNode(nodeId, point, e);
     const edgeId = closestData(e.target, "data-edge-id");
     if (edgeId) return pressEdge(edgeId);
@@ -639,7 +658,7 @@ export default function DiagramsPage() {
     if (!node) return;
     const shape = getShape(node.type);
     const width = Math.max(shape.minSize.width, Math.round(resize.width + point.x - resize.start.x));
-    const height = shape.isAutoHeight ? node.height : Math.max(shape.minSize.height, Math.round(resize.height + point.y - resize.start.y));
+    const height = shape.isAutoHeight || shape.contentHeight ? node.height : Math.max(shape.minSize.height, Math.round(resize.height + point.y - resize.start.y));
     updateNode(node.id, { width, height });
   }
 
@@ -660,12 +679,12 @@ export default function DiagramsPage() {
     const point = toBoard(e.clientX, e.clientY);
     const active = interaction.current;
     if (!active) {
-      if (mode === "connect" && connectFrom) setConnectDraft({ fromId: connectFrom, to: point });
+      if (mode === "connect" && connectFrom) setConnectDraft({ fromId: connectFrom, fromRow: connectFromRow.current, to: point });
       return;
     }
     if (active.kind === "drag") moveDrag(active, point);
     else if (active.kind === "resize") moveResize(active, point);
-    else if (active.kind === "connect") setConnectDraft({ fromId: active.fromId, to: point });
+    else if (active.kind === "connect") setConnectDraft({ fromId: active.fromId, fromRow: active.fromRow, to: point });
     else if (active.kind === "pinch") movePinch(active);
     else if (active.kind === "box") moveBox(active, point);
     else if (active.kind === "draw") movePen(active, point);
@@ -677,8 +696,9 @@ export default function DiagramsPage() {
     longPress.up();
     const active = interaction.current;
     if (active?.kind === "connect" && e.type !== "pointercancel") {
-      const targetId = closestData(document.elementFromPoint(e.clientX, e.clientY), "data-node-id");
-      if (targetId) addEdge(active.fromId, targetId);
+      const target = document.elementFromPoint(e.clientX, e.clientY);
+      const targetId = closestData(target, "data-node-id");
+      if (targetId) addEdge({ id: active.fromId, row: active.fromRow }, { id: targetId, row: closestData(target, "data-row-id") ?? undefined });
     }
     if (active?.kind === "connect") setConnectDraft(null);
     if (active?.kind === "box") setSelectionBox(null);
@@ -803,6 +823,13 @@ export default function DiagramsPage() {
     }));
   }
 
+  function toggleCardinality() {
+    updateCurrent((d) => ({
+      ...d,
+      edges: d.edges.map((edge) => (edge.id === selectedEdgeId && edge.cardinality ? { ...edge, cardinality: nextCardinality(edge.cardinality) } : edge)),
+    }));
+  }
+
   function renderInput(diagram: Diagram): RenderInput {
     return { diagram, rectOf, describeAsset: (node) => describeAsset(projectId, node) };
   }
@@ -853,6 +880,8 @@ export default function DiagramsPage() {
         saveState={autosave.state}
         tool={mode}
         hasSelectedEdge={Boolean(selectedEdgeId)}
+        selectedCardinality={current?.edges.find((edge) => edge.id === selectedEdgeId)?.cardinality}
+        onToggleCardinality={toggleCardinality}
         onBack={() => { autosave.flush(); setShowList(true); }}
         onRename={(name) => updateCurrent((d) => ({ ...d, name }))}
         onTool={changeTool}

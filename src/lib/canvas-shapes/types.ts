@@ -21,13 +21,13 @@ export interface PngContext extends ExportContext {
 }
 
 /** Which card body draws the shape on the board; each kind has one React component in `DiagramCard`. */
-export type BodyKind = "shape" | "note" | "checklist" | "image" | "link" | "asset" | "group" | "drawing";
+export type BodyKind = "shape" | "note" | "checklist" | "image" | "link" | "asset" | "group" | "drawing" | "table";
 
 /** What happens when someone adds the shape from the menu, the library or quick-add. */
 export type Placement = "place" | "edit" | "pick-image" | "pick-asset";
 
 /** Sections of the Add menu; the shape library groups them into tabs. */
-export type LibrarySection = "board" | "shapes" | "flow";
+export type LibrarySection = "board" | "shapes" | "flow" | "database";
 
 export interface LibraryEntry {
   section: LibrarySection;
@@ -67,6 +67,12 @@ export interface ShapeDefinition {
   shapeStyle?: "basic" | "flow";
   /** Shape bodies: horizontal padding (a Tailwind class) that keeps the label inside the outline. */
   labelInset?: string;
+  /** Cards whose height follows their data (table rows): the board and the exports use this, not the stored height. */
+  contentHeight?(node: DiagramNode): number;
+  /** Cards with rows lines can attach to: the row's vertical middle on the board, or undefined if it's gone. */
+  anchorY?(node: DiagramNode, anchorId: string): number | undefined;
+  /** Starting `data` for a new card; `nodeId` keeps ids inside it unique. */
+  defaultData?(nodeId: string): Record<string, unknown>;
   /** Shown in the Add menu, the shape library and quick-add; cards without one are made another way (the pen). */
   library?: LibraryEntry;
   toSvg(node: DiagramNode, r: Rect, context: ExportContext): string;

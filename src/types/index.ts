@@ -129,7 +129,8 @@ export interface DiagramNode {
     | "rectangle"
     | "ellipse"
     | "diamond"
-    | "drawing";
+    | "drawing"
+    | "table";
   x: number;
   y: number;
   width: number;
@@ -139,12 +140,21 @@ export interface DiagramNode {
   data?: Record<string, unknown>;
 }
 
+/** Crow's-foot ends of a database relation line: the first word is the `from` end, the second the `to` end. */
+export type Cardinality = "one-to-one" | "one-to-many" | "many-to-one" | "many-to-many";
+
 export interface DiagramEdge {
   id: string;
   from: string;
   to: string;
   label?: string;
   type: "arrow" | "line" | "dashed";
+  /** The table row (column id) the line starts at, when `from` is a table. */
+  fromRow?: string;
+  /** The table row (column id) the line ends at, when `to` is a table. */
+  toRow?: string;
+  /** Set on relation lines between tables: draws crow's-foot ends instead of an arrowhead. */
+  cardinality?: Cardinality;
 }
 
 export interface Diagram {

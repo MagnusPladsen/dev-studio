@@ -7,6 +7,7 @@ import { DRAWING_STROKE, placedPoints } from "./freehand";
 import type { Rect } from "./geometry";
 import type { AssetLook } from "./render-png";
 import type { ShapeOutline } from "./shapes";
+import { keyColor, keyLabel, TABLE_HEADER, TABLE_ROW, tableColumns } from "./tables";
 
 /** Pictures the PNG export loaded up front, by source; `null` when the host wouldn't share one. */
 export type Images = Map<string, HTMLImageElement | null>;
@@ -299,4 +300,42 @@ export function drawAssetCard(ctx: CanvasRenderingContext2D, node: DiagramNode, 
   ctx.fillStyle = TEXT;
   ctx.font = `600 14px ${FONT}`;
   drawLines(ctx, [look?.name ?? node.label], x, r.y + 30, 18, r.y + r.height);
+}
+
+export function drawTable(ctx: CanvasRenderingContext2D, node: DiagramNode, r: Rect, shape: ShapeDefinition) {
+  const color = node.color ?? shape.color;
+  ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(r.x, r.y, r.width, r.height, 8);
+  ctx.fillStyle = CARD_BG;
+  ctx.fill();
+  ctx.clip();
+  ctx.fillStyle = `${color}2e`;
+  ctx.fillRect(r.x, r.y, r.width, TABLE_HEADER);
+  ctx.restore();
+  drawText(ctx, [node.label], r.x + 12, r.y + 11, { font: "600 13px", color: TEXT, lineHeight: 16 }, r.y + r.height);
+  const columns = tableColumns(node);
+  if (!columns.length) drawText(ctx, ["No columns"], r.x + 12, r.y + TABLE_HEADER + 7, { font: "12px", color: MUTED, lineHeight: 14 }, r.y + r.height);
+  columns.forEach((column, i) => {
+    const top = r.y + TABLE_HEADER + i * TABLE_ROW;
+    ctx.strokeStyle = CARD_BORDER;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(r.x, top);
+    ctx.lineTo(r.x + r.width, top);
+    ctx.stroke();
+    const key = keyLabel(column);
+    if (key) drawText(ctx, [key], r.x + 10, top + 8, { font: "700 9px", color: keyColor(column), lineHeight: 12 }, r.y + r.height);
+    drawText(ctx, [column.name], r.x + 42, top + 6, { font: column.isPrimaryKey ? "600 12px" : "12px", color: TEXT, lineHeight: 14 }, r.y + r.height);
+    ctx.fillStyle = MUTED;
+    ctx.font = `11px ${FONT}`;
+    ctx.textAlign = "right";
+    ctx.textBaseline = "top";
+    ctx.fillText(column.type, r.x + r.width - 10, top + 7);
+  });
+  ctx.beginPath();
+  ctx.roundRect(r.x, r.y, r.width, r.height, 8);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
 }

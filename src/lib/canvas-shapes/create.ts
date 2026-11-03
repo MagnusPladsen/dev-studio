@@ -19,6 +19,7 @@ export function createNode(type: NodeType, center: Point, { id, cascade = 0, ext
     id,
     type,
     label: shape.defaultLabel,
+    ...(shape.defaultData ? { data: shape.defaultData(id) } : {}),
     ...extra,
     x: Math.round(center.x - size.width / 2 + cascade),
     y: Math.round(center.y - size.height / 2 + cascade),

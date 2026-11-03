@@ -7,6 +7,7 @@ import { DRAWING_STROKE, placedPoints, smoothPath } from "./freehand";
 import { GROUP_HEADER, type Rect } from "./geometry";
 import type { AssetLook } from "./render-png";
 import { polygonPoints, type ShapeOutline } from "./shapes";
+import { keyColor, keyLabel, TABLE_HEADER, TABLE_ROW, tableColumns } from "./tables";
 
 /** Rough glyph width as a share of the font size; SVG export can't measure text, so it wraps by estimate. */
 const CHAR_WIDTH = 0.56;
@@ -205,4 +206,25 @@ export function assetSvg(node: DiagramNode, r: Rect, look: AssetLook | null): st
   }
   svg += textBlock([look?.kind ?? "Deleted asset"], x, r.y + 14, { size: 11, lineHeight: 14, color });
   return svg + textBlock([look?.name ?? node.label], x, r.y + 30, { size: 14, lineHeight: 18, color: TEXT, weight: 600 });
+}
+
+/** A database table: the name in a tinted header, then one row per column with its key marker and type. */
+export function tableSvg(node: DiagramNode, r: Rect, shape: ShapeDefinition): string {
+  const color = escapeXml(node.color ?? shape.color);
+  const clipId = `table-${node.id.replace(/[^\w-]/g, "_")}`;
+  let svg = `<clipPath id="${clipId}"><rect x="${r.x}" y="${r.y}" width="${r.width}" height="${r.height}" rx="8"/></clipPath>`;
+  svg += `<rect x="${r.x}" y="${r.y}" width="${r.width}" height="${r.height}" rx="8" fill="${CARD_BG}"/>`;
+  svg += `<rect x="${r.x}" y="${r.y}" width="${r.width}" height="${TABLE_HEADER}" fill="${color}" fill-opacity="0.18" clip-path="url(#${clipId})"/>`;
+  svg += textBlock([node.label], r.x + 12, r.y + 11, { size: 13, lineHeight: 16, color: TEXT, weight: 600 });
+  const columns = tableColumns(node);
+  if (!columns.length) svg += textBlock(["No columns"], r.x + 12, r.y + TABLE_HEADER + 7, { size: 12, lineHeight: 14, color: MUTED });
+  columns.forEach((column, i) => {
+    const top = r.y + TABLE_HEADER + i * TABLE_ROW;
+    svg += `<line x1="${r.x}" y1="${top}" x2="${r.x + r.width}" y2="${top}" stroke="${CARD_BORDER}"/>`;
+    const key = keyLabel(column);
+    if (key) svg += textBlock([key], r.x + 10, top + 8, { size: 9, lineHeight: 12, color: keyColor(column), weight: 700 });
+    svg += textBlock([column.name], r.x + 42, top + 6, { size: 12, lineHeight: 14, color: TEXT, weight: column.isPrimaryKey ? 600 : undefined });
+    svg += `<text x="${r.x + r.width - 10}" y="${top + 7}" font-size="11" fill="${MUTED}" text-anchor="end" dominant-baseline="hanging">${escapeXml(column.type)}</text>`;
+  });
+  return svg + `<rect x="${r.x}" y="${r.y}" width="${r.width}" height="${r.height}" rx="8" fill="none" stroke="${color}" stroke-width="1.5"/>`;
 }
