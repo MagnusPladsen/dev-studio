@@ -249,6 +249,8 @@ export interface Sprint {
   endDate?: string;
   state: "planned" | "active" | "closed";
   closedAt?: string;
+  /** Added with the example issues, and removed with them. */
+  example?: boolean;
 }
 
 /** One task board per project: its columns and sprints. Issues are stored separately. */

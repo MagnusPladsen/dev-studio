@@ -7,7 +7,7 @@ import { audioExamples } from "./audio";
 import { levelExamples } from "./levels";
 import { planningExamples } from "./planning";
 import { writingExamples } from "./writing";
-import { boardExamples } from "./board";
+import { boardExamples, removeExampleSprints } from "./board";
 import { modelExamples } from "./models";
 import { devStudioExamples, DEV_STUDIO_LINKS } from "./dev-studio";
 import { isDevStudio } from "../app-config";
@@ -115,6 +115,7 @@ export function removeExamples(projectId: string, collections: ProjectCollection
       removed++;
     }
   }
+  if (collections.includes("issues")) removeExampleSprints(projectId);
   return removed;
 }
 

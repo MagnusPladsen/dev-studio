@@ -1,6 +1,6 @@
 import type { AssetRef } from "@/types";
 import type { ExampleModule } from "./types";
-import { issuesModule, type IssueDraft } from "./board";
+import { issuesModule, type ExampleSprint, type IssueDraft } from "./board";
 import { diagram } from "./planning";
 
 // Dev Studio's example project: "Tidepool", a small habit-tracker app heading for its public beta.
@@ -259,9 +259,13 @@ Tip: write *what you did*, *what happened* and *what you expected*.
   ],
 };
 
+const BETA_PREP: ExampleSprint = { slug: "sprint-beta-prep", name: "Beta prep", goal: "Ready for the first beta batch", current: true };
+const BETA_LAUNCH: ExampleSprint = { slug: "sprint-beta-launch", name: "Beta launch", goal: "Invite testers and watch the numbers" };
+
 const ISSUES: IssueDraft[] = [
   {
     slug: "i-onboarding",
+    sprint: BETA_PREP,
     title: "Onboarding: pick three habits",
     status: "done",
     type: "feature",
@@ -272,6 +276,7 @@ const ISSUES: IssueDraft[] = [
   },
   {
     slug: "i-streaks",
+    sprint: BETA_PREP,
     title: "Rest days in the streak engine",
     status: "testing",
     type: "feature",
@@ -282,6 +287,7 @@ const ISSUES: IssueDraft[] = [
   },
   {
     slug: "i-sync-conflicts",
+    sprint: BETA_PREP,
     title: "Resolve sync conflicts between devices",
     status: "in-progress",
     type: "feature",
@@ -293,6 +299,7 @@ const ISSUES: IssueDraft[] = [
   },
   {
     slug: "i-reminders",
+    sprint: BETA_PREP,
     title: "Habit reminders",
     status: "in-progress",
     type: "feature",
@@ -303,17 +310,20 @@ const ISSUES: IssueDraft[] = [
   },
   {
     slug: "i-crash-bug",
+    sprint: BETA_PREP,
     title: "Bug: crash after changing the phone's language",
     status: "todo",
     type: "bug",
     priority: "high",
     points: 2,
     labels: ["bug", "app"],
+    dueInDays: -1,
     description:
       "**Steps**\n1. Open Tidepool\n2. Change the phone's language in Settings\n3. Switch back to the app\n\n**Expected** the app shows the new language  \n**Actual** it crashes",
   },
   {
     slug: "i-beta-invites",
+    sprint: BETA_LAUNCH,
     title: "Send beta invites in batches",
     status: "todo",
     type: "task",
@@ -324,6 +334,7 @@ const ISSUES: IssueDraft[] = [
   },
   {
     slug: "i-analytics",
+    sprint: BETA_LAUNCH,
     title: "Privacy-friendly usage stats",
     status: "todo",
     type: "task",

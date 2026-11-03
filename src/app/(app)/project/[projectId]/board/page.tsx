@@ -9,6 +9,7 @@ import {
   ArrowDown,
   ArrowUp,
   CalendarDays,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Flag,
@@ -18,15 +19,17 @@ import {
   NotebookPen,
   Play,
   Plus,
+  RotateCcw,
   Search,
   SquareKanban,
   Trash2,
   X,
 } from "lucide-react";
 import { v4 as uuid } from "uuid";
-import type { Board, BoardColumn, ColumnCategory, Issue, IssuePriority, IssueType, Sprint } from "@/types";
+import type { AssetRelation, Board, BoardColumn, ColumnCategory, Issue, IssuePriority, IssueType, Sprint } from "@/types";
 import { storage } from "@/lib/storage";
-import { getRelated } from "@/lib/links";
+import { countRelated, linksTouching, restoreLinks, type RelatedCount } from "@/lib/links";
+import { taskProgress } from "@/lib/task-list";
 import { useOpenParam, useTrackOpenAsset, useStorageVersion } from "@/hooks/useStorage";
 import { useHistory } from "@/hooks/useHistory";
 import { UndoRedoButtons } from "@/components/UndoRedoButtons";
@@ -50,6 +53,7 @@ import {
   TYPE_META,
   TypeIcon,
   createDefaultBoard,
+  completeSprint,
   createIssue,
   csvCell,
   daysLeft,
@@ -57,6 +61,7 @@ import {
   formatDate,
   isOverdue,
   relativeTime,
+  reopenSprint,
   saveBoard,
   saveIssue,
   secondaryBtn,
@@ -69,15 +74,16 @@ const MOVE_MENU_ROW_HEIGHT = 30;
 const MOVE_MENU_PADDING = 32;
 
 type View = "board" | "backlog" | "all";
-type Filters = { q: string; type: IssueType | ""; priority: IssuePriority | ""; label: string };
-const NO_FILTERS: Filters = { q: "", type: "", priority: "", label: "" };
+/** `labels`: show issues with any of these labels (none picked = any label). */
+type Filters = { q: string; type: IssueType | ""; priority: IssuePriority | ""; labels: string[] };
+const NO_FILTERS: Filters = { q: "", type: "", priority: "", labels: [] };
 
 const byOrder = (a: Issue, b: Issue) => a.order - b.order || a.createdAt.localeCompare(b.createdAt);
 
 function matches(i: Issue, f: Filters): boolean {
   if (f.type && i.type !== f.type) return false;
   if (f.priority && i.priority !== f.priority) return false;
-  if (f.label && !i.labels.includes(f.label)) return false;
+  if (f.labels.length && !f.labels.some((l) => i.labels.includes(l))) return false;
   const q = f.q.trim().toLowerCase();
   if (!q) return true;
   return [i.key, i.title, i.description, ...i.labels].some((s) => s?.toLowerCase().includes(q));
@@ -123,16 +129,27 @@ export default function TaskBoardPage() {
   const issuesKey = issues.map((i) => `${i.id}@${i.updatedAt}:${i.order}`).join("|");
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const snapshot = useMemo(() => ({ board, issues }), [board?.updatedAt, issuesKey]);
+
+  // deleting an issue deletes its links; remember each issue's last links so undo can bring them back
+  const lastLinks = useRef(new Map<string, AssetRelation[]>());
+  useEffect(() => {
+    const touching = linksTouching(projectId, issues.map((i) => i.id));
+    for (const i of issues) lastLinks.current.set(i.id, touching.get(i.id) ?? []);
+  }, [projectId, version, issues]);
+
   const restore = useCallback(
     (snap: { board?: Board; issues: Issue[] }) => {
       if (snap.board) storage.save("boards", snap.board, projectId);
       const current = storage.getAll("issues", projectId);
       const want = new Map(snap.issues.map((i) => [i.id, i]));
       for (const c of current) if (!want.has(c.id)) storage.delete("issues", c.id, projectId);
+      const revived: string[] = [];
       for (const w of snap.issues) {
         const c = current.find((x) => x.id === w.id);
+        if (!c) revived.push(w.id);
         if (c !== w) storage.save("issues", w, projectId);
       }
+      restoreLinks(projectId, revived.flatMap((id) => lastLinks.current.get(id) ?? []));
     },
     [projectId]
   );
@@ -237,9 +254,7 @@ export default function TaskBoardPage() {
         </div>
       </div>
 
-      {view !== "backlog" && (
-        <FilterBar filters={filters} setFilters={setFilters} labels={labels} />
-      )}
+      <FilterBar filters={filters} setFilters={setFilters} labels={labels} />
 
       <div className="flex-1 min-h-0 overflow-auto">
         {issues.length === 0 ? (
@@ -256,7 +271,7 @@ export default function TaskBoardPage() {
             onGoBacklog={() => setView("backlog")}
           />
         ) : view === "backlog" ? (
-          <BacklogView projectId={projectId} board={board} issues={issues} onOpen={setOpenId} onCompleteSprint={setCompleting} />
+          <BacklogView projectId={projectId} board={board} issues={issues} filters={filters} onOpen={setOpenId} onCompleteSprint={setCompleting} />
         ) : (
           <AllIssuesView projectId={projectId} board={board} issues={issues} filters={filters} onOpen={setOpenId} />
         )}
@@ -290,7 +305,7 @@ export default function TaskBoardPage() {
 // ─── filters ─────────────────────────────────────────────────────────────────
 
 function FilterBar({ filters, setFilters, labels }: { filters: Filters; setFilters(f: Filters): void; labels: string[] }) {
-  const active = filters.q || filters.type || filters.priority || filters.label;
+  const active = filters.q || filters.type || filters.priority || filters.labels.length > 0;
   const sel = "px-2 py-1 rounded-md text-xs outline-none";
   return (
     <div className="shrink-0 px-3 md:px-4 py-2 flex flex-wrap items-center gap-2 border-b" style={{ borderColor: "var(--border)" }}>
@@ -321,20 +336,62 @@ function FilterBar({ filters, setFilters, labels }: { filters: Filters; setFilte
           </option>
         ))}
       </select>
-      {labels.length > 0 && (
-        <select value={filters.label} onChange={(e) => setFilters({ ...filters, label: e.target.value })} className={sel} style={fieldStyle} aria-label="Filter by label">
-          <option value="">Any label</option>
-          {labels.map((l) => (
-            <option key={l} value={l}>
-              {l}
-            </option>
-          ))}
-        </select>
-      )}
+      {labels.length > 0 && <LabelFilter labels={labels} selected={filters.labels} onChange={(picked) => setFilters({ ...filters, labels: picked })} />}
       {active && (
         <button onClick={() => setFilters(NO_FILTERS)} className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs" style={secondaryBtn}>
           <X className="w-3 h-3" /> Clear
         </button>
+      )}
+    </div>
+  );
+}
+
+function LabelFilter({ labels, selected, onChange }: { labels: string[]; selected: string[]; onChange(picked: string[]): void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: PointerEvent) => ref.current && !ref.current.contains(e.target as Node) && setOpen(false);
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("pointerdown", close);
+    document.addEventListener("keydown", esc);
+    return () => {
+      document.removeEventListener("pointerdown", close);
+      document.removeEventListener("keydown", esc);
+    };
+  }, [open]);
+
+  const summary = selected.length === 0 ? "Any label" : selected.length === 1 ? selected[0] : `${selected.length} labels`;
+  const toggle = (label: string) => onChange(selected.includes(label) ? selected.filter((l) => l !== label) : [...selected, label]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs outline-none"
+        style={fieldStyle}
+        aria-label="Filter by label"
+        aria-haspopup="true"
+        aria-expanded={open}
+      >
+        {summary}
+        <ChevronDown className="w-3 h-3" style={{ color: "var(--text-muted)" }} />
+      </button>
+      {open && (
+        <div className="absolute left-0 top-full mt-1 z-30 w-48 max-h-64 overflow-y-auto p-1 rounded-lg shadow-xl" style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)" }}>
+          {labels.map((l) => (
+            <label key={l} className="flex items-center gap-2 px-2 py-1.5 rounded-md text-xs cursor-pointer hover:bg-[var(--bg-hover)]" style={{ color: "var(--text-primary)" }}>
+              <input type="checkbox" checked={selected.includes(l)} onChange={() => toggle(l)} />
+              {l}
+            </label>
+          ))}
+          {selected.length > 0 && (
+            <button onClick={() => onChange([])} className="w-full text-left px-2 py-1.5 rounded-md text-xs hover:bg-[var(--bg-hover)]" style={{ color: "var(--text-secondary)" }}>
+              Any label
+            </button>
+          )}
+        </div>
       )}
     </div>
   );
@@ -377,6 +434,7 @@ function BoardView({
   const shown = onBoard.filter((i) => matches(i, filters));
   const doneIds = new Set(board.columns.filter((c) => c.category === "done").map((c) => c.id));
   const doneOnBoard = onBoard.filter((i) => doneIds.has(i.status));
+  const relatedCounts = countRelated(projectId, shown.map((i) => i.id));
 
   function move(id: string, status: string, before: string | null) {
     const moving = storage.getById("issues", id, projectId);
@@ -508,6 +566,7 @@ function BoardView({
                       projectId={projectId}
                       board={board}
                       issue={issue}
+                      related={relatedCounts.get(issue.id) ?? { notes: 0, others: 0 }}
                       onOpen={() => onOpen(issue.id)}
                       onMove={(status) => move(issue.id, status, null)}
                       onDragStart={(e) => {
@@ -754,6 +813,7 @@ function IssueCard({
   projectId,
   board,
   issue,
+  related,
   onOpen,
   onMove,
   onDragStart,
@@ -762,24 +822,20 @@ function IssueCard({
   projectId: string;
   board: Board;
   issue: Issue;
+  related: RelatedCount;
   onOpen(): void;
   onMove(status: string): void;
   onDragStart(e: React.DragEvent): void;
   onDragOverCard(e: React.DragEvent<HTMLDivElement>): void;
 }) {
-  const version = useStorageVersion();
   const { assetTriggerProps } = useAssetMenu();
   const trigger = assetTriggerProps({ type: "issue", id: issue.id });
   const [menu, setMenu] = useState<MenuPlacement | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
-  const related = useMemo(
-    () => getRelated(projectId, "issue", issue.id),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [projectId, issue.id, version]
-  );
-  const noteCount = related.filter((r) => r.type === "note").length;
-  const linkCount = related.length - noteCount;
+  const noteCount = related.notes;
+  const linkCount = related.others;
+  const tasks = taskProgress(issue.description);
   const overdue = isOverdue(issue);
   const done = !!issue.resolvedAt;
 
@@ -844,6 +900,12 @@ function IssueCard({
           <span className="inline-flex items-center gap-0.5" style={{ color: overdue ? "var(--red)" : undefined }} title={overdue ? "Overdue" : "Due date"}>
             <CalendarDays className="w-3 h-3" />
             {formatDate(issue.dueDate)}
+          </span>
+        )}
+        {tasks.total > 0 && (
+          <span className="inline-flex items-center gap-0.5 tabular-nums" style={{ color: tasks.done === tasks.total ? "var(--green)" : undefined }} title={`${tasks.done} of ${tasks.total} tasks done`}>
+            <ListChecks className="w-3 h-3" />
+            {tasks.done}/{tasks.total}
           </span>
         )}
         {linkCount > 0 && (
@@ -936,12 +998,14 @@ function BacklogView({
   projectId,
   board,
   issues,
+  filters,
   onOpen,
   onCompleteSprint,
 }: {
   projectId: string;
   board: Board;
   issues: Issue[];
+  filters: Filters;
   onOpen(id: string): void;
   onCompleteSprint(s: Sprint): void;
 }) {
@@ -1004,6 +1068,7 @@ function BacklogView({
         const key = sprint?.id ?? "backlog";
         const list = open.filter((i) => i.sprintId === (sprint?.id ?? null)).sort(byOrder);
         const stats = sprintStats(board, list);
+        const shown = list.filter((i) => matches(i, filters));
         return (
           <section
             key={key}
@@ -1102,12 +1167,12 @@ function BacklogView({
               )}
             </div>
             <ul>
-              {list.length === 0 && (
+              {shown.length === 0 && (
                 <li className="px-3 py-3 text-xs" style={{ color: "var(--text-muted)" }}>
-                  {sprint ? "Drag issues here from the backlog." : "Nothing in the backlog."}
+                  {list.length > 0 ? "No issues match the filters." : sprint ? "Drag issues here from the backlog." : "Nothing in the backlog."}
                 </li>
               )}
-              {list.map((issue) => {
+              {shown.map((issue) => {
                 const col = board.columns.find((c) => c.id === issue.status);
                 return (
                   <li
@@ -1183,9 +1248,19 @@ function BacklogView({
             {closed.map((s) => {
               const n = issues.filter((i) => i.sprintId === s.id).length;
               return (
-                <li key={s.id}>
-                  {s.name}
-                  {s.goal ? `: ${s.goal}` : ""} · closed {formatDate(s.closedAt)} · {n} issue{n === 1 ? "" : "s"} (find them in All issues)
+                <li key={s.id} className="flex flex-wrap items-center gap-2">
+                  <span>
+                    {s.name}
+                    {s.goal ? `: ${s.goal}` : ""} · closed {formatDate(s.closedAt)} · {n} issue{n === 1 ? "" : "s"} (find them in All issues)
+                  </span>
+                  <button
+                    onClick={() => reopenSprint(projectId, board, s.id)}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md"
+                    style={secondaryBtn}
+                    title="Bring it back as a planned sprint. Archived issues stay in All issues."
+                  >
+                    <RotateCcw className="w-3 h-3" /> Reopen
+                  </button>
                 </li>
               );
             })}
@@ -1523,14 +1598,15 @@ function CompleteSprintDialog({
   const doneIds = new Set(board.columns.filter((c) => c.category === "done").map((c) => c.id));
   const done = inSprint.filter((i) => doneIds.has(i.status));
   const open = inSprint.filter((i) => !doneIds.has(i.status));
-  const next = board.sprints.find((s) => s.state === "planned");
+  const planned = board.sprints.filter((s) => s.state === "planned" && s.id !== sprint.id);
   const [target, setTarget] = useState<string>("");
 
   function complete() {
-    const now = new Date().toISOString();
-    for (const i of done) saveIssue(projectId, board, i, { archived: true });
-    for (const i of open) saveIssue(projectId, board, i, { sprintId: target || null });
-    saveBoard(projectId, board, { sprints: board.sprints.map((s) => (s.id === sprint.id ? { ...s, state: "closed", closedAt: now } : s)) });
+    const targetName = planned.find((s) => s.id === target)?.name ?? "the backlog";
+    const archiving = done.length ? `${done.length} done issue${done.length === 1 ? " is" : "s are"} archived` : "Nothing is archived";
+    const moving = open.length ? ` and ${open.length} open issue${open.length === 1 ? " moves" : "s move"} to ${targetName}` : "";
+    if (!confirm(`Complete "${sprint.name}"? ${archiving}${moving}.`)) return;
+    completeSprint(projectId, board, sprint.id, target || null);
     onClose();
   }
 
@@ -1557,7 +1633,12 @@ function CompleteSprintDialog({
             <span style={{ color: "var(--text-muted)" }}>Move open issues to</span>
             <select value={target} onChange={(e) => setTarget(e.target.value)} className="w-full px-2 py-1.5 rounded-md text-xs outline-none" style={fieldStyle}>
               <option value="">Backlog</option>
-              {next && <option value={next.id}>{next.name} (next sprint)</option>}
+              {planned.map((s, index) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                  {index === 0 ? " (next sprint)" : ""}
+                </option>
+              ))}
             </select>
           </label>
         )}
