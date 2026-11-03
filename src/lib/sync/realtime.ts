@@ -29,6 +29,8 @@ export interface RemoteSyncDeps {
   cachedIds(): Record<CloudTable, string[]>;
   /** The newest `updated_at` the initial load saw. */
   cursor: string | null;
+  /** A server version of a row was applied (or a row deleted), so the next save expects its rev. */
+  onServerRow?(table: CloudTable, kind: "upsert" | "delete", row: CloudRow): void;
   now?: () => number;
 }
 
@@ -80,6 +82,7 @@ export function createRemoteSync(deps: RemoteSyncDeps): RemoteSync {
     }
     if (time && time <= (seen.get(key) ?? 0)) return;
     if (time) seen.set(key, time);
+    deps.onServerRow?.(table, kind, row);
     const change = toChange(table, kind, row);
     if (change) deps.apply([change]);
   }
