@@ -7,7 +7,7 @@ import { useAssetMenu } from "@/components/AssetContextMenu";
 import { AssetMenuButton, AssetPinButton, PasteButton } from "@/components/AssetMenuButton";
 import { ExamplesBar } from "@/components/ExamplesBar";
 import { HelpButton } from "@/components/HelpButton";
-import { APP } from "@/lib/app-config";
+import { COPY } from "@/copy";
 import type { CanvasTemplate } from "@/lib/canvas-shapes/templates";
 import { TemplatePicker } from "./TemplatePicker";
 
@@ -44,7 +44,7 @@ export function CanvasList({ projectId, diagrams, onOpen, onNew, onDelete }: Can
         </div>
       </div>
       <p className="text-sm mb-3" style={{ color: "var(--text-secondary)" }}>
-        Boards for moodboards, story flow, level planning and reference collections, plus flow charts and state machines.
+        {COPY.canvas.intro}
       </p>
       <ExamplesBar projectId={projectId} collections={["diagrams"]} className="mb-6" />
       {diagrams.length === 0 ? (
@@ -54,7 +54,7 @@ export function CanvasList({ projectId, diagrams, onOpen, onNew, onDelete }: Can
             No canvases yet
           </p>
           <p className="text-sm mb-4 px-4" style={{ color: "var(--text-secondary)" }}>
-            Pin up notes, images, videos, links and to-dos, or plan {APP.subject} logic with flow charts
+            {COPY.canvas.emptyBody}
           </p>
           <div className="flex justify-center gap-2">
             <button

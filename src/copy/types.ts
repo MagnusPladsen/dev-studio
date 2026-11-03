@@ -82,6 +82,11 @@ export interface AppCopy {
     storySuggestionLabel: string;
   };
   canvas: {
+    /** Under the "Canvas" heading of the canvas list. */
+    intro: string;
+    emptyBody: string;
+    /** Library and Add menu hint of the card that shows another project item. */
+    assetCardHint: string;
     /** Starting card labels of the New canvas templates. */
     templates: {
       flowChart: { start: string; check: string; yes: string; no: string; end: string };

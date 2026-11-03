@@ -233,6 +233,9 @@ export const GAMEDEV_STUDIO_COPY = {
     storySuggestionLabel: "Story",
   },
   canvas: {
+    intro: "Boards for moodboards, story flow, level planning and reference collections, plus flow charts and state machines.",
+    emptyBody: "Pin up notes, images, videos, links and to-dos, or plan game logic with flow charts",
+    assetCardHint: "Any sprite, sound, story… in this project",
     templates: {
       flowChart: { start: "Player presses Jump", check: "On the ground?", yes: "Jump", no: "Buffer the jump", end: "Landed" },
       architectureDescription: "Client, servers and data, grouped by layer",

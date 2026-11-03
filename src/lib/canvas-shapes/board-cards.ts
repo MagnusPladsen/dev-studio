@@ -1,4 +1,5 @@
 import { Boxes, Image as ImageIcon, Link2, ListChecks, PenLine, SquareDashed, StickyNote } from "lucide-react";
+import { COPY } from "@/copy";
 import { imageSrc, linkPreview, linkUrl } from "@/lib/diagrams/cards";
 import { embedFor, imageUrlFor } from "@/lib/diagrams/embeds";
 import { drawAssetCard, drawChecklist, drawDrawing, drawGroup, drawImageCard, drawLink, drawNote } from "@/lib/diagrams/png-cards";
@@ -93,7 +94,7 @@ export const BOARD_CARDS = [
     canEditText: false,
     placement: "pick-asset",
     body: "asset",
-    library: { section: "board", hint: "Any sprite, sound, story… in this project", keywords: ["asset", "project", "reference", "embed"] },
+    library: { section: "board", hint: COPY.canvas.assetCardHint, keywords: ["asset", "project", "reference", "embed"] },
     toSvg: (node, r, { describeAsset }) => assetSvg(node, r, describeAsset(node)),
     drawPng: (ctx, node, r, { describeAsset, images }) => drawAssetCard(ctx, node, r, describeAsset(node), images),
     imageSources: (node, { describeAsset }) => [describeAsset(node)?.thumbnail ?? ""],

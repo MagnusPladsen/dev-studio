@@ -221,6 +221,9 @@ export const DEV_STUDIO_COPY = {
     storySuggestionLabel: "Wiki",
   },
   canvas: {
+    intro: "Boards for architecture sketches, flow charts, plans, moodboards and reference collections.",
+    emptyBody: "Pin up notes, images, videos, links and to-dos, or map out flows and architecture with flow charts",
+    assetCardHint: "Any issue, wiki page, note or decision in this project",
     templates: {
       flowChart: { start: "User opens sign-up", check: "Email valid?", yes: "Create account", no: "Show error", end: "Signed in" },
       architectureDescription: "Apps, API, jobs and data, grouped by layer",
