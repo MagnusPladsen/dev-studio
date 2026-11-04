@@ -50,6 +50,18 @@ only forgets the sign-in on this computer. An access token keeps working for up 
 Resources: `studio://projects`, `studio://project/{projectId}`, `studio://project/{projectId}/{type}/{id}` (one asset as
 Markdown, for `@`-mentions in Claude Code) and `studio://shapes` (canvas shapes).
 
+### Prompts
+
+Ready-made jobs; Claude Desktop shows them in the **+** menu, Claude Code as `/mcp__dev-studio__<name>`. Each one asks
+before it writes anything you haven't agreed to.
+
+| Prompt | Arguments | Does |
+|---|---|---|
+| `plan_sprint` | `projectId`, `capacity?` (points), `goal?` | reads the board, the backlog and the active sprint, proposes the next sprint, creates it once you agree |
+| `draw_data_model` | `projectId`, `source?` (a schema, code or a description) | builds an ERD canvas with tables, columns and relation lines, and links it to matching wiki pages and decisions |
+| `meeting_notes_to_issues` | `projectId`, `note` (title or id) | turns the note's `- [ ]` action items into issues linked back to the note; ticks nothing without asking |
+| `record_decision` | `projectId`, `topic` | asks a few questions, writes the next ADR, and offers to supersede an older one |
+
 Rules it keeps:
 
 - **No deletes.** Tokens issued to Claude can't delete rows (the database refuses). So `unlink` can take a link off a
