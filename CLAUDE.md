@@ -69,7 +69,8 @@ tools comes from `COPY.help`. `npm test` checks both objects have the same keys 
 - **Claude (MCP) sign-in**: `/oauth/consent` is the consent page of Supabase's OAuth 2.1 server (`src/lib/oauth-consent.ts`);
   the sidebar's **Use with Claude** (`src/components/UseWithClaude.tsx`) shows setup and Connected apps
   (`src/lib/oauth-grants.ts`). `/auth/cli` is a fallback behind `NEXT_PUBLIC_MCP_CLI_AUTH=on`. Owner setup and the
-  round-trip test: `docs/mcp-auth-setup.md`.
+  round-trip test: `docs/mcp-auth-setup.md`. The server itself is the `packages/mcp` workspace (`dev-studio-mcp`, see its
+  README): it bundles `src/lib` with tsup, so keep the modules it imports free of browser-only code at import time.
 - **Examples**: `src/lib/examples/` — one module per tool group; items get `example: true` and ids
   `ctx.id(slug)`; `addExamples` / `removeExamples` only ever touch flagged items. Slugs in `types.ts`.
 - **Shared editor pieces**: `useAutosave` + `SaveIndicator`, `ExportMenu`, `ExamplesBar`, `useHistory` +

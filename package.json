@@ -2,6 +2,9 @@
   "name": "gamedev-studio",
   "version": "0.1.0-beta",
   "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "dev": "next dev",
     "build": "next build",

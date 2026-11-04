@@ -50,3 +50,6 @@ next-env.d.ts
 /desktop/server/
 /desktop/dist/
 /desktop/node_modules/
+
+# MCP server bundle
+/packages/*/dist

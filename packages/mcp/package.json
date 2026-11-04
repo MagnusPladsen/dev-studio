@@ -1,0 +1,43 @@
+{
+  "name": "dev-studio-mcp",
+  "version": "0.1.0-beta",
+  "description": "MCP server for Dev Studio and GameDev Studio: plan sprints, draw canvases and search your notes from Claude.",
+  "homepage": "https://github.com/MagnusPladsen/dev-studio/tree/main/packages/mcp#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MagnusPladsen/dev-studio.git",
+    "directory": "packages/mcp"
+  },
+  "license": "MIT",
+  "author": {
+    "name": "Magnus Pladsen",
+    "email": "93226629+MagnusPladsen@users.noreply.github.com"
+  },
+  "type": "module",
+  "bin": {
+    "dev-studio-mcp": "dist/index.js",
+    "studio-mcp": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit -p .",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/server": "2.4.0",
+    "@napi-rs/keyring": "^2.1.2",
+    "@supabase/supabase-js": "^2.118.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/client": "^2.4.0",
+    "tsup": "^9.0.0"
+  },
+  "engines": {
+    "node": ">=20.9"
+  }
+}
