@@ -127,6 +127,15 @@ loaded (`src/store/persister.ts`). Calls run one at a time.
 MCP SDK: `@modelcontextprotocol/server` 2.x. Claude Code 2.1 and Claude Desktop first try the 2026-07-28 protocol
 (`server/discover`) and fall back to `initialize`; SDK 2.4 answers that with 2025-11-25, which both accept.
 
+### End-to-end check (local Supabase, never production)
+
+`scripts/mcp-e2e.sh` starts the repo's Supabase stack in Docker (migrations apply on start), builds this server and
+Dev Studio against it, and runs `e2e/run.ts`: users A and B, the real sign-in (`login` → the local consent page →
+loopback), every tool, prompt and resource over stdio, Playwright on the app at 1440×900 and 390×844, and the row
+level security checks (B can't read or write A's rows; tokens with a `client_id` claim can't delete). Needs Docker,
+the Supabase CLI and `npx playwright install chromium`. It stops the stack afterwards if it started it
+(`KEEP_STACK=1` keeps it). The **MCP end-to-end** GitHub workflow runs it by hand.
+
 ### Try it against your real account before it's on npm
 
 1. Build it: `npm install && npm run build -w dev-studio-mcp`.

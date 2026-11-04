@@ -1,0 +1,27 @@
+name: MCP end-to-end
+
+# Runs scripts/mcp-e2e.sh by hand: dev-studio-mcp against a local Supabase stack in Docker (never production),
+# the Dev Studio app built against it, and Playwright on desktop and phone. About 10 minutes.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Run the end-to-end check
+        run: scripts/mcp-e2e.sh
