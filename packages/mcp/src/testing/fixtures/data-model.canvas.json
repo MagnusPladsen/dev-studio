@@ -1,0 +1,217 @@
+{
+  "id": "2eecffed-594a-444a-b3fa-c5d749e6ba76",
+  "projectId": "p",
+  "name": "Task tracker data model",
+  "nodes": [
+    {
+      "id": "a3944210-e2a2-4420-b58a-dd03a0f1822e",
+      "type": "table",
+      "label": "teams",
+      "data": {
+        "columns": [
+          {
+            "id": "d6fb55b4-3e57-491c-9708-92dd9e922d7c",
+            "name": "id",
+            "type": "uuid",
+            "isPrimaryKey": true
+          },
+          {
+            "id": "d74f4977-d7e1-4b0b-a6d3-5257133f10e7",
+            "name": "name",
+            "type": "text"
+          }
+        ]
+      },
+      "width": 240,
+      "x": 0,
+      "y": 0,
+      "height": 94
+    },
+    {
+      "id": "86567765-1b2a-4116-b4aa-1052b25a8026",
+      "type": "table",
+      "label": "users",
+      "data": {
+        "columns": [
+          {
+            "id": "7b044154-e8ee-46ff-80c1-56de8e94dbe9",
+            "name": "id",
+            "type": "uuid",
+            "isPrimaryKey": true
+          },
+          {
+            "id": "12bfa47c-8b48-4817-b744-07105fdc044b",
+            "name": "email",
+            "type": "text"
+          },
+          {
+            "id": "730bcec9-a2fd-4568-aed7-7e0894e823ae",
+            "name": "team_id",
+            "type": "uuid",
+            "isForeignKey": true
+          }
+        ]
+      },
+      "width": 240,
+      "x": 320,
+      "y": 74,
+      "height": 120
+    },
+    {
+      "id": "64344d8f-8110-4f91-b673-8f6848fdef9e",
+      "type": "table",
+      "label": "tasks",
+      "data": {
+        "columns": [
+          {
+            "id": "2233ddd4-db75-4712-86d4-c172d452cf7a",
+            "name": "id",
+            "type": "uuid",
+            "isPrimaryKey": true
+          },
+          {
+            "id": "552a5be9-5662-4719-9b74-4bdd0c0b2eba",
+            "name": "title",
+            "type": "text"
+          },
+          {
+            "id": "3f5b1fcf-cca4-4fec-a117-e0b1288d5fa5",
+            "name": "assignee_id",
+            "type": "uuid",
+            "isForeignKey": true
+          },
+          {
+            "id": "485a2069-6632-4bf8-a813-0940cc3997d1",
+            "name": "team_id",
+            "type": "uuid",
+            "isForeignKey": true
+          },
+          {
+            "id": "f746fd4b-c8ba-41bb-91ed-8937846c981a",
+            "name": "due_at",
+            "type": "timestamptz"
+          }
+        ]
+      },
+      "width": 240,
+      "x": 640,
+      "y": 48,
+      "height": 172
+    },
+    {
+      "id": "b30b0b00-542d-4cef-bd42-b8ada5a214bb",
+      "type": "table",
+      "label": "tags",
+      "data": {
+        "columns": [
+          {
+            "id": "43ee5211-556b-4b46-b0b9-cf42d81aa341",
+            "name": "id",
+            "type": "uuid",
+            "isPrimaryKey": true
+          },
+          {
+            "id": "27e26e7c-92eb-40a4-bc67-b97ae3439a47",
+            "name": "label",
+            "type": "text"
+          }
+        ]
+      },
+      "width": 240,
+      "x": 0,
+      "y": 174,
+      "height": 94
+    },
+    {
+      "id": "cc84d7ba-d534-4576-8ef5-15c807542640",
+      "type": "table",
+      "label": "task_tags",
+      "data": {
+        "columns": [
+          {
+            "id": "019eb23e-2e49-4fec-965b-345bf16fcd78",
+            "name": "task_id",
+            "type": "uuid",
+            "isPrimaryKey": true,
+            "isForeignKey": true
+          },
+          {
+            "id": "f2fc5b96-c6ac-4375-92f9-d4f0d4c65bca",
+            "name": "tag_id",
+            "type": "uuid",
+            "isPrimaryKey": true,
+            "isForeignKey": true
+          }
+        ]
+      },
+      "width": 240,
+      "x": 960,
+      "y": 87,
+      "height": 94
+    },
+    {
+      "id": "a40a2768-74af-4333-b340-009fe5699bb5",
+      "type": "note",
+      "label": "Soft deletes: rows keep deleted_at instead of going away.",
+      "x": 640,
+      "y": 260,
+      "width": 220,
+      "height": 96
+    }
+  ],
+  "edges": [
+    {
+      "id": "e4c5d52b-f43b-4774-a98b-efebafe202b3",
+      "from": "86567765-1b2a-4116-b4aa-1052b25a8026",
+      "to": "a3944210-e2a2-4420-b58a-dd03a0f1822e",
+      "label": "",
+      "type": "line",
+      "cardinality": "many-to-one",
+      "fromRow": "730bcec9-a2fd-4568-aed7-7e0894e823ae",
+      "toRow": "d6fb55b4-3e57-491c-9708-92dd9e922d7c"
+    },
+    {
+      "id": "e30efeed-08b9-4121-ad77-9e8772e122a9",
+      "from": "64344d8f-8110-4f91-b673-8f6848fdef9e",
+      "to": "86567765-1b2a-4116-b4aa-1052b25a8026",
+      "label": "",
+      "type": "line",
+      "cardinality": "many-to-one",
+      "fromRow": "3f5b1fcf-cca4-4fec-a117-e0b1288d5fa5",
+      "toRow": "7b044154-e8ee-46ff-80c1-56de8e94dbe9"
+    },
+    {
+      "id": "4466ea40-a8d9-4894-8faf-a21bb5bd4395",
+      "from": "64344d8f-8110-4f91-b673-8f6848fdef9e",
+      "to": "a3944210-e2a2-4420-b58a-dd03a0f1822e",
+      "label": "",
+      "type": "line",
+      "cardinality": "many-to-one",
+      "fromRow": "485a2069-6632-4bf8-a813-0940cc3997d1",
+      "toRow": "d6fb55b4-3e57-491c-9708-92dd9e922d7c"
+    },
+    {
+      "id": "e2f35a3e-5042-4fab-80c1-4d1f46152590",
+      "from": "cc84d7ba-d534-4576-8ef5-15c807542640",
+      "to": "64344d8f-8110-4f91-b673-8f6848fdef9e",
+      "label": "",
+      "type": "line",
+      "cardinality": "many-to-one",
+      "fromRow": "019eb23e-2e49-4fec-965b-345bf16fcd78",
+      "toRow": "2233ddd4-db75-4712-86d4-c172d452cf7a"
+    },
+    {
+      "id": "3cc35f7b-3aa2-4c51-8eef-bae224506632",
+      "from": "cc84d7ba-d534-4576-8ef5-15c807542640",
+      "to": "b30b0b00-542d-4cef-bd42-b8ada5a214bb",
+      "label": "",
+      "type": "line",
+      "cardinality": "many-to-one",
+      "fromRow": "f2fc5b96-c6ac-4375-92f9-d4f0d4c65bca",
+      "toRow": "43ee5211-556b-4b46-b0b9-cf42d81aa341"
+    }
+  ],
+  "tags": [],
+  "createdAt": "2026-11-04T00:00:00.000Z",
+  "updatedAt": "2026-11-04T00:00:00.000Z"
+}
