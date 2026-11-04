@@ -91,6 +91,11 @@ export async function loadCloudSnapshot(
   supabase: SupabaseClient
 ): Promise<{ snapshot: Snapshot; cursor: string | null; rows: Record<CloudTable, CloudRow[]> }> {
   const [projects, assets] = await Promise.all([selectAll(supabase, "projects"), selectAll(supabase, "assets")]);
+  return { snapshot: snapshotFromRows(projects, assets), cursor: newestUpdate([...projects, ...assets]), rows: { projects, assets } };
+}
+
+/** Cache contents for project and asset rows as the server holds them. */
+export function snapshotFromRows(projects: CloudRow[], assets: CloudRow[]): Snapshot {
   const snap: Snapshot = new Map();
   snap.set(cacheKey("projects"), projects.map((r) => ({ ...r.data, id: r.id })));
   for (const a of assets) {
@@ -100,7 +105,7 @@ export async function loadCloudSnapshot(
     list.push({ ...a.data, id: a.id });
     snap.set(key, list);
   }
-  return { snapshot: snap, cursor: newestUpdate([...projects, ...assets]), rows: { projects, assets } };
+  return snap;
 }
 
 /** Upload a whole snapshot (used once when a guest signs in with local data). */

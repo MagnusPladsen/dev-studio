@@ -15,6 +15,8 @@ const eslintConfig = defineConfig([
     // Desktop build output: the copied server and the packaged installers.
     "desktop/server/**",
     "desktop/dist/**",
+    // MCP server bundle.
+    "packages/*/dist/**",
   ]),
 ]);
 
