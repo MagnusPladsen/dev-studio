@@ -306,8 +306,8 @@ export function removeColumn(projectId: string, board: Board, columnId: string, 
 
 // ─── sprints ─────────────────────────────────────────────────────────────────
 
-/** Adds a planned sprint, named "Sprint n" unless `fields` say otherwise. */
-export function createSprint(projectId: string, board: Board, fields: Partial<Omit<Sprint, "id" | "state">> = {}): { sprint: Sprint; board: Board } {
+/** Adds a planned sprint, named "Sprint n" with a fresh id unless `fields` say otherwise. */
+export function createSprint(projectId: string, board: Board, fields: Partial<Omit<Sprint, "state">> = {}): { sprint: Sprint; board: Board } {
   const sprint: Sprint = { id: uuid(), name: `Sprint ${board.sprints.length + 1}`, ...fields, state: "planned" };
   return { sprint, board: saveBoard(projectId, board, { sprints: [...board.sprints, sprint] }) };
 }

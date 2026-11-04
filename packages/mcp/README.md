@@ -35,6 +35,13 @@ only forgets the sign-in on this computer. An access token keeps working for up 
 | `list_assets`, `get_asset` | issues, notes, wiki/story pages, decisions and canvas outlines, as Markdown; art and audio as name and size only |
 | `search` | full-text search over titles, text and canvas labels |
 | `get_related`, `link`, `unlink` | links between assets (either end may be one canvas element) |
+| `get_board`, `list_issues`, `get_issue` | the Task Board: columns, sprints and labels; issues filtered by sprint, column, type, priority, label or text; one issue with its checklist progress |
+| `create_issues`, `update_issues` | up to 100 issues per call, with the next free keys; fields, labels, column, sprint, order and archive (no deletes) |
+| `create_sprint`, `complete_sprint` | plan or start a sprint (one runs at a time); complete it like the app: done issues archived, open ones moved |
+| `check_task` | tick or untick a `- [ ]` task in an issue, note or wiki/story page, or an item of a canvas checklist |
+| `create_note`, `update_note` | Notebook notes, from the app's note templates; append or swap passages without resending the note |
+| `create_wiki_page`, `update_wiki_page` | Wiki pages (Story in GameDev Studio) with the app's page types and templates; reports where each `[[link]]` points |
+| `create_decision`, `update_decision` | Decision log entries as the next ADR number; `supersedes` marks the old ADR superseded and points it at the new one |
 | `get_canvas` | a canvas as a short outline: one line per element and line, with handles (`t1`, `n2`, `e3`) that stay the same for the session |
 | `create_canvas`, `edit_canvas` | a new canvas (blank or from a template) and changes to one: add, update, move, delete, connect, group. Tables with columns and relation lines make a data model in one call. The server places new elements and never moves the ones already there |
 | `layout_canvas` | arranges named elements (or the whole canvas, when asked) as an ERD, flow, tree or grid |

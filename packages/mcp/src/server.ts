@@ -5,6 +5,8 @@ import type { Session } from "./auth/session";
 import { Studio } from "./store/studio";
 import { registerResources } from "./resources";
 import { registerAssetTools } from "./tools/assets";
+import { registerBoardTools } from "./tools/board";
+import { registerDocTools } from "./tools/docs";
 import { registerCanvasTools } from "./tools/canvas";
 import { registerLinkTools } from "./tools/links";
 import { registerProjectTools } from "./tools/projects";
@@ -26,6 +28,8 @@ export function createStudioServer(config: ServerConfig, session: Session, clien
   registerAssetTools(ctx);
   registerSearchTool(ctx);
   registerLinkTools(ctx);
+  registerBoardTools(ctx);
+  registerDocTools(ctx);
   registerCanvasTools(ctx);
   registerResources(ctx);
   return server;
