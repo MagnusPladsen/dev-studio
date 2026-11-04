@@ -189,13 +189,16 @@ export const HELP: Record<HelpTopic, HelpContent> = {
       { icon: Grid3X3, text: "Paint with your project sprites or basic colour tiles." },
       { icon: PaintBucket, text: "Paint, fill an area or erase." },
       { icon: Layers, text: "Stack layers, hide them and change their order." },
-      { icon: Download, text: "Export a PNG of the map or Tiled-style JSON." },
+      { icon: Shapes, text: "Auto-tile with terrains, and mark solid or one-way collision." },
+      { icon: Download, text: "Export a PNG of the map or Tiled-style JSON with collision." },
     ],
     steps: [
       "Press + and set the map's width and height in tiles.",
       "Pick a sprite or colour on the left.",
       "Click or drag on the map to paint.",
       "Add a layer for things that sit on top, like trees.",
+      "For auto-tiling, add a terrain, give its slots tiles, then pick it and paint.",
+      "Pick the collision tool to mark where players can stand.",
     ],
     tips: [
       "Draw tiles in Pixel Art and they show up here.",

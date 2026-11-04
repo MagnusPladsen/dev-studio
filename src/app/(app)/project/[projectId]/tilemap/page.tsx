@@ -16,6 +16,10 @@ import {
   ChevronUp,
   ChevronDown,
   X,
+  BrickWall,
+  Square,
+  PanelTop,
+  SquareDashed,
 } from "lucide-react";
 import { storage } from "@/lib/storage";
 import { getLoadedImage, preloadImages, spriteFrameSrc } from "@/lib/pixels";
@@ -37,11 +41,14 @@ import { useImport } from "@/hooks/useImport";
 import { importAsNewAssets, saveImportedAssets, type ImportStep } from "@/lib/import";
 import { TILEMAP_IMPORTERS, type TilemapImport } from "@/lib/import/tilemap";
 import { BASIC_TILES, toTiledJson } from "@/lib/tilemap/tiled-export";
-import type { TilemapData, TilemapLayer, Sprite } from "@/types";
+import { eraseWithTerrains, paintTerrain } from "@/lib/tilemap/autotile";
+import { COLLISION, collisionGrid, paintCollision, type CollisionValue } from "@/lib/tilemap/collision";
+import { TerrainPanel } from "@/components/tilemap/TerrainPanel";
+import type { TilemapData, TilemapLayer, TilemapTerrain, Sprite } from "@/types";
 import { v4 as uuid } from "uuid";
 
 type Tile = number | string | null;
-type Tool = "paint" | "erase" | "fill";
+type Tool = "paint" | "erase" | "fill" | "collision";
 
 const TILE_SIZES = [8, 16, 32];
 
@@ -52,6 +59,7 @@ function createEmptyLayer(name: string, w: number, h: number): TilemapLayer {
 function referencedSprites(tm: TilemapData): string[] {
   const ids = new Set<string>();
   for (const layer of tm.layers) for (const row of layer.tiles) for (const t of row) if (typeof t === "string") ids.add(t);
+  for (const terrain of tm.terrains ?? []) for (const t of Object.values(terrain.tiles)) if (typeof t === "string") ids.add(t);
   return [...ids];
 }
 
@@ -70,7 +78,7 @@ function drawTilemap(
   ctx: CanvasRenderingContext2D,
   tm: TilemapData,
   spriteById: Map<string, Sprite>,
-  opts: { grid: boolean; background: boolean; onImageReady?: () => void }
+  opts: { grid: boolean; background: boolean; collision?: boolean; onImageReady?: () => void }
 ) {
   const ts = tm.tileSize;
   ctx.imageSmoothingEnabled = false;
@@ -110,6 +118,8 @@ function drawTilemap(
     }
   }
 
+  if (opts.collision) drawCollision(ctx, tm);
+
   if (opts.grid) {
     ctx.strokeStyle = "rgba(255,255,255,0.06)";
     ctx.lineWidth = 0.5;
@@ -128,6 +138,31 @@ function drawTilemap(
   }
 }
 
+/** Solid cells as red boxes, one-way platforms as a blue band along their top edge. */
+function drawCollision(ctx: CanvasRenderingContext2D, tm: TilemapData) {
+  const ts = tm.tileSize;
+  collisionGrid(tm).forEach((row, r) =>
+    row.forEach((value, c) => {
+      if (value === COLLISION.solid) {
+        ctx.fillStyle = "rgba(239,68,68,0.35)";
+        ctx.fillRect(c * ts, r * ts, ts, ts);
+        ctx.strokeStyle = "rgba(239,68,68,0.9)";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(c * ts + 0.5, r * ts + 0.5, ts - 1, ts - 1);
+      } else if (value === COLLISION.oneWay) {
+        ctx.fillStyle = "rgba(56,189,248,0.85)";
+        ctx.fillRect(c * ts, r * ts, ts, Math.max(2, ts / 4));
+      }
+    })
+  );
+}
+
+const COLLISION_BRUSHES: { value: CollisionValue; label: string; Icon: typeof Square }[] = [
+  { value: COLLISION.solid, label: "Solid", Icon: Square },
+  { value: COLLISION.oneWay, label: "One-way platform", Icon: PanelTop },
+  { value: COLLISION.empty, label: "Clear collision", Icon: SquareDashed },
+];
+
 const inputStyle = { background: "var(--bg-primary)", color: "var(--text-primary)", border: "1px solid var(--border)" };
 const secondaryBtn = { color: "var(--text-primary)", border: "1px solid var(--border)" };
 
@@ -143,6 +178,11 @@ export default function TilemapPage() {
   const [selectedTile, setSelectedTile] = useState<number | string>(0);
   const [selectedLayer, setSelectedLayer] = useState(0);
   const [tool, setTool] = useState<Tool>("paint");
+  // painting with a terrain (auto-tile) instead of the selected tile
+  const [activeTerrainId, setActiveTerrainId] = useState<string | null>(null);
+  const [collisionBrush, setCollisionBrush] = useState<CollisionValue>(COLLISION.solid);
+  const [showCollision, setShowCollision] = useState(false);
+  const lastCell = useRef<string | null>(null);
   const [showNew, setShowNew] = useState(false);
   const [newName, setNewName] = useState("");
   const [newWidth, setNewWidth] = useState(20);
@@ -170,10 +210,7 @@ export default function TilemapPage() {
     const tm = storage.getById("tilemaps", id, projectId);
     if (tm) selectTilemap(tm);
   });
-  useConsumedParam("tile", (spriteId) => {
-    setSelectedTile(spriteId);
-    setTool("paint");
-  });
+  useConsumedParam("tile", (spriteId) => pickTile(spriteId));
   useTrackOpenAsset(current?.id ? { type: "tilemap", id: current?.id } : null);
 
   const requestRedraw = useCallback(() => setRedrawTick((t) => t + 1), []);
@@ -185,8 +222,8 @@ export default function TilemapPage() {
     if (!ctx) return;
     canvas.width = current.width * current.tileSize;
     canvas.height = current.height * current.tileSize;
-    drawTilemap(ctx, current, spriteById, { grid: true, background: true, onImageReady: requestRedraw });
-  }, [current, spriteById, redrawTick, requestRedraw]);
+    drawTilemap(ctx, current, spriteById, { grid: true, background: true, collision: showCollision || tool === "collision", onImageReady: requestRedraw });
+  }, [current, spriteById, redrawTick, requestRedraw, showCollision, tool]);
 
   const persist = useCallback(
     (tm: TilemapData | null) => {
@@ -215,7 +252,25 @@ export default function TilemapPage() {
   function selectTilemap(tm: TilemapData) {
     setCurrent(tm);
     setSelectedLayer(0);
+    setActiveTerrainId(null);
     setMobilePanel(null);
+  }
+
+  function pickTile(tile: number | string) {
+    setSelectedTile(tile);
+    setActiveTerrainId(null);
+    if (tool === "erase" || tool === "collision") setTool("paint");
+  }
+
+  function activateTerrain(terrainId: string) {
+    setActiveTerrainId(terrainId);
+    if (tool === "erase" || tool === "collision") setTool("paint");
+  }
+
+  function setTerrains(terrains: TilemapTerrain[]) {
+    if (!current) return;
+    update({ ...current, terrains });
+    if (activeTerrainId && !terrains.some((t) => t.id === activeTerrainId)) setActiveTerrainId(null);
   }
 
   function update(tm: TilemapData) {
@@ -310,14 +365,33 @@ export default function TilemapPage() {
     update({ ...current, layers: current.layers.map((l, i) => (i === selectedLayer ? { ...l, tiles } : l)) });
   }
 
+  const activeTerrain = current?.terrains?.find((t) => t.id === activeTerrainId) ?? null;
+
   function paintAt(e: React.PointerEvent<HTMLCanvasElement>) {
     const cell = cellFromEvent(e);
     const layer = current?.layers[selectedLayer];
-    if (!cell || !layer) return;
-    const value: Tile = tool === "erase" ? null : selectedTile;
-    if (layer.tiles[cell.y][cell.x] === value) return;
+    if (!cell || !layer || !current) return;
+    // a stroke paints each cell once, so auto-tiling doesn't redo a cell the pointer is still on
+    const key = `${cell.x},${cell.y}`;
+    if (lastCell.current === key) return;
+    lastCell.current = key;
+    if (tool === "collision") {
+      const grid = collisionGrid(current);
+      const next = paintCollision(grid, [[cell.x, cell.y]], collisionBrush);
+      if (next !== grid) update({ ...current, collision: next });
+      return;
+    }
+    if (tool === "erase") {
+      if (layer.tiles[cell.y][cell.x] !== null) setLayerTiles(eraseWithTerrains(layer.tiles, current.terrains ?? [], [[cell.x, cell.y]]));
+      return;
+    }
+    if (activeTerrain) {
+      setLayerTiles(paintTerrain(layer.tiles, activeTerrain, [[cell.x, cell.y]]));
+      return;
+    }
+    if (layer.tiles[cell.y][cell.x] === selectedTile) return;
     const tiles = layer.tiles.map((row) => [...row]);
-    tiles[cell.y][cell.x] = value;
+    tiles[cell.y][cell.x] = selectedTile;
     setLayerTiles(tiles);
   }
 
@@ -327,20 +401,25 @@ export default function TilemapPage() {
     if (!cell || !layer || !current) return;
     const target = layer.tiles[cell.y][cell.x];
     const value: Tile = selectedTile;
-    if (target === value) return;
+    if (!activeTerrain && target === value) return;
     const tiles = layer.tiles.map((row) => [...row]);
+    const seen = new Set<string>();
+    const area: [number, number][] = [];
     const stack = [[cell.x, cell.y]];
     while (stack.length) {
       const [x, y] = stack.pop()!;
-      if (x < 0 || y < 0 || x >= current.width || y >= current.height || tiles[y][x] !== target) continue;
+      if (x < 0 || y < 0 || x >= current.width || y >= current.height || tiles[y][x] !== target || seen.has(`${x},${y}`)) continue;
+      seen.add(`${x},${y}`);
+      area.push([x, y]);
       tiles[y][x] = value;
       stack.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]);
     }
-    setLayerTiles(tiles);
+    setLayerTiles(activeTerrain ? paintTerrain(layer.tiles, activeTerrain, area) : tiles);
   }
 
   function endStroke() {
     setIsPainting(false);
+    lastCell.current = null;
   }
 
   function deleteTilemap(id: string) {
@@ -514,6 +593,17 @@ export default function TilemapPage() {
           <ExamplesBar projectId={projectId} collections={["tilemaps"]} className="mt-3" />
         </div>
 
+        {current && (
+          <TerrainPanel
+            terrains={current.terrains ?? []}
+            activeTerrainId={activeTerrain?.id ?? null}
+            selectedTile={selectedTile}
+            spriteById={spriteById}
+            onActivate={activateTerrain}
+            onChange={setTerrains}
+          />
+        )}
+
         <div className="p-3 border-b" style={{ borderColor: "var(--border)" }}>
           <span className="text-xs font-medium block mb-2" style={{ color: "var(--text-secondary)" }}>Your sprites</span>
           {sprites.length === 0 ? (
@@ -526,11 +616,11 @@ export default function TilemapPage() {
             <div className="grid grid-cols-4 max-md:grid-cols-8 gap-1">
               {sprites.map((s) => {
                 const src = spriteFrameSrc(s, 0);
-                const active = selectedTile === s.id;
+                const active = !activeTerrain && selectedTile === s.id;
                 return (
                   <button
                     key={s.id}
-                    onClick={() => { setSelectedTile(s.id); if (tool === "erase") setTool("paint"); }}
+                    onClick={() => pickTile(s.id)}
                     className="w-full aspect-square rounded flex items-center justify-center overflow-hidden"
                     style={{
                       background: "repeating-conic-gradient(#1a1a2e 0% 25%, #222238 0% 50%) 0 0 / 8px 8px",
@@ -562,13 +652,13 @@ export default function TilemapPage() {
                 className="w-full aspect-square rounded"
                 style={{
                   background: color,
-                  outline: selectedTile === i ? "2px solid var(--accent)" : "1px solid var(--border)",
-                  outlineOffset: selectedTile === i ? "1px" : "0",
+                  outline: !activeTerrain && selectedTile === i ? "2px solid var(--accent)" : "1px solid var(--border)",
+                  outlineOffset: !activeTerrain && selectedTile === i ? "1px" : "0",
                 }}
-                onClick={() => { setSelectedTile(i); if (tool === "erase") setTool("paint"); }}
+                onClick={() => pickTile(i)}
                 title={color}
                 aria-label={`Paint with colour ${color}`}
-                aria-pressed={selectedTile === i}
+                aria-pressed={!activeTerrain && selectedTile === i}
               />
             ))}
           </div>
@@ -578,12 +668,30 @@ export default function TilemapPage() {
       {/* Main canvas area */}
       <div className="flex-1 flex flex-col overflow-hidden max-md:min-h-[60vh]">
         <div className="h-10 flex items-center gap-2 px-3 border-b shrink-0 max-md:h-auto max-md:min-h-10 max-md:py-1.5 max-md:flex-wrap max-md:gap-y-1.5 md:max-xl:h-auto md:max-xl:min-h-10 md:max-xl:py-1.5 md:max-xl:flex-wrap md:max-xl:gap-y-1.5" style={{ borderColor: "var(--border)", background: "var(--bg-secondary)" }}>
-          <div className="flex items-center gap-2 min-w-0 max-md:overflow-x-auto [&>*]:shrink-0">
+          <div className="flex items-center gap-2 min-w-0 overflow-x-auto [&>*]:shrink-0">
             <UndoRedoButtons history={imports.history} />
             <div className="w-px h-5 shrink-0" style={{ background: "var(--border)" }} />
             {toolBtn("paint", Paintbrush, "Paint")}
             {toolBtn("fill", PaintBucket, "Fill area")}
             {toolBtn("erase", Eraser, "Erase")}
+            {toolBtn("collision", BrickWall, "Paint collision")}
+            {tool === "collision" && current && (
+              <div className="flex items-center rounded-md overflow-hidden" style={{ border: "1px solid var(--border)" }} role="group" aria-label="Collision brush">
+                {COLLISION_BRUSHES.map((brush) => (
+                  <button
+                    key={brush.value}
+                    onClick={() => setCollisionBrush(brush.value)}
+                    className="p-1.5"
+                    style={{ background: collisionBrush === brush.value ? "var(--bg-hover)" : "transparent", color: "var(--text-primary)" }}
+                    title={brush.label}
+                    aria-label={brush.label}
+                    aria-pressed={collisionBrush === brush.value}
+                  >
+                    <brush.Icon className="w-3.5 h-3.5" />
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           <div className="ml-auto flex items-center gap-3 shrink-0">
             {current && (
@@ -610,7 +718,7 @@ export default function TilemapPage() {
               disabled={!current}
               items={[
                 { label: "PNG (whole map)", description: "One image of every visible layer, no grid", onClick: exportPNG },
-                { label: "JSON (Tiled-style layers)", description: "Layers as tile-id arrays plus a tileset table", onClick: exportJSON },
+                { label: "JSON (Tiled-style layers)", description: "Layers as tile-id arrays, a tileset table, terrains and a Collision object layer", onClick: exportJSON },
               ]}
             />
           </div>
@@ -733,6 +841,24 @@ export default function TilemapPage() {
                   </div>
                 </div>
               ))}
+            </div>
+            <div
+              className="mt-2 pt-2 border-t flex items-center gap-1 px-2 text-xs"
+              style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}
+            >
+              <button
+                onClick={() => setShowCollision((v) => !v)}
+                style={{ color: showCollision ? "var(--text-secondary)" : "var(--text-muted)" }}
+                title={showCollision ? "Hide collision" : "Show collision"}
+                aria-label={showCollision ? "Hide collision" : "Show collision"}
+                aria-pressed={showCollision}
+              >
+                {showCollision ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+              </button>
+              <button onClick={() => setTool("collision")} className="flex-1 flex items-center gap-1 text-left py-1" title="Paint collision">
+                <BrickWall className="w-3 h-3" style={{ color: "var(--text-secondary)" }} />
+                Collision
+              </button>
             </div>
           </div>
           <div className="p-3">

@@ -58,10 +58,9 @@ describe("Tiled import: JSON with external tilesets", () => {
     expect(cutOf(pixels.get("Items 1")!)).toBe("0,0 8x8");
     expect(sprites.find((sprite) => sprite.name === "Items 1")).toMatchObject({ width: 8, height: 8, tags: ["tileset"] });
     expect(new Set(tilemap.tilesetSpriteIds)).toEqual(new Set(sprites.map((sprite) => sprite.id)));
-    expect(warnings).toEqual([
-      "Made 5 sprites from the tileset tiles this map uses.",
-      'The Tilemap has no object or image layers, so these were skipped: "Collision" (objects).',
-    ]);
+    expect(warnings).toEqual(["Made 5 sprites from the tileset tiles this map uses."]);
+    expect(tilemap.collision).toEqual([[0, 0, 0], [1, 1, 1]]);
+    expect(tilemap.terrains).toBeUndefined();
   });
 
   it("asks for external tilesets, then for their images", async () => {
@@ -99,13 +98,50 @@ describe("Tiled import: TMX", () => {
     expect(cells(tilemap, 4, names)).toEqual([["Cave 1", ".", ".", "."], [".", ".", ".", "Cave 2"]]);
     expect(cutOf(sprites.find((sprite) => sprite.name === "Cave 3")!.frames[0].pixels)).toBe("8,8 8x8");
     expect(warnings).toContain("1 tile was flipped or rotated; the Tilemap has no flips, so it faces the default way.");
-    expect(warnings).toContain('The Tilemap has no object or image layers, so these were skipped: "Spawns" (objects).');
+    expect(warnings).toContain('The Tilemap reads only collision from object layers and has no image layers, so these were skipped: "Spawns" (objects).');
+    expect(tilemap.collision).toBeUndefined();
   });
 
   it("explains Zstandard data", async () => {
     const text = readFileSync(fileURLToPath(new URL("./fixtures/cave.tmx", import.meta.url)), "utf8").replace('compression="zlib"', 'compression="zstd"');
     const outcome = await importMap(textFile(text, "cave.tmx", ""), [image("cave.png")]);
     expect(outcome).toMatchObject({ ok: false, message: expect.stringContaining("Zstandard") });
+  });
+});
+
+describe("Tiled import: collision", () => {
+  const tmx = (objects: string, layerName = "Walls") =>
+    textFile(
+      `<?xml version="1.0"?>
+<map orientation="orthogonal" width="4" height="2" tilewidth="8" tileheight="8" infinite="0">
+ <layer name="Ground" width="4" height="2"><data encoding="csv">0,0,0,0,0,0,0,0</data></layer>
+ <objectgroup name="${layerName}">${objects}</objectgroup>
+</map>`,
+      "walls.tmx",
+      ""
+    );
+
+  it("reads solid and one-way rectangles from TMX, by type, class or property", async () => {
+    const { tilemap, warnings } = await importOk(
+      tmx(`
+  <object id="1" type="solid" x="0" y="8" width="32" height="8"/>
+  <object id="2" class="one_way" x="0" y="0" width="8" height="8"/>
+  <object id="3" type="solid" x="24" y="0" width="8" height="8"><properties><property name="one_way" type="bool" value="true"/></properties></object>
+  <object id="4" type="solid" x="8" y="0"><polygon points="0,0 8,0 8,8"/></object>`)
+    );
+    expect(tilemap.collision).toEqual([[2, 0, 0, 2], [1, 1, 1, 1]]);
+    expect(warnings).toEqual(["1 collision shape wasn't a rectangle and was skipped."]);
+  });
+
+  it("reads untyped rectangles on a layer named for collision", async () => {
+    const { tilemap } = await importOk(tmx(`<object id="1" x="8" y="0" width="16" height="8"/>`, "Collision"));
+    expect(tilemap.collision).toEqual([[0, 1, 1, 0], [0, 0, 0, 0]]);
+  });
+
+  it("skips object layers that aren't collision", async () => {
+    const { tilemap, warnings } = await importOk(tmx(`<object id="1" type="spawn" x="8" y="0" width="8" height="8"/>`, "Spawns"));
+    expect(tilemap.collision).toBeUndefined();
+    expect(warnings).toEqual(['The Tilemap reads only collision from object layers and has no image layers, so these were skipped: "Spawns" (objects).']);
   });
 });
 
@@ -181,9 +217,18 @@ describe("Tiled import: the Tilemap's own JSON export", () => {
     createdAt: "",
     updatedAt: "",
   };
-  const comparable = ({ name, width, height, tileSize, layers }: TilemapData) => ({ name, width, height, tileSize, layers });
+  const withTerrainAndCollision: TilemapData = {
+    ...handMade,
+    name: "Walls",
+    terrains: [
+      { id: "t1", name: "Rock", kind: "edge16", tiles: { 0: 3, 15: "sprite-1", 5: "sprite-unused" } },
+      { id: "t2", name: "Moss", kind: "blob47", tiles: {} },
+    ],
+    collision: [[1, 1, 2], [0, 1, 0]],
+  };
+  const comparable = ({ name, width, height, tileSize, layers, terrains, collision }: TilemapData) => ({ name, width, height, tileSize, layers, terrains, collision });
 
-  it.each([...exampleTilemaps, handMade].map((tilemap) => [tilemap.name, tilemap] as const))("round-trips %s losslessly", async (_name, tilemap) => {
+  it.each([...exampleTilemaps, handMade, withTerrainAndCollision].map((tilemap) => [tilemap.name, tilemap] as const))("round-trips %s losslessly", async (_name, tilemap) => {
     const exported = textFile(JSON.stringify(toTiledJson(tilemap, () => "Sprite"), null, 2), `${tilemap.name}.json`);
     const { tilemap: copy, sprites, warnings } = await importOk(exported);
     expect(warnings).toEqual([]);

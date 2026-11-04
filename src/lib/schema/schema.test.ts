@@ -100,3 +100,14 @@ describe("schemas reject bad rows", () => {
     expect(validateRow("links", { ...link, to: { type: "canvas", id: "d" } }).ok).toBe(false);
   });
 });
+
+describe("tilemap rows", () => {
+  const tilemap = { id: "m", projectId: "p", name: "Map", width: 2, height: 1, tileSize: 16, layers: [{ id: "l", name: "Ground", visible: true, tiles: [[0, null]] }], tilesetSpriteIds: [], tags: [], createdAt: NOW, updatedAt: NOW };
+
+  it("accepts old maps without terrains or collision, and new ones with them", async () => {
+    const { validateRow } = await import("./index");
+    expect(validateRow("tilemaps", tilemap).ok).toBe(true);
+    expect(validateRow("tilemaps", { ...tilemap, terrains: [{ id: "t", name: "Rock", kind: "blob47", tiles: { 255: "s" } }], collision: [[1, 2]] }).ok).toBe(true);
+    expect(validateRow("tilemaps", { ...tilemap, terrains: [{ id: "t", name: "Rock", kind: "hex", tiles: {} }] }).ok).toBe(false);
+  });
+});
