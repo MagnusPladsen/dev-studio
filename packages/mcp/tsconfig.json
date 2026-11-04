@@ -9,6 +9,6 @@
       "@/*": ["../../src/*"]
     }
   },
-  "include": ["src/**/*.ts", "tsup.config.ts"],
+  "include": ["src/**/*.ts", "e2e/**/*.ts", "tsup.config.ts"],
   "exclude": ["node_modules", "dist"]
 }
