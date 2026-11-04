@@ -60,7 +60,7 @@ export function idsInside(area: Rect, rects: (Rect & { id: string })[]): string[
 export const GROUP_HEADER = 40;
 export const GROUP_PADDING = 16;
 const STACK_GAP = 12;
-const MIN_GROUP_WIDTH = 160;
+export const MIN_GROUP_WIDTH = 160;
 
 /**
  * Lines cards up top to bottom inside a group, keeping their current vertical order, and

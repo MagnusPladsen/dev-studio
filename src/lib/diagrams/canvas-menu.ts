@@ -163,13 +163,16 @@ export interface BoardMenuActions {
   paste(): void;
   addShape(): void;
   selectAll(): void;
+  autoArrange(): void;
 }
 
 export function boardMenuEntries(state: { canPaste: boolean; hasElements: boolean; isMac: boolean }, actions: BoardMenuActions): ContextMenuEntry[] {
   return [
     ...(state.canPaste ? [item("paste", "Paste", actions.paste, { shortcut: shortcut("V", state.isMac) })] : []),
     item("add-shape", "Add shape…", actions.addShape, { shortcut: QUICK_ADD_SHORTCUT }),
-    ...(state.hasElements ? [item("select-all", "Select all", actions.selectAll, { shortcut: shortcut("A", state.isMac) })] : []),
+    ...(state.hasElements
+      ? [item("select-all", "Select all", actions.selectAll, { shortcut: shortcut("A", state.isMac) }), item("auto-arrange", "Auto-arrange", actions.autoArrange)]
+      : []),
   ];
 }
 

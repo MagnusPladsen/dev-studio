@@ -68,13 +68,13 @@ describe("elementMenuEntries", () => {
 });
 
 describe("boardMenuEntries", () => {
-  const board = { paste: vi.fn(), addShape: vi.fn(), selectAll: vi.fn() };
+  const board = { paste: vi.fn(), addShape: vi.fn(), selectAll: vi.fn(), autoArrange: vi.fn() };
 
-  it("should offer paste, add shape and select all", () => {
-    expect(labels(boardMenuEntries({ canPaste: true, hasElements: true, isMac: true }, board))).toEqual(["Paste", "Add shape…", "Select all"]);
+  it("should offer paste, add shape, select all and auto-arrange", () => {
+    expect(labels(boardMenuEntries({ canPaste: true, hasElements: true, isMac: true }, board))).toEqual(["Paste", "Add shape…", "Select all", "Auto-arrange"]);
   });
 
-  it("should hide paste and select all when they would do nothing", () => {
+  it("should hide paste, select all and auto-arrange when they would do nothing", () => {
     expect(labels(boardMenuEntries({ canPaste: false, hasElements: false, isMac: true }, board))).toEqual(["Add shape…"]);
   });
 });
