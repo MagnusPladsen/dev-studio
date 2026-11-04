@@ -46,6 +46,7 @@ import { createNode, insertNode } from "@/lib/canvas-shapes/create";
 import { SHAPE_DRAG_TYPE } from "@/lib/canvas-shapes/library";
 import type { CanvasTemplate } from "@/lib/canvas-shapes/templates";
 import { imageUrlFor, normalizeUrl } from "@/lib/diagrams/embeds";
+import { applyLayout, autoLayout } from "@/lib/diagrams/auto-layout";
 import { boundsOf, idsInside, stackColumn, type Point, type Rect } from "@/lib/diagrams/geometry";
 import {
   alignRects,
@@ -1002,6 +1003,7 @@ export default function DiagramsPage() {
         paste: () => void pasteFromMenu(),
         addShape: () => setQuickAddAt(at),
         selectAll: () => selectNodes(current?.nodes.map((n) => n.id) ?? []),
+        autoArrange: () => updateCurrent((d) => ({ ...d, nodes: applyLayout(d.nodes, autoLayout(d.nodes, d.edges)) })),
       }
     );
   }
