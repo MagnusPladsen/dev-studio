@@ -56,7 +56,9 @@ tools comes from `COPY.help`. `npm test` checks both objects have the same keys 
   again. Issue keys and ADR numbers are unique per project (DB index); a clash moves ours to the next free one.
   `search_assets` RPC searches the `asset_search` table (kept by trigger). OAuth clients (the MCP) cannot delete.
 - **Supabase**: tables `projects` and `assets` (JSON bodies, row level security per user). Schema lives in
-  `supabase/migrations/` and is applied by Supabase's GitHub integration. Adding a collection means a new migration
+  `supabase/migrations/` and is applied by Supabase's GitHub integration on merge to `main` (connected 2026-11-04;
+  the migrations before that were run by hand and recorded in `supabase_migrations.schema_migrations`). After merging
+  one, check the live API has it before relying on it. Adding a collection means a new migration
   that widens `assets_collection_check` (and, if its text should be searchable, a case in `asset_search_text`).
   `supabase/db-tests/run.sh` applies every migration to Postgres 17 in Docker and runs SQL checks with two users. Env: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
 - **Assets & links**: `src/lib/assets.ts` (`ASSET_KINDS` registry: collection, label, tool path, colour) and
@@ -102,6 +104,11 @@ vitest unit tests cover the voxel lib and the examples (`npm test`). UI changes 
 Playwright (desktop 1440×900 and phone 390×844): create a project with examples, open every tool, check for page
 errors and horizontal overflow on phones, and exercise the feature changed. Do the same before pushing UI work.
 
+`scripts/mcp-e2e.sh` runs the MCP server end to end against a local Supabase in Docker (real OAuth sign-in, every
+tool and prompt, the app opening what it made, two-user RLS); it needs Docker and the Supabase CLI. The npm package
+publishes from `.github/workflows/mcp-release.yml` when `packages/mcp/package.json`'s version changes (see
+`packages/mcp/PUBLISHING.md`).
+
 ## Known gaps
 
 - Task Board: on touch screens cards move via a "Move to…" menu, not drag.
@@ -113,7 +120,7 @@ errors and horizontal overflow on phones, and exercise the feature changed. Do t
 
 ## Next up (from competitor research, highest value first)
 
-Pixel Art animation tags + per-frame durations · Tilemap auto-tiling and collision layer · one-click engine exports
+One-click engine exports
 (Godot, Unity, Phaser, Tiled) · mirror / pixel-perfect / dither tools and Lospec palette import · Tilemap object layer
 · dialogue variables and localisation CSV · story timeline and world map · multi-pattern songs, envelopes, MIDI ·
 pixel font maker · read-only share links and a "play this level" preview.
