@@ -15,6 +15,20 @@ function fill(g: Tile[][], tile: string, x0: number, x1: number, y0: number, y1:
   for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) g[y][x] = tile;
 }
 
+/** "Ground" auto-tiles grass on top (no ground above) and dirt below: the 16-tile kind, keyed by neighbour mask. */
+function groundTerrain(ctx: ExampleContext, grass: string, dirt: string) {
+  const NORTH = 1;
+  const tiles = Object.fromEntries(Array.from({ length: 16 }, (_, mask) => [mask, mask & NORTH ? dirt : grass]));
+  return { id: ctx.id("meadow-terrain-ground"), name: "Ground", kind: "edge16" as const, tiles };
+}
+
+/** Solid ground and pond bed, one-way floating platforms, and water you can fall into. */
+function meadowCollision(ground: Tile[][], water: string, platforms: [number, number, number][]): number[][] {
+  const collision = ground.map((row) => row.map((tile): number => (tile && tile !== water ? 1 : 0)));
+  for (const [x0, x1, y] of platforms) for (let x = x0; x <= x1; x++) collision[y][x] = 2;
+  return collision;
+}
+
 /** "Mossbrook Meadow": a short level that walks from the village edge, over a pond, up a hill to a chest. */
 function meadow(ctx: ExampleContext) {
   const grass = ctx.id("tile-grass");
@@ -38,9 +52,8 @@ function meadow(ctx: ExampleContext) {
   fill(ground, grass, 26, 31, 11, 11);
   fill(ground, dirt, 26, 31, 12, 17);
   // floating stone platforms
-  fill(ground, stone, 6, 9, 9, 9);
-  fill(ground, stone, 12, 14, 7, 7);
-  fill(ground, stone, 18, 21, 10, 10);
+  const platforms: [number, number, number][] = [[6, 9, 9], [12, 14, 7], [18, 21, 10]];
+  for (const [x0, x1, y] of platforms) fill(ground, stone, x0, x1, y, y);
 
   const objects = grid();
   const hero = ctx.id("hero");
@@ -68,6 +81,8 @@ function meadow(ctx: ExampleContext) {
       { id: ctx.id("meadow-layer-objects"), name: "Objects", visible: true, tiles: objects },
     ],
     tilesetSpriteIds: [grass, dirt, stone, water, hero, coin, slime, chest],
+    terrains: [groundTerrain(ctx, grass, dirt)],
+    collision: meadowCollision(ground, water, platforms),
     tags: ["level", "platformer"],
   };
 }

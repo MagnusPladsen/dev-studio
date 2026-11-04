@@ -1,6 +1,6 @@
 import { ImportError } from "../types";
-import type { ExportedTileType } from "@/lib/tilemap/tiled-export";
-import type { TiledChunk, TiledImage, TiledLayer, TiledMap, TiledTileset, TiledTilesetRef } from "./tiled-model";
+import type { ExportedTerrain, ExportedTileType } from "@/lib/tilemap/tiled-export";
+import type { TiledChunk, TiledImage, TiledLayer, TiledMap, TiledObject, TiledTileset, TiledTilesetRef } from "./tiled-model";
 import { decodeTileData, type TileEncoding } from "./tile-data";
 
 type Json = Record<string, unknown>;
@@ -16,6 +16,7 @@ export async function readTiledJsonMap(data: unknown): Promise<TiledMap> {
   if (isTiledJsonTileset(data)) throw new ImportError("This is a Tiled tileset, not a map. Import the map that uses it, together with this file.");
   if (!isObject(data) || !Array.isArray(data.layers) || typeof data.width !== "number") throw new ImportError("This isn't a Tiled map.");
   const ownTileTypes = Array.isArray(data.tileset) ? (data.tileset as ExportedTileType[]) : undefined;
+  const ownTerrains = ownTileTypes && Array.isArray(data.terrains) ? (data.terrains.filter(isObject) as unknown as ExportedTerrain[]) : undefined;
   return {
     name: str(data.name),
     orientation: str(data.orientation) ?? "orthogonal",
@@ -27,6 +28,7 @@ export async function readTiledJsonMap(data: unknown): Promise<TiledMap> {
     layers: await readLayers(data.layers, true),
     tilesets: Array.isArray(data.tilesets) ? data.tilesets.filter(isObject).map(readTilesetRef) : [],
     ownTileTypes,
+    ownTerrains,
   };
 }
 
@@ -36,11 +38,27 @@ async function readLayers(layers: unknown[], isParentVisible: boolean): Promise<
     const name = str(layer.name) ?? "Layer";
     const visible = isParentVisible && layer.visible !== false;
     if (layer.type === "group") read.push(...(await readLayers(Array.isArray(layer.layers) ? layer.layers : [], visible)));
-    else if (layer.type === "objectgroup") read.push({ kind: "object", name });
+    else if (layer.type === "objectgroup") read.push({ kind: "object", name, objects: readObjects(layer.objects) });
     else if (layer.type === "imagelayer") read.push({ kind: "image", name });
     else if (layer.type === "tilelayer") read.push({ kind: "tile", name, visible, chunks: await readChunks(layer, name) });
   }
   return read;
+}
+
+function readObjects(objects: unknown): TiledObject[] {
+  return (Array.isArray(objects) ? objects.filter(isObject) : []).map((object) => {
+    const isRectangle = !object.ellipse && !object.point && !object.polygon && !object.polyline && !object.text && object.gid === undefined;
+    const properties = Array.isArray(object.properties) ? object.properties.filter(isObject) : [];
+    return {
+      shape: isRectangle ? "rectangle" : "other",
+      x: num(object.x),
+      y: num(object.y),
+      width: num(object.width),
+      height: num(object.height),
+      type: str(object.type) ?? str(object.class) ?? "",
+      isOneWay: properties.some((property) => property.name === "one_way" && property.value === true),
+    };
+  });
 }
 
 async function readChunks(layer: Json, name: string): Promise<TiledChunk[]> {
