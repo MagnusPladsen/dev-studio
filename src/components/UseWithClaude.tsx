@@ -123,6 +123,24 @@ function SetupStep({ title, hint, text, copyLabel }: { title: string; hint: stri
   );
 }
 
+function SessionEnded() {
+  const sync = useSync();
+  return (
+    <div className="flex items-center gap-2 text-xs" role="alert">
+      <span className="min-w-0" style={{ color: "var(--red)" }}>
+        Your sign-in has ended. Sign out, then sign in again to see connected apps.
+      </span>
+      <button
+        onClick={() => void sync.signOut()}
+        className="shrink-0 px-2 py-1 rounded-lg"
+        style={{ color: "var(--text-primary)", border: "1px solid var(--border)" }}
+      >
+        Sign out
+      </button>
+    </div>
+  );
+}
+
 function ConnectedApps() {
   const [state, setState] = useState<GrantsState>({ kind: "loading" });
   const [revoking, setRevoking] = useState<string | null>(null);
@@ -171,6 +189,7 @@ function ConnectedApps() {
           </button>
         </p>
       )}
+      {state.kind === "session-ended" && <SessionEnded />}
       {state.kind === "list" && (
         <ul className="space-y-2">
           {state.grants.map((grant) => (
