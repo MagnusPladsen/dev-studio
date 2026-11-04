@@ -4,12 +4,22 @@ import type { OAuthGrant, SupabaseClient } from "@supabase/supabase-js";
 export type GrantsState =
   | { kind: "loading" }
   | { kind: "error"; message: string }
+  | { kind: "session-ended" }
   | { kind: "empty" }
   | { kind: "list"; grants: OAuthGrant[] };
 
 type AuthClient = Pick<SupabaseClient["auth"], "oauth">;
 
-export function grantsStateFrom(result: { data: OAuthGrant[] | null; error: { message: string } | null }): GrantsState {
+/**
+ * Supabase deleted this browser's session (signed out elsewhere, or a session limit). Its access token still works for
+ * data until it expires, but account calls like listing grants are refused, so the only fix is signing in again.
+ */
+export function isSessionEnded(error: { name?: string } | null): boolean {
+  return error?.name === "AuthSessionMissingError";
+}
+
+export function grantsStateFrom(result: { data: OAuthGrant[] | null; error: { message: string; name?: string } | null }): GrantsState {
+  if (isSessionEnded(result.error)) return { kind: "session-ended" };
   if (result.error) return { kind: "error", message: result.error.message };
   const grants = [...(result.data ?? [])].sort((a, b) => b.granted_at.localeCompare(a.granted_at));
   return grants.length ? { kind: "list", grants } : { kind: "empty" };

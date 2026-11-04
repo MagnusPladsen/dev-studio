@@ -11,6 +11,11 @@ describe("grantsStateFrom", () => {
     expect(grantsStateFrom({ data: null, error: { message: "OAuth server is disabled" } })).toEqual({ kind: "error", message: "OAuth server is disabled" });
   });
 
+  it("asks to sign in again when Supabase no longer knows the session", () => {
+    const error = { name: "AuthSessionMissingError", message: "Auth session missing!" };
+    expect(grantsStateFrom({ data: null, error })).toEqual({ kind: "session-ended" });
+  });
+
   it("is empty with no grants", () => {
     expect(grantsStateFrom({ data: [], error: null })).toEqual({ kind: "empty" });
     expect(grantsStateFrom({ data: null, error: null })).toEqual({ kind: "empty" });
