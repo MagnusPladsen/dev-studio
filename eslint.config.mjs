@@ -17,6 +17,8 @@ const eslintConfig = defineConfig([
     "desktop/dist/**",
     // MCP server bundle.
     "packages/*/dist/**",
+    // Claude Desktop extension staging and output (npm run pack:mcpb).
+    "packages/*/release/**",
   ]),
 ]);
 

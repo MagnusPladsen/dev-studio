@@ -1,0 +1,49 @@
+{
+  "manifest_version": "0.3",
+  "name": "dev-studio-mcp",
+  "display_name": "Dev Studio & GameDev Studio",
+  "description": "Plan sprints, draw canvases and search your notes in Dev Studio and GameDev Studio.",
+  "long_description": "Reads and edits your projects in Dev Studio and GameDev Studio: Task Board issues and sprints, Canvas diagrams, Notebook notes, Wiki/Story pages and the Decision log. Runs on your computer and talks to your own account directly; free, like everything there. Claude can't delete anything, and art and audio stay read-only.",
+  "author": {
+    "name": "Magnus Pladsen",
+    "url": "https://github.com/MagnusPladsen"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MagnusPladsen/dev-studio"
+  },
+  "homepage": "https://dev-studio.pladsen.dev",
+  "documentation": "https://github.com/MagnusPladsen/dev-studio/tree/main/packages/mcp#readme",
+  "support": "https://github.com/MagnusPladsen/dev-studio/issues",
+  "icon": "icon.png",
+  "server": {
+    "type": "node",
+    "entry_point": "server/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/server/index.js"],
+      "env": {
+        "STUDIO_DEFAULT_APP": "${user_config.default_app}"
+      }
+    }
+  },
+  "user_config": {
+    "default_app": {
+      "type": "string",
+      "title": "Default app for new projects",
+      "description": "dev-studio or gamedev-studio",
+      "default": "dev-studio",
+      "required": false
+    }
+  },
+  "prompts_generated": true,
+  "keywords": ["dev studio", "gamedev studio", "task board", "sprints", "canvas", "wiki", "notes", "decisions"],
+  "license": "MIT",
+  "privacy_policies": ["https://gamedev-studio.pladsen.dev/privacy"],
+  "compatibility": {
+    "platforms": ["darwin", "win32", "linux"],
+    "runtimes": {
+      "node": ">=20.9.0"
+    }
+  }
+}

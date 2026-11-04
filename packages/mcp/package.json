@@ -2,7 +2,25 @@
   "name": "dev-studio-mcp",
   "version": "0.1.0-beta",
   "description": "MCP server for Dev Studio and GameDev Studio: plan sprints, draw canvases and search your notes from Claude.",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "claude",
+    "claude-desktop",
+    "claude-code",
+    "mcpb",
+    "dev-studio",
+    "gamedev-studio",
+    "task-board",
+    "kanban",
+    "wiki",
+    "notes",
+    "adr"
+  ],
   "homepage": "https://github.com/MagnusPladsen/dev-studio/tree/main/packages/mcp#readme",
+  "bugs": {
+    "url": "https://github.com/MagnusPladsen/dev-studio/issues"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/MagnusPladsen/dev-studio.git",
@@ -20,12 +38,16 @@
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc --noEmit -p .",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "prepack": "npm run build",
+    "pack:mcpb": "node scripts/build-mcpb.mjs",
+    "smoke": "node scripts/smoke-test.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "2.4.0",
@@ -39,5 +61,9 @@
   },
   "engines": {
     "node": ">=20.9"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
   }
 }

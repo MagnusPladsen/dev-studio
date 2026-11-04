@@ -1,0 +1,130 @@
+name: MCP release
+
+# Publishes dev-studio-mcp (packages/mcp) when its version changes on main: npm with provenance, and the Claude
+# Desktop extension (.mcpb) on a GitHub release tagged mcp-v<version>. A version that is already on npm and already
+# released is skipped, so re-runs and unrelated edits to package.json do nothing. Running it by hand does the same
+# for the version on the branch it runs on (only main publishes), and always keeps the .mcpb as a run artifact.
+on:
+  push:
+    branches: [main]
+    paths:
+      - packages/mcp/package.json
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mcp-release
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.state.outputs.version }}
+      on-npm: ${{ steps.state.outputs.on-npm }}
+      released: ${{ steps.state.outputs.released }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: state
+        name: See what is already published
+        run: |
+          version=$(node -p "require('./packages/mcp/package.json').version")
+          on_npm=false
+          if [ -n "$(npm view "dev-studio-mcp@$version" version 2> /dev/null)" ]; then on_npm=true; fi
+          released=false
+          if gh release view "mcp-v$version" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then released=true; fi
+          echo "dev-studio-mcp $version: on npm $on_npm, GitHub release $released"
+          {
+            echo "version=$version"
+            echo "on-npm=$on_npm"
+            echo "released=$released"
+          } >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  build:
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck -w dev-studio-mcp
+      - run: npx vitest run packages/mcp
+      - name: Pack, install the tarball and start it over stdio
+        run: npm run smoke -w dev-studio-mcp
+      - name: Build the .mcpb
+        run: npm run pack:mcpb -w dev-studio-mcp
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dev-studio-mcp-mcpb
+          path: packages/mcp/release/*.mcpb
+          if-no-files-found: error
+
+  npm:
+    needs: [check, build]
+    if: github.ref == 'refs/heads/main' && needs.check.outputs.on-npm == 'false'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+      VERSION: ${{ needs.check.outputs.version }}
+    steps:
+      - id: token
+        name: Check for the npm token
+        run: |
+          if [ -z "$NPM_TOKEN" ]; then
+            echo "::notice title=npm publish skipped::NPM_TOKEN is not set, so dev-studio-mcp $VERSION was not published to npm. See packages/mcp/PUBLISHING.md."
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.token.outputs.present == 'true'
+        uses: actions/checkout@v4
+      - if: steps.token.outputs.present == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          registry-url: https://registry.npmjs.org
+      - if: steps.token.outputs.present == 'true'
+        run: npm ci
+      # The whole product is in beta, so the beta version is what `npx dev-studio-mcp` (the latest tag) gets.
+      - if: steps.token.outputs.present == 'true'
+        run: npm publish -w dev-studio-mcp --provenance --access public --tag latest
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  github-release:
+    needs: [check, build]
+    if: github.ref == 'refs/heads/main' && needs.check.outputs.released == 'false'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dev-studio-mcp-mcpb
+          path: mcpb
+      # Never marked latest: the website's desktop downloads link to releases/latest.
+      - name: Tag and publish the release
+        run: |
+          gh release create "mcp-v$VERSION" mcpb/*.mcpb --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "dev-studio-mcp $VERSION" --latest=false --notes "$NOTES"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.check.outputs.version }}
+          NOTES: |
+            The Dev Studio & GameDev Studio MCP server for Claude.
+
+            - **Claude Desktop:** download `dev-studio-mcp-${{ needs.check.outputs.version }}.mcpb` and double-click it (or Settings → Extensions → Install Extension). The bundle is not signed yet.
+            - **Claude Code:** `claude mcp add --scope user dev-studio -- npx -y dev-studio-mcp`
+
+            Setup and the list of tools: https://github.com/MagnusPladsen/dev-studio/tree/main/packages/mcp#readme
