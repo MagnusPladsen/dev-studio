@@ -33,6 +33,7 @@ import { LinkedAssets } from "@/components/LinkedAssets";
 import { StoryGraph } from "@/components/story/StoryGraph";
 import { useOpenParam, useTrackOpenAsset, useStorageVersion } from "@/hooks/useStorage";
 import { useRemoteChanges } from "@/hooks/useRemoteChanges";
+import { mergeText } from "@/lib/sync/merge";
 import type { StoryEntry } from "@/types";
 import { useAutosave } from "@/hooks/useAutosave";
 import { SaveIndicator } from "@/components/SaveIndicator";
@@ -101,6 +102,8 @@ export default function StoryPage() {
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [draft, setDraft] = useState<{ id: string; content: string } | null>(null);
+  /** The saved text the draft was typed on top of: the base for merging text changed elsewhere meanwhile. */
+  const draftBase = useRef("");
   const [searchQuery, setSearchQuery] = useState("");
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [showNewForm, setShowNewForm] = useState(false);
@@ -188,7 +191,14 @@ export default function StoryPage() {
   const autosave = useAutosave(draft, (d) => {
     if (!d) return;
     const entry = storage.getById("stories", d.id, projectId);
-    if (entry && entry.content !== d.content) storage.save("stories", { ...entry, content: d.content, updatedAt: new Date().toISOString() }, projectId);
+    if (!entry || entry.content === d.content) return;
+    // text changed elsewhere since typing started is merged in by line, never overwritten
+    const content = entry.content === draftBase.current ? d.content : mergeText(draftBase.current, d.content, entry.content);
+    storage.save("stories", { ...entry, content, updatedAt: new Date().toISOString() }, projectId);
+    draftBase.current = content;
+    if (content !== d.content) {
+      setDraft((cur) => (cur?.id === d.id ? { id: d.id, content: mergeText(d.content, cur.content, content) } : cur));
+    }
   });
 
   const flushAutosave = autosave.flush;
@@ -298,6 +308,12 @@ export default function StoryPage() {
     setAc((prev) => ({ query: m[1], start: caret - m[0].length, index: prev?.query === m[1] ? prev.index : 0 }));
   }
 
+  function typeContent(content: string) {
+    if (!selected) return;
+    if (draft?.id !== selected.id) draftBase.current = selected.content;
+    setDraft({ id: selected.id, content });
+  }
+
   function insertLink(title: string) {
     const ta = textareaRef.current;
     if (!ta || !ac || !selected) return;
@@ -306,7 +322,7 @@ export default function StoryPage() {
     const after = content.slice(caret).startsWith("]]") ? content.slice(caret + 2) : content.slice(caret);
     const next = `${content.slice(0, ac.start)}[[${title}]]${after}`;
     const pos = ac.start + title.length + 4;
-    setDraft({ id: selected.id, content: next });
+    typeContent(next);
     setAc(null);
     requestAnimationFrame(() => {
       ta.focus();
@@ -678,7 +694,7 @@ export default function StoryPage() {
                 ref={textareaRef}
                 value={selected.content}
                 onChange={(e) => {
-                  setDraft({ id: selected.id, content: e.target.value });
+                  typeContent(e.target.value);
                   updateAutocomplete(e.target.value, e.target.selectionStart);
                 }}
                 onKeyDown={onEditorKeyDown}

@@ -26,6 +26,7 @@ import { assetHref } from "@/lib/assets";
 import { registerAutosaveFlush } from "@/lib/autosave-registry";
 import { useOpenParam, useTrackOpenAsset, useStorageVersion } from "@/hooks/useStorage";
 import { useRemoteChanges } from "@/hooks/useRemoteChanges";
+import { mergeDocuments, rebaseOnStored } from "@/lib/sync/open-document";
 import { useHistory } from "@/hooks/useHistory";
 import { LinkedAssets } from "@/components/LinkedAssets";
 import { UndoRedoButtons } from "@/components/UndoRedoButtons";
@@ -146,6 +147,8 @@ export default function NotebookPage() {
   const [complete, setComplete] = useState<{ query: string; start: number; top: number; left: number; index: number } | null>(null);
 
   const savedRef = useRef<Note | null>(null);
+  /** Goes up when a save merged in a change made elsewhere, to restart the undo history. */
+  const [mergeCount, setMergeCount] = useState(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savedFlashRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -165,8 +168,15 @@ export default function NotebookPage() {
   // ── saving ──
   const writeNow = useCallback(
     (note: Note) => {
-      storage.save("notes", { ...note, updatedAt: new Date().toISOString() }, projectId);
-      savedRef.current = note;
+      // a change from elsewhere that landed since the note was opened is merged in, never overwritten
+      const stored = storage.getById("notes", note.id, projectId);
+      const merged = rebaseOnStored(savedRef.current?.id === note.id ? savedRef.current : null, note, stored);
+      storage.save("notes", { ...merged, updatedAt: new Date().toISOString() }, projectId);
+      savedRef.current = merged;
+      if (merged !== note) {
+        setDraft((d) => (d === note ? merged : d?.id === note.id ? mergeDocuments(note, d, merged) : d));
+        setMergeCount((n) => n + 1);
+      }
       setSaveState("saved");
       if (savedFlashRef.current) clearTimeout(savedFlashRef.current);
       savedFlashRef.current = setTimeout(() => setSaveState("idle"), 1500);
@@ -222,7 +232,7 @@ export default function NotebookPage() {
   });
 
   // ── history (undo/redo) ──
-  const history = useHistory<Note | null>(draft, (v) => setDraft(v), draft ? `${draft.id}:${remoteRevision}` : undefined);
+  const history = useHistory<Note | null>(draft, (v) => setDraft(v), draft ? `${draft.id}:${remoteRevision}:${mergeCount}` : undefined);
 
   // ── selection ──
   const select = useCallback(
