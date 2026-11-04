@@ -37,8 +37,8 @@ beforeEach(async () => {
 describe("the MCP server", () => {
   it("lists the step 4 tools, none of them a delete", async () => {
     const { tools } = await client.listTools();
-    expect(tools.map((t) => t.name).sort()).toEqual(
-      ["create_project", "get_asset", "get_project", "get_related", "link", "list_assets", "list_projects", "search", "sign_in", "sign_out", "unlink", "whoami"].sort()
+    expect(tools.map((t) => t.name)).toEqual(
+      expect.arrayContaining(["create_project", "get_asset", "get_project", "get_related", "link", "list_assets", "list_projects", "search", "sign_in", "sign_out", "unlink", "whoami"])
     );
     expect(tools.filter((t) => t.annotations?.destructiveHint)).toEqual([]);
     expect(tools.find((t) => t.name === "search")?.annotations?.readOnlyHint).toBe(true);

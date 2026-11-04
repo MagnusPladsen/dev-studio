@@ -35,6 +35,9 @@ only forgets the sign-in on this computer. An access token keeps working for up 
 | `list_assets`, `get_asset` | issues, notes, wiki/story pages, decisions and canvas outlines, as Markdown; art and audio as name and size only |
 | `search` | full-text search over titles, text and canvas labels |
 | `get_related`, `link`, `unlink` | links between assets (either end may be one canvas element) |
+| `get_canvas` | a canvas as a short outline: one line per element and line, with handles (`t1`, `n2`, `e3`) that stay the same for the session |
+| `create_canvas`, `edit_canvas` | a new canvas (blank or from a template) and changes to one: add, update, move, delete, connect, group. Tables with columns and relation lines make a data model in one call. The server places new elements and never moves the ones already there |
+| `layout_canvas` | arranges named elements (or the whole canvas, when asked) as an ERD, flow, tree or grid |
 | `sign_in`, `whoami`, `sign_out` | the connection |
 
 Resources: `studio://projects`, `studio://project/{projectId}`, `studio://project/{projectId}/{type}/{id}` (one asset as
