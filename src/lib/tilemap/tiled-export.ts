@@ -1,4 +1,5 @@
-import type { TilemapData } from "@/types";
+import type { TilemapData, TilemapTerrain } from "@/types";
+import { COLLISION, COLLISION_TYPES, collisionRects, hasCollision } from "./collision";
 
 /** The colours of the Tilemap's basic tiles; a number tile is an index into this list. */
 export const BASIC_TILES = [
@@ -18,6 +19,46 @@ export interface ExportedTileType {
   color?: string;
 }
 
+/** A terrain in the export, with each tile written as its gid. */
+export interface ExportedTerrain {
+  name: string;
+  kind: TilemapTerrain["kind"];
+  tiles: Record<string, number>;
+}
+
+/** The name of the object layer collision is written to. */
+export const COLLISION_LAYER_NAME = "Collision";
+
+/**
+ * Collision as a Tiled object layer of rectangles (in pixels), typed "solid" or "one_way" and with a `one_way`
+ * bool property, which Tiled shows and Godot's Tiled importers turn into collision shapes.
+ */
+function collisionLayer(tilemap: TilemapData, id: number) {
+  const size = tilemap.tileSize;
+  return {
+    id,
+    name: COLLISION_LAYER_NAME,
+    type: "objectgroup",
+    visible: true,
+    opacity: 1,
+    x: 0,
+    y: 0,
+    draworder: "topdown",
+    objects: collisionRects(tilemap.collision ?? []).map((rect, i) => ({
+      id: i + 1,
+      name: "",
+      type: COLLISION_TYPES[rect.value],
+      x: rect.x * size,
+      y: rect.y * size,
+      width: rect.width * size,
+      height: rect.height * size,
+      rotation: 0,
+      visible: true,
+      properties: [{ name: "one_way", type: "bool", value: rect.value === COLLISION.oneWay }],
+    })),
+  };
+}
+
 /** Tiled-style JSON: each layer is a flat array of tile ids (0 = empty), with a tileset table. */
 export function toTiledJson(tilemap: TilemapData, spriteName: (spriteId: string) => string | undefined) {
   const gids = new Map<string, number>();
@@ -34,6 +75,21 @@ export function toTiledJson(tilemap: TilemapData, spriteName: (spriteId: string)
     }
     return gid;
   };
+  const layers: object[] = tilemap.layers.map((l, i) => ({
+    id: i + 1,
+    name: l.name,
+    type: "tilelayer",
+    visible: l.visible,
+    width: tilemap.width,
+    height: tilemap.height,
+    data: l.tiles.flatMap((row) => row.map(gidFor)),
+  }));
+  if (hasCollision(tilemap.collision)) layers.push(collisionLayer(tilemap, layers.length + 1));
+  const terrains = (tilemap.terrains ?? []).map((terrain): ExportedTerrain => ({
+    name: terrain.name,
+    kind: terrain.kind,
+    tiles: Object.fromEntries(Object.entries(terrain.tiles).map(([mask, tile]) => [mask, gidFor(tile)])),
+  }));
   return {
     name: tilemap.name,
     width: tilemap.width,
@@ -42,15 +98,9 @@ export function toTiledJson(tilemap: TilemapData, spriteName: (spriteId: string)
     tileheight: tilemap.tileSize,
     orientation: "orthogonal",
     renderorder: "right-down",
-    layers: tilemap.layers.map((l, i) => ({
-      id: i + 1,
-      name: l.name,
-      type: "tilelayer",
-      visible: l.visible,
-      width: tilemap.width,
-      height: tilemap.height,
-      data: l.tiles.flatMap((row) => row.map(gidFor)),
-    })),
+    nextlayerid: layers.length + 1,
+    layers,
     tileset,
+    ...(terrains.length ? { terrains } : {}),
   };
 }

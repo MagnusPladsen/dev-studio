@@ -195,9 +195,25 @@ export interface TilemapData {
   tileSize: number;
   layers: TilemapLayer[];
   tilesetSpriteIds: string[];
+  /** Auto-tile brushes; missing on maps made before terrains existed. */
+  terrains?: TilemapTerrain[];
+  /** One row per map row: 0 = empty, 1 = solid, 2 = one-way platform. Missing = all empty. */
+  collision?: number[][];
   tags: string[];
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * A set of tiles that join up: painting picks each cell's tile from which neighbours are the same terrain.
+ * "edge16" looks at the 4 sides (16 tiles), "blob47" also at the corners (47 tiles). `tiles` is keyed by the
+ * neighbour mask (see `src/lib/tilemap/autotile.ts`); a missing key falls back to the terrain's centre tile.
+ */
+export interface TilemapTerrain {
+  id: string;
+  name: string;
+  kind: "edge16" | "blob47";
+  tiles: Record<string, number | string>;
 }
 
 export interface TilemapLayer {

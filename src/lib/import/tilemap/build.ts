@@ -1,10 +1,11 @@
 import { v4 as uuid } from "uuid";
-import type { Sprite, TilemapLayer } from "@/types";
-import { BASIC_TILES, type ExportedTileType } from "@/lib/tilemap/tiled-export";
+import type { Sprite, TilemapLayer, TilemapTerrain } from "@/types";
+import { BASIC_TILES, type ExportedTerrain, type ExportedTileType } from "@/lib/tilemap/tiled-export";
 import type { ImageCodec } from "../image/codec";
 import { ImportError, MissingFilesError, type ImportResult } from "../types";
 import type { TiledChunk, TiledLayer, TiledMap, TilemapImport } from "./tiled-model";
 import { isFlipped, tileIdOf } from "./tile-data";
+import { isCollisionLayer, readCollision } from "./collision";
 import { missingImages, planImageCuts, resolveTilesets, spritesFromCuts } from "./tilesets";
 
 /** The Tilemap's own limit for a new map. */
@@ -42,12 +43,32 @@ export async function buildTilemapImport(map: TiledMap, fileName: string, contex
     ? { tileByGid: ownTileLookup(map.ownTileTypes, warnings), sprites: [] }
     : await tilesetLookup(map, usedGids, context, warnings);
   const layers = tileLayers.map((layer) => toTilemapLayer(layer, bounds, tileByGid));
+  const extras = { collision: readCollision(map, bounds, warnings), terrains: map.ownTerrains && toTerrains(map.ownTerrains, tileByGid) };
   warnAboutTiles(tileLayers, tileByGid, warnings);
   warnAboutSkippedLayers(map.layers, warnings);
   if (map.tileWidth !== map.tileHeight) {
     warnings.push(`Tiles are ${map.tileWidth}×${map.tileHeight} px; the Tilemap uses square tiles, so they show as ${map.tileWidth}×${map.tileWidth}.`);
   }
-  return { items: [{ tilemap: tilemapOf(map, fileName, bounds, layers), sprites }], warnings };
+  return { items: [{ tilemap: { ...tilemapOf(map, fileName, bounds, layers), ...withoutEmpty(extras) }, sprites }], warnings };
+}
+
+/** Leaves out what the map doesn't have, so it looks like a map made in the Tilemap without terrains or collision. */
+function withoutEmpty<T extends Record<string, unknown>>(fields: T): Partial<T> {
+  return Object.fromEntries(Object.entries(fields).filter(([, value]) => value !== undefined && !(Array.isArray(value) && !value.length))) as Partial<T>;
+}
+
+/** The Tilemap's own terrains, with their gids turned back into tiles; tiles it can't place are dropped. */
+function toTerrains(terrains: ExportedTerrain[], tileByGid: Map<number, Tile>): TilemapTerrain[] {
+  return terrains.map((terrain) => ({
+    id: uuid(),
+    name: typeof terrain.name === "string" ? terrain.name : "Terrain",
+    kind: terrain.kind === "blob47" ? "blob47" : "edge16",
+    tiles: Object.fromEntries(
+      Object.entries(terrain.tiles ?? {})
+        .map(([mask, gid]) => [mask, tileByGid.get(gid)] as const)
+        .filter((entry): entry is [string, number | string] => entry[1] !== null && entry[1] !== undefined)
+    ),
+  }));
 }
 
 function tilemapOf(map: TiledMap, fileName: string, bounds: Bounds, layers: TilemapLayer[]): TilemapImport["tilemap"] {
@@ -151,6 +172,6 @@ function warnAboutTiles(layers: TileLayer[], tileByGid: Map<number, Tile>, warni
 }
 
 function warnAboutSkippedLayers(layers: TiledLayer[], warnings: string[]) {
-  const skipped = layers.filter((layer) => layer.kind !== "tile").map((layer) => `"${layer.name}" (${layer.kind === "object" ? "objects" : "image"})`);
-  if (skipped.length) warnings.push(`The Tilemap has no object or image layers, so these were skipped: ${skipped.join(", ")}.`);
+  const skipped = layers.filter((layer) => layer.kind === "image" || (layer.kind === "object" && !isCollisionLayer(layer))).map((layer) => `"${layer.name}" (${layer.kind === "object" ? "objects" : "image"})`);
+  if (skipped.length) warnings.push(`The Tilemap reads only collision from object layers and has no image layers, so these were skipped: ${skipped.join(", ")}.`);
 }

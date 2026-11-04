@@ -45,6 +45,10 @@ export const tilemapSchema = z.looseObject({
   tileSize: z.number().positive(),
   layers: z.array(z.looseObject({ id, name: z.string(), visible: z.boolean(), tiles: z.array(z.array(z.union([z.number(), z.string(), z.null()]))) })),
   tilesetSpriteIds: z.array(z.string()),
+  terrains: z
+    .array(z.looseObject({ id, name: z.string(), kind: z.enum(["edge16", "blob47"]), tiles: z.record(z.string(), z.union([z.number(), z.string()])) }))
+    .optional(),
+  collision: z.array(z.array(z.number())).optional(),
   tags,
 });
 

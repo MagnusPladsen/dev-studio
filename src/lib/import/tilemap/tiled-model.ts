@@ -1,5 +1,5 @@
 import type { Sprite, TilemapData } from "@/types";
-import type { ExportedTileType } from "@/lib/tilemap/tiled-export";
+import type { ExportedTerrain, ExportedTileType } from "@/lib/tilemap/tiled-export";
 
 /** One imported map plus the sprites made from its tilesets. */
 export interface TilemapImport {
@@ -17,7 +17,22 @@ export interface TiledChunk {
   gids: number[];
 }
 
-export type TiledLayer = { kind: "tile"; name: string; visible: boolean; chunks: TiledChunk[] } | { kind: "object" | "image"; name: string };
+/** An object on an object layer, in pixels. Only rectangles can become collision. */
+export interface TiledObject {
+  shape: "rectangle" | "other";
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  /** Tiled's object type (called class since Tiled 1.9). */
+  type: string;
+  isOneWay: boolean;
+}
+
+export type TiledLayer =
+  | { kind: "tile"; name: string; visible: boolean; chunks: TiledChunk[] }
+  | { kind: "object"; name: string; objects: TiledObject[] }
+  | { kind: "image"; name: string };
 
 export interface TiledImage {
   source: string;
@@ -54,4 +69,6 @@ export interface TiledMap {
   tilesets: TiledTilesetRef[];
   /** Only in the Tilemap's own JSON export: what each gid stands for (a basic tile colour or a sprite id). */
   ownTileTypes?: ExportedTileType[];
+  /** Only in the Tilemap's own JSON export: its terrains, with gids for tiles. */
+  ownTerrains?: ExportedTerrain[];
 }

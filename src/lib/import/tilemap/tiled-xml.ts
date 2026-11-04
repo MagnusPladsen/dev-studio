@@ -1,5 +1,5 @@
 import { ImportError } from "../types";
-import type { TiledChunk, TiledImage, TiledLayer, TiledMap, TiledTileset, TiledTilesetRef } from "./tiled-model";
+import type { TiledChunk, TiledImage, TiledLayer, TiledMap, TiledObject, TiledTileset, TiledTilesetRef } from "./tiled-model";
 import { decodeTileData, type TileEncoding } from "./tile-data";
 
 function parseXml(text: string): Element {
@@ -47,11 +47,27 @@ async function readLayers(parent: Element, isParentVisible: boolean): Promise<Ti
     const name = attr(element, "name") ?? "Layer";
     const visible = isParentVisible && attr(element, "visible") !== "0";
     if (element.nodeName === "group") read.push(...(await readLayers(element, visible)));
-    else if (element.nodeName === "objectgroup") read.push({ kind: "object", name });
+    else if (element.nodeName === "objectgroup") read.push({ kind: "object", name, objects: childElements(element, "object").map(readObject) });
     else if (element.nodeName === "imagelayer") read.push({ kind: "image", name });
     else if (element.nodeName === "layer") read.push({ kind: "tile", name, visible, chunks: await readChunks(element, name) });
   }
   return read;
+}
+
+const OTHER_SHAPES = ["ellipse", "point", "polygon", "polyline", "text"];
+
+function readObject(object: Element): TiledObject {
+  const isRectangle = !object.hasAttribute("gid") && !OTHER_SHAPES.some((shape) => firstChild(object, shape));
+  const properties = childElements(firstChild(object, "properties") ?? object, "property");
+  return {
+    shape: isRectangle ? "rectangle" : "other",
+    x: numAttr(object, "x"),
+    y: numAttr(object, "y"),
+    width: numAttr(object, "width"),
+    height: numAttr(object, "height"),
+    type: attr(object, "type") ?? attr(object, "class") ?? "",
+    isOneWay: properties.some((property) => attr(property, "name") === "one_way" && attr(property, "value") === "true"),
+  };
 }
 
 async function readChunks(layer: Element, name: string): Promise<TiledChunk[]> {
