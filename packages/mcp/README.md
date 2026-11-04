@@ -39,6 +39,9 @@ only forgets the sign-in on this computer. An access token keeps working for up 
 | `create_issues`, `update_issues` | up to 100 issues per call, with the next free keys; fields, labels, column, sprint, order and archive (no deletes) |
 | `create_sprint`, `complete_sprint` | plan or start a sprint (one runs at a time); complete it like the app: done issues archived, open ones moved |
 | `check_task` | tick or untick a `- [ ]` task in an issue, note or wiki/story page, or an item of a canvas checklist |
+| `create_note`, `update_note` | Notebook notes, from the app's note templates; append or swap passages without resending the note |
+| `create_wiki_page`, `update_wiki_page` | Wiki pages (Story in GameDev Studio) with the app's page types and templates; reports where each `[[link]]` points |
+| `create_decision`, `update_decision` | Decision log entries as the next ADR number; `supersedes` marks the old ADR superseded and points it at the new one |
 | `sign_in`, `whoami`, `sign_out` | the connection |
 
 Resources: `studio://projects`, `studio://project/{projectId}`, `studio://project/{projectId}/{type}/{id}` (one asset as
