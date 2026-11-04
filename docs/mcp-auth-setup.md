@@ -39,7 +39,7 @@ public.
      - `http://127.0.0.1:53685/callback`
    - **Client URI** (optional): `https://gamedev-studio.pladsen.dev`; logo optional.
    - Create, then copy the **Client ID** (a UUID). It is public: it goes into the MCP package as `STUDIO_CLIENT_ID`'s
-     default (step 4 of the build).
+     default (step 4 of the build). Production client: `307f2e96-2f35-4a4e-a116-0d5c4302551f`.
 4. **Authentication → URL Configuration → Redirect URLs**: add the four
    `http://127.0.0.1:5368X/callback**` entries from `supabase/config.toml`. Only the `/auth/cli` fallback needs them
    (normal sign-in redirects; Supabase may already accept loopback addresses without them).

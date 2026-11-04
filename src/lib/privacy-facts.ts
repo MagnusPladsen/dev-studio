@@ -16,7 +16,7 @@ export interface PrivacyFacts {
 export const PRIVACY_FACTS: PrivacyFacts = {
   controller: "Magnus Pladsen",
   website: "pladsen.dev",
-  contactEmail: null,
-  supabaseRegion: null,
+  contactEmail: "magnus_pladsen@hotmail.com",
+  supabaseRegion: "Zurich, Switzerland (eu-central-2)",
   lastUpdated: "2026-11-03",
 };
