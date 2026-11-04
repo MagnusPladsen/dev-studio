@@ -5,6 +5,7 @@ import type { Session } from "./auth/session";
 import { Studio } from "./store/studio";
 import { registerResources } from "./resources";
 import { registerAssetTools } from "./tools/assets";
+import { registerDocTools } from "./tools/docs";
 import { registerLinkTools } from "./tools/links";
 import { registerProjectTools } from "./tools/projects";
 import { registerSearchTool } from "./tools/search";
@@ -25,6 +26,7 @@ export function createStudioServer(config: ServerConfig, session: Session, clien
   registerAssetTools(ctx);
   registerSearchTool(ctx);
   registerLinkTools(ctx);
+  registerDocTools(ctx);
   registerResources(ctx);
   return server;
 }

@@ -35,6 +35,9 @@ only forgets the sign-in on this computer. An access token keeps working for up 
 | `list_assets`, `get_asset` | issues, notes, wiki/story pages, decisions and canvas outlines, as Markdown; art and audio as name and size only |
 | `search` | full-text search over titles, text and canvas labels |
 | `get_related`, `link`, `unlink` | links between assets (either end may be one canvas element) |
+| `create_note`, `update_note` | Notebook notes, from the app's note templates; append or swap passages without resending the note |
+| `create_wiki_page`, `update_wiki_page` | Wiki pages (Story in GameDev Studio) with the app's page types and templates; reports where each `[[link]]` points |
+| `create_decision`, `update_decision` | Decision log entries as the next ADR number; `supersedes` marks the old ADR superseded and points it at the new one |
 | `sign_in`, `whoami`, `sign_out` | the connection |
 
 Resources: `studio://projects`, `studio://project/{projectId}`, `studio://project/{projectId}/{type}/{id}` (one asset as
