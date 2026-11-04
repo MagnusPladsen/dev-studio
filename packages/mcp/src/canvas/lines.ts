@@ -1,4 +1,3 @@
-import { v4 as uuid } from "uuid";
 import type { Cardinality, DiagramEdge } from "@/types";
 import { newLine } from "@/lib/diagrams/tables";
 import type { ConnectOp } from "./op-schema";
@@ -24,7 +23,7 @@ function withCardinality(work: Work, edge: DiagramEdge, cardinality: Cardinality
 
 /** A line made the way the board makes one (`newLine`): a row-to-row line is a many-to-one relation. */
 export function connect(work: Work, op: ConnectOp): void {
-  const drawn = newLine(uuid(), lineEnd(work, op.from, op.fromRow), lineEnd(work, op.to, op.toRow));
+  const drawn = newLine(work.newId(), lineEnd(work, op.from, op.fromRow), lineEnd(work, op.to, op.toRow));
   if (!drawn) throw new Error(`Can't connect "${op.from}" to itself.`);
   const existing = work.diagram.edges.find((e) => sameEnds(e, drawn));
   if (existing) {

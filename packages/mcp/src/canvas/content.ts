@@ -1,4 +1,3 @@
-import { v4 as uuid } from "uuid";
 import type { DiagramNode } from "@/types";
 import { CARD_COLORS, checklistItems, linkCardSize, safeWebUrl, type ChecklistItem } from "@/lib/diagrams/cards";
 import { tableColumns, type TableColumn } from "@/lib/diagrams/tables";
@@ -18,8 +17,8 @@ export function cardColor(value: string): string | undefined {
   return swatch.value;
 }
 
-export function newColumn(spec: { name: string; type?: string; pk?: boolean; fk?: boolean }): TableColumn {
-  return { id: uuid(), name: spec.name, type: spec.type ?? "text", ...(spec.pk ? { isPrimaryKey: true } : {}), ...(spec.fk ? { isForeignKey: true } : {}) };
+export function newColumn(spec: { name: string; type?: string; pk?: boolean; fk?: boolean }, makeId: () => string): TableColumn {
+  return { id: makeId(), name: spec.name, type: spec.type ?? "text", ...(spec.pk ? { isPrimaryKey: true } : {}), ...(spec.fk ? { isForeignKey: true } : {}) };
 }
 
 /** Wide enough for the longest "name type" row, like the SQL import makes them. */
@@ -35,19 +34,19 @@ function patchedColumn(column: TableColumn, patch: ColumnPatch): TableColumn {
   return next;
 }
 
-export function patchColumns(node: DiagramNode, patches: ColumnPatch[]): TableColumn[] {
+export function patchColumns(node: DiagramNode, patches: ColumnPatch[], makeId: () => string): TableColumn[] {
   return patches.reduce((columns, patch) => {
     const index = columns.findIndex((c) => c.name.toLowerCase() === patch.name.toLowerCase());
-    if (index < 0) return patch.remove ? columns : [...columns, newColumn(patch)];
+    if (index < 0) return patch.remove ? columns : [...columns, newColumn(patch, makeId)];
     if (patch.remove) return columns.filter((_, i) => i !== index);
     return columns.map((c, i) => (i === index ? patchedColumn(c, patch) : c));
   }, tableColumns(node));
 }
 
-export function patchItems(node: DiagramNode, patches: ItemPatch[]): ChecklistItem[] {
+export function patchItems(node: DiagramNode, patches: ItemPatch[], makeId: () => string): ChecklistItem[] {
   return patches.reduce((items, patch) => {
     const index = items.findIndex((i) => i.text === patch.text);
-    if (index < 0) return patch.remove ? items : [...items, { id: uuid(), text: patch.text, done: patch.done ?? false }];
+    if (index < 0) return patch.remove ? items : [...items, { id: makeId(), text: patch.text, done: patch.done ?? false }];
     if (patch.remove) return items.filter((_, i) => i !== index);
     return items.map((item, i) => (i === index ? { ...item, text: patch.newText ?? item.text, done: patch.done ?? item.done } : item));
   }, checklistItems(node));
@@ -67,15 +66,15 @@ function refuseStrayFields(op: AddOp): void {
 }
 
 /** The fields `createNode` takes for an add: label, colour, and the data its kind keeps. */
-export function addFields(op: AddOp, defaultLabel: string): Partial<DiagramNode> {
+export function addFields(op: AddOp, defaultLabel: string, makeId: () => string): Partial<DiagramNode> {
   refuseStrayFields(op);
   const label = op.text ?? defaultLabel;
   const base: Partial<DiagramNode> = { label, ...(op.color ? { color: cardColor(op.color) } : {}) };
   if (op.kind === "table" && op.columns) {
-    const columns = op.columns.map(newColumn);
+    const columns = op.columns.map((c) => newColumn(c, makeId));
     return { ...base, width: tableWidth(label, columns), data: { columns } };
   }
-  if (op.kind === "checklist") return { ...base, data: { items: (op.items ?? []).map((i) => ({ id: uuid(), text: i.text, done: i.done ?? false })) } };
+  if (op.kind === "checklist") return { ...base, data: { items: (op.items ?? []).map((i) => ({ id: makeId(), text: i.text, done: i.done ?? false })) } };
   if (op.kind === "link") return { ...base, label: op.text ?? "", width: linkCardSize(webUrl(op)).width, data: { url: webUrl(op) } };
   if (op.kind === "image") return { ...base, data: { src: webUrl(op) } };
   if (op.kind === "asset") {

@@ -1,4 +1,3 @@
-import { v4 as uuid } from "uuid";
 import type { DiagramNode } from "@/types";
 import { getShape } from "@/lib/canvas-shapes";
 import { createNode, insertNode } from "@/lib/canvas-shapes/create";
@@ -25,9 +24,9 @@ function requestPlacement(work: Work, id: string, request: PlacementRequest): vo
 export function addElement(work: Work, op: AddOp): void {
   if (op.asset) requireRef(work.projectId, { type: op.asset.type, id: op.asset.id });
   for (const target of op.linkTo ?? []) requireRef(work.projectId, target);
-  const id = uuid();
+  const id = work.newId();
   const shape = getShape(op.kind);
-  const created = createNode(op.kind, { x: 0, y: 0 }, { id, extra: addFields(op, shape.defaultLabel) });
+  const created = createNode(op.kind, { x: 0, y: 0 }, { id, extra: addFields(op, shape.defaultLabel, work.newId) });
   const width = op.size ? Math.max(op.size.width, shape.minSize.width) : created.width;
   const node = { ...created, width, height: startingHeight(created, op), ...(op.at ? { x: Math.round(op.at.x), y: Math.round(op.at.y) } : {}) };
   work.diagram.nodes = insertNode(work.diagram.nodes, node);
@@ -41,11 +40,11 @@ function withContent(work: Work, node: DiagramNode, op: UpdateOp): DiagramNode {
   if (op.columns && node.type !== "table") throw new Error(`"${elementName(node)}" is not a table.`);
   if (op.items && node.type !== "checklist") throw new Error(`"${elementName(node)}" is not a to-do list.`);
   if (op.columns) {
-    const columns = patchColumns(node, op.columns);
+    const columns = patchColumns(node, op.columns, work.newId);
     work.diagram.edges = pruneRowLinks(work.diagram.edges, node.id, columns);
     return { ...node, height: tableHeight(columns.length), data: { ...node.data, columns } };
   }
-  if (op.items) return { ...node, data: { ...node.data, items: patchItems(node, op.items) } };
+  if (op.items) return { ...node, data: { ...node.data, items: patchItems(node, op.items, work.newId) } };
   return node;
 }
 
@@ -89,7 +88,7 @@ export function deleteElement(work: Work, handle: string): void {
 
 export function groupElements(work: Work, op: { ref?: string; label: string; members: string[] }): void {
   const members = [...new Set(op.members.map((m) => nodeOf(work, m).id))];
-  const id = uuid();
+  const id = work.newId();
   const group = { ...createNode("group", { x: 0, y: 0 }, { id }), label: op.label };
   work.diagram.nodes = insertNode(work.diagram.nodes, group);
   work.groups.push({ id, members });

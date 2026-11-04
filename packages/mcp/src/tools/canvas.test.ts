@@ -197,6 +197,27 @@ describe("canvas tools", () => {
     expect(canvasRow("canvas-1").nodes.filter((n) => n.label === "Once")).toHaveLength(1);
   });
 
+  it("reruns with the same ids, so links saved by a half-finished attempt still point at the element", async () => {
+    db.forcedStatuses = [["conflict"]];
+    const ops = [{ op: "add", kind: "note", text: "Linked", linkTo: [{ type: "note", id: "note-1" }] }];
+    expect((await call("edit_canvas", { projectId: P, canvas: "canvas-1", ops })).isError).toBe(false);
+    const links = db.assets.filter((a) => a.collection === "links");
+    const note = canvasRow("canvas-1").nodes.find((n) => n.label === "Linked")!;
+    expect(links).toHaveLength(1);
+    expect(links[0].data.from).toEqual({ type: "diagram", id: "canvas-1", elementId: note.id });
+  });
+
+  it("writes a new canvas once even when its first save only half landed", async () => {
+    db.forcedStatuses = [["ok", "conflict"]];
+    const ops = [{ op: "add", kind: "note", text: "Linked", linkTo: [{ type: "note", id: "note-1" }] }];
+    const result = await call("create_canvas", { projectId: P, name: "Retry", ops });
+    expect(result.isError).toBe(false);
+    const canvases = db.assets.filter((a) => a.collection === "diagrams" && a.data.name === "Retry");
+    expect(canvases).toHaveLength(1);
+    expect((canvases[0].data as unknown as Diagram).nodes).toHaveLength(1);
+    expect(db.assets.filter((a) => a.collection === "links")).toHaveLength(1);
+  });
+
   it("starts from the project's app template", async () => {
     const result = await call("create_canvas", { projectId: P, name: "Flow", template: "flow-chart", tags: ["#Plan", "plan"] });
     const diagram = canvasRow((result.data.canvas as { id: string }).id);

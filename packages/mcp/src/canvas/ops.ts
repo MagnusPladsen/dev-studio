@@ -2,6 +2,7 @@ import type { Diagram } from "@/types";
 import { addLink } from "@/lib/links";
 import { storage } from "@/lib/storage";
 import type { AliasBook } from "./aliases";
+import type { IdSequence } from "./ids";
 import { addElement, deleteElement, groupElements, moveElement, updateElement } from "./elements";
 import { connect, disconnect, updateLine } from "./lines";
 import type { LayoutChoice, Op } from "./op-schema";
@@ -37,8 +38,8 @@ function applyOp(work: Work, op: Op): void {
 }
 
 /** Runs the ops in order on a copy of the canvas and places what they left unplaced. Nothing is saved yet. */
-export function applyOps(projectId: string, diagram: Diagram, ops: Op[], aliases: AliasBook, layout: LayoutChoice = "auto"): Work {
-  const work = startWork(projectId, diagram, aliases);
+export function applyOps(projectId: string, diagram: Diagram, ops: Op[], aliases: AliasBook, ids: IdSequence, layout: LayoutChoice = "auto"): Work {
+  const work = startWork(projectId, diagram, aliases, ids.next);
   ops.forEach((op, index) => {
     try {
       applyOp(work, op);
@@ -51,8 +52,8 @@ export function applyOps(projectId: string, diagram: Diagram, ops: Op[], aliases
 }
 
 /** Applies the ops, saves the canvas into the cache and adds the asked element links (the store then writes both). */
-export function editCanvas(projectId: string, diagram: Diagram, ops: Op[], aliases: AliasBook, layout?: LayoutChoice): EditOutcome {
-  const work = applyOps(projectId, diagram, ops, aliases, layout);
+export function editCanvas(projectId: string, diagram: Diagram, ops: Op[], aliases: AliasBook, ids: IdSequence, layout?: LayoutChoice): EditOutcome {
+  const work = applyOps(projectId, diagram, ops, aliases, ids, layout);
   const saved = { ...work.diagram, updatedAt: new Date().toISOString() };
   storage.save("diagrams", saved, projectId);
   for (const link of work.links) addLink(projectId, { type: "diagram", id: saved.id, elementId: link.elementId }, link.to);

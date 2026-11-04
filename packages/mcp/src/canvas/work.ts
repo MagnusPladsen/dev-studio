@@ -9,6 +9,7 @@ export interface Work {
   projectId: string;
   diagram: Diagram;
   aliases: AliasBook;
+  newId: () => string;
   /** Temp refs of this call → real ids. */
   refs: Map<string, string>;
   /** Elements the server places once every op ran (adds and moves without `at`). */
@@ -20,11 +21,12 @@ export interface Work {
   warnings: string[];
 }
 
-export function startWork(projectId: string, diagram: Diagram, aliases: AliasBook): Work {
+export function startWork(projectId: string, diagram: Diagram, aliases: AliasBook, newId: () => string): Work {
   return {
     projectId,
     diagram: { ...diagram, nodes: [...diagram.nodes], edges: [...diagram.edges] },
     aliases,
+    newId,
     refs: new Map(),
     placements: new Map(),
     groups: [],

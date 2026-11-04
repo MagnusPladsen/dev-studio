@@ -1,5 +1,4 @@
 import * as z from "zod";
-import { v4 as uuid } from "uuid";
 import type { Diagram, Project } from "@/types";
 import { assetTypesFor } from "@/lib/assets";
 import { appConfigFor } from "@/lib/app-config";
@@ -8,6 +7,7 @@ import { applyLayout, autoLayout } from "@/lib/diagrams/auto-layout";
 import { storage } from "@/lib/storage";
 import { normalizeTag } from "@/lib/tags";
 import { AliasBook } from "../canvas/aliases";
+import { IdSequence } from "../canvas/ids";
 import { layoutSchema, MAX_OPS, opSchema } from "../canvas/op-schema";
 import { editCanvas, type EditOutcome } from "../canvas/ops";
 import { canvasOutline } from "../canvas/outline";
@@ -61,10 +61,10 @@ function editResult(project: Project, outcome: EditOutcome, aliases: AliasBook, 
   return result(text, { canvas: { id: diagram.id, name: diagram.name }, url, refs, nodes: outline.nodes, lines: outline.lines, warnings: outcome.warnings });
 }
 
-function newCanvas(project: Project, name: string, template: TemplateId, tags: string[]): Diagram {
+function newCanvas(project: Project, name: string, template: TemplateId, tags: string[], ids: IdSequence): Diagram {
   const chosen = canvasTemplatesFor(projectApp(project)).find((t) => t.id === template)!;
   const now = new Date().toISOString();
-  return { id: uuid(), projectId: project.id, name, ...chosen.build(uuid), tags: cleanTags(tags), createdAt: now, updatedAt: now };
+  return { id: ids.next(), projectId: project.id, name, ...chosen.build(ids.next), tags: cleanTags(tags), createdAt: now, updatedAt: now };
 }
 
 export function registerCanvasTools(ctx: ToolContext): void {
@@ -110,10 +110,12 @@ export function registerCanvasTools(ctx: ToolContext): void {
     },
     ({ projectId, name, template, tags, ops, layout }) =>
       guarded(async () => {
+        const ids = new IdSequence();
         const { project, outcome } = await studio.write({ projectId, collections: EDIT_SCOPE }, () => {
+          ids.restart();
           const project = canvasProject(projectId);
-          const diagram = newCanvas(project, name, template ?? "blank", tags ?? []);
-          return { project, outcome: editCanvas(projectId, diagram, ops ?? [], aliases, layout) };
+          const diagram = newCanvas(project, name, template ?? "blank", tags ?? [], ids);
+          return { project, outcome: editCanvas(projectId, diagram, ops ?? [], aliases, ids, layout) };
         });
         return editResult(project, { ...outcome, changed: new Set([...outcome.diagram.nodes, ...outcome.diagram.edges].map((e) => e.id)) }, aliases, "Created");
       })
@@ -134,9 +136,11 @@ export function registerCanvasTools(ctx: ToolContext): void {
     },
     ({ projectId, canvas, ops, layout }) =>
       guarded(async () => {
+        const ids = new IdSequence();
         const { project, outcome } = await studio.write({ projectId, collections: EDIT_SCOPE }, () => {
+          ids.restart();
           const project = canvasProject(projectId);
-          return { project, outcome: editCanvas(projectId, findCanvas(projectId, canvas), ops, aliases, layout) };
+          return { project, outcome: editCanvas(projectId, findCanvas(projectId, canvas), ops, aliases, ids, layout) };
         });
         return editResult(project, outcome, aliases, "Edited");
       })
@@ -165,7 +169,7 @@ export function registerCanvasTools(ctx: ToolContext): void {
         const { project, outcome } = await studio.write({ projectId, collections: EDIT_SCOPE }, () => {
           const project = canvasProject(projectId);
           const diagram = findCanvas(projectId, canvas);
-          const work = startWork(projectId, diagram, aliases);
+          const work = startWork(projectId, diagram, aliases, new IdSequence().next);
           const place = everything ? undefined : elements!.map((h) => nodeOf(work, h).id);
           const rects = autoLayout(diagram.nodes, diagram.edges, { algorithm, direction, spacing, place });
           const saved = { ...diagram, nodes: applyLayout(diagram.nodes, rects), updatedAt: new Date().toISOString() };
