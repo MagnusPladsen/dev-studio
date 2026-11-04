@@ -42,6 +42,8 @@ import { getLoadedImage, loadImage } from "@/lib/pixels";
 import { scalePixels, type ScaleFactor, type ScaleMethod } from "@/lib/pixel-scale";
 import { encodeGif } from "@/lib/gif";
 import { downloadBlob } from "@/lib/download";
+import { ENGINES, engineZipName, zipBlob } from "@/lib/engine-export";
+import { canvasPng } from "@/lib/engine-export/render";
 import { APP } from "@/lib/app-config";
 import {
   ANIMATION_DIRECTIONS,
@@ -1097,7 +1099,7 @@ export default function PixelArtPage() {
 
   const exportName = newName.trim() || "sprite";
 
-  async function exportSpriteSheet() {
+  async function renderSheet() {
     const { columns, rows, rects } = sheetLayout(frames.length, canvasW, canvasH);
     const c = document.createElement("canvas");
     c.width = canvasW * columns;
@@ -1106,10 +1108,31 @@ export default function PixelArtPage() {
     for (let i = 0; i < frames.length; i++) {
       await drawLayers(ctx, frames[i].layers, rects[i].x, rects[i].y);
     }
+    return { canvas: c, columns, rows };
+  }
+
+  async function exportSpriteSheet() {
+    const { canvas } = await renderSheet();
     const a = document.createElement("a");
-    a.href = c.toDataURL("image/png");
+    a.href = canvas.toDataURL("image/png");
     a.download = `${exportName}_sheet.png`;
     a.click();
+  }
+
+  /** One zip laid out the way the engine expects: the sheet, its animations from the tags, and a README. */
+  async function exportForEngine(engine: (typeof ENGINES)[number]) {
+    const { canvas, columns, rows } = await renderSheet();
+    const files = engine.sprite.files({
+      name: exportName,
+      width: canvasW,
+      height: canvasH,
+      durations: frames.map((frame) => frame.duration),
+      tags: frameTags,
+      columns,
+      rows,
+      sheetPng: await canvasPng(canvas),
+    });
+    downloadBlob(engineZipName(exportName, "sprite", engine.id), zipBlob(files));
   }
 
   function exportSheetJson() {
@@ -1592,6 +1615,11 @@ export default function PixelArtPage() {
               label: `GIF: ${tag.name} (frames ${tag.from + 1}–${tag.to + 1})`,
               description: `The "${tag.name}" tag, ${ANIMATION_DIRECTIONS.find((d) => d.value === tag.direction)?.label.toLowerCase()}, 4× size`,
               onClick: () => exportGif(4, tag),
+            })),
+            ...ENGINES.map((engine) => ({
+              label: `Export for engine: ${engine.label}`,
+              description: `Zip: ${engine.sprite.description}`,
+              onClick: () => exportForEngine(engine),
             })),
           ]}
         />

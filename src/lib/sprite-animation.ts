@@ -130,14 +130,16 @@ export interface SheetJsonInput {
   durations: number[];
   tags: FrameTag[];
   app: string;
+  /** Each frame's `filename`; Aseprite's default is "<name> <index>". Phaser's `createFromAseprite` wants the index alone. */
+  frameName?: (index: number) => string;
 }
 
 /** The sprite sheet's data in Aseprite's JSON format (array), which engines and tools like Phaser and Godot plugins read. */
-export function asepriteSheetJson({ name, image, width, height, durations, tags, app }: SheetJsonInput) {
+export function asepriteSheetJson({ name, image, width, height, durations, tags, app, frameName = (i) => `${name} ${i}` }: SheetJsonInput) {
   const { columns, rows, rects } = sheetLayout(durations.length, width, height);
   return {
     frames: rects.map((rect, i) => ({
-      filename: `${name} ${i}`,
+      filename: frameName(i),
       frame: rect,
       rotated: false,
       trimmed: false,

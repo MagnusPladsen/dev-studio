@@ -1,0 +1,3 @@
+coin/coin.png (binary)
+coin/coin.json
+coin/README.md

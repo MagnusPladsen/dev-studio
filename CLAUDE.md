@@ -79,6 +79,10 @@ tools comes from `COPY.help`. `npm test` checks both objects have the same keys 
 - **Import**: `src/lib/import/` (contract + how to add one in its `README.md`). One file per `Importer` (`parse` →
   items with fresh ids + warnings) listed in the tool's array (`CANVAS_IMPORTERS`…); `useImport` + `<ImportMenu>`
   (right before `ExportMenu`) + `<ImportDropZone>`; `jsonReimporter` re-imports a tool's own JSON export.
+- **Engine exports**: `src/lib/engine-export/` (`ENGINES`: Godot 4, Unity, Phaser 3, Tiled) turns a Pixel Art sprite or
+  a Tilemap into one zip (fflate) per engine; pure file builders, browser drawing in `render.ts`. Golden files in
+  `__golden__/` (`npm test -- -u` rewrites them); `GODOT_EXPORT_DIR=<godot project> npm test -- godot` writes the
+  Godot exports there for a `godot --headless --import` check.
 
 ## Conventions (agreed with the owner)
 

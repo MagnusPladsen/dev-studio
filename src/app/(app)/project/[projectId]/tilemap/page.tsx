@@ -41,6 +41,9 @@ import { useImport } from "@/hooks/useImport";
 import { importAsNewAssets, saveImportedAssets, type ImportStep } from "@/lib/import";
 import { TILEMAP_IMPORTERS, type TilemapImport } from "@/lib/import/tilemap";
 import { BASIC_TILES, toTiledJson } from "@/lib/tilemap/tiled-export";
+import { ENGINES, engineZipName, zipBlob } from "@/lib/engine-export";
+import { renderTilemapExport } from "@/lib/engine-export/render";
+import { downloadBlob } from "@/lib/download";
 import { eraseWithTerrains, paintTerrain } from "@/lib/tilemap/autotile";
 import { COLLISION, collisionGrid, paintCollision, type CollisionValue } from "@/lib/tilemap/collision";
 import { TerrainPanel } from "@/components/tilemap/TerrainPanel";
@@ -480,6 +483,13 @@ export default function TilemapPage() {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
+  /** One zip laid out the way the engine expects: tiles, terrains, collision, the map and a README. */
+  async function exportForEngine(engine: (typeof ENGINES)[number]) {
+    if (!current) return;
+    const files = engine.tilemap.files(await renderTilemapExport(current, spriteById));
+    downloadBlob(engineZipName(current.name, "tilemap", engine.id), zipBlob(files));
+  }
+
   const toolBtn = (t: Tool, Icon: typeof Paintbrush, title: string) => (
     <button
       onClick={() => setTool(t)}
@@ -719,6 +729,11 @@ export default function TilemapPage() {
               items={[
                 { label: "PNG (whole map)", description: "One image of every visible layer, no grid", onClick: exportPNG },
                 { label: "JSON (Tiled-style layers)", description: "Layers as tile-id arrays, a tileset table, terrains and a Collision object layer", onClick: exportJSON },
+                ...ENGINES.map((engine) => ({
+                  label: `Export for engine: ${engine.label}`,
+                  description: `Zip: ${engine.tilemap.description}`,
+                  onClick: () => exportForEngine(engine),
+                })),
               ]}
             />
           </div>
