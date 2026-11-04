@@ -23,9 +23,6 @@ export function pixelGifImporter(options: PixelImportOptions = DEFAULT_PIXEL_IMP
         frames[0].height,
         frames.map((frame, i) => ({ pixels: codec.encode(frame), duration: delays[i] }))
       );
-      if (frames.length > 1 && new Set(delays).size > 1) {
-        warnings.push(`Frame delays differ; each frame keeps its own for GIF export, and the preview plays at ${sprite.fps} fps`);
-      }
       return { items: [sprite], warnings };
     },
   };

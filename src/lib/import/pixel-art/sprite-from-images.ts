@@ -78,6 +78,7 @@ export function buildSprite(name: string, width: number, height: number, frames:
     width,
     height,
     fps: fpsForDurations(frames.map((frame) => frame.duration)),
+    hasFrameDurations: true,
     frames: frames.map(({ pixels, duration }) => ({
       id: uuid(),
       pixels,

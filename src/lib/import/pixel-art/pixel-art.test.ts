@@ -71,12 +71,8 @@ describe("Pixel Art GIF import", () => {
     expect(sprite.frames.map((frame) => frame.duration)).toEqual([100, 100, 300]);
     expect(sprite.fps).toBe(10);
     expect(pixelAt(decodeFake(sprite.frames[2].pixels), 0, 0)).toEqual([0, 0, 255, 255]);
-    expect(outcome.result.warnings[0]).toMatch(/preview plays at 10 fps/);
-  });
-
-  it("should not warn about delays when every frame has the same one", async () => {
-    const outcome = await runImporter(pixelGifImporter(undefined, fakeCodec), await gifFile([{ color: [1, 2, 3], delay: 80 }, { color: [3, 2, 1], delay: 80 }]));
-    expect(outcome.ok && outcome.result.warnings).toEqual([]);
+    expect(sprite.hasFrameDurations).toBe(true);
+    expect(outcome.result.warnings).toEqual([]);
   });
 
   it("should say a non-GIF file isn't a GIF", async () => {

@@ -1,3 +1,4 @@
+import type { FrameTag } from "@/types";
 import type { ExampleContext, ExampleModule } from "./types";
 
 // Meadow palette shared by every example sprite, so they read as one game.
@@ -57,7 +58,13 @@ function tile(base: string, specks: [number, number, string][], rows?: Record<nu
   return grid.map((r) => r.join(""));
 }
 
-function sprite(ctx: ExampleContext, slug: string, name: string, fps: number, frames: string[][]) {
+interface Animation {
+  /** Milliseconds per frame, where a frame differs from the fps. */
+  durations?: number[];
+  frameTags?: Omit<FrameTag, "id">[];
+}
+
+function sprite(ctx: ExampleContext, slug: string, name: string, fps: number, frames: string[][], animation: Animation = {}) {
   const id = ctx.id(slug);
   const duration = Math.round(1000 / fps);
   return {
@@ -66,13 +73,15 @@ function sprite(ctx: ExampleContext, slug: string, name: string, fps: number, fr
     width: SIZE,
     height: SIZE,
     fps,
+    hasFrameDurations: true,
+    frameTags: (animation.frameTags ?? []).map((tag) => ({ ...tag, id: `${id}-tag-${tag.name}` })),
     tags: ["example"],
     frames: frames.map((rows, i) => {
       const pixels = toDataUrl(rows);
       return {
         id: `${id}-f${i}`,
         pixels,
-        duration,
+        duration: animation.durations?.[i] ?? duration,
         layers: [{ id: `${id}-f${i}-l0`, name: "Layer 1", visible: true, pixels }],
       };
     }),
@@ -116,6 +125,8 @@ const PIP_TOGETHER = [
 ];
 // passing pose: body bobs up a pixel while the legs pass each other
 const pipBob = () => [...shiftUp(PIP_TOP, 1).slice(0, 10), PIP_TOP[10], ...PIP_TOGETHER];
+const PIP_STAND = [...PIP_TOP, ...PIP_TOGETHER];
+const PIP_BLINK = PIP_STAND.map((row, y) => (y === 5 ? "....KSSSSSSK...." : row));
 
 // ── Slime: idle squash ──
 const SLIME_UP = [
@@ -288,8 +299,17 @@ export const artExamples: ExampleModule[] = [
   {
     collection: "sprites",
     build: (ctx) => [
-      sprite(ctx, "hero", "Pip (walk)", 8, [[...PIP_TOP, ...PIP_STRIDE_A], pipBob(), [...PIP_TOP, ...PIP_STRIDE_B], pipBob()]),
-      sprite(ctx, "slime", "Slime", 3, [SLIME_UP, SLIME_SQUASH]),
+      sprite(ctx, "hero", "Pip (walk)", 8, [PIP_STAND, PIP_BLINK, [...PIP_TOP, ...PIP_STRIDE_A], pipBob(), [...PIP_TOP, ...PIP_STRIDE_B], pipBob()], {
+        durations: [1200, 150],
+        frameTags: [
+          { name: "idle", from: 0, to: 1, color: "#5aa9e6", direction: "forward" },
+          { name: "walk", from: 2, to: 5, color: "#6abe30", direction: "forward" },
+        ],
+      }),
+      sprite(ctx, "slime", "Slime", 3, [SLIME_UP, SLIME_SQUASH], {
+        durations: [450, 200],
+        frameTags: [{ name: "bounce", from: 0, to: 1, color: "#9b5de5", direction: "forward" }],
+      }),
       sprite(ctx, "coin", "Coin", 8, [COIN_FULL, COIN_TURN, COIN_EDGE, flipH(COIN_TURN)]),
       sprite(ctx, "heart", "Heart", 8, [HEART]),
       sprite(ctx, "sword", "Sunsteel Sword", 8, [SWORD]),
