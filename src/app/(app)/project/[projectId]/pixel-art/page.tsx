@@ -29,6 +29,10 @@ import {
   Film,
   Maximize2,
   PanelTopOpen,
+  Tag,
+  ArrowRight,
+  ArrowLeft,
+  ArrowLeftRight,
 } from "lucide-react";
 import { v4 as uuid } from "uuid";
 import { useUndoShortcuts } from "@/hooks/useHistory";
@@ -37,6 +41,23 @@ import { storage } from "@/lib/storage";
 import { getLoadedImage, loadImage } from "@/lib/pixels";
 import { scalePixels, type ScaleFactor, type ScaleMethod } from "@/lib/pixel-scale";
 import { encodeGif } from "@/lib/gif";
+import { downloadBlob } from "@/lib/download";
+import { APP } from "@/lib/app-config";
+import {
+  ANIMATION_DIRECTIONS,
+  TAG_TEXT_COLOR,
+  unusedTagColor,
+  asepriteSheetJson,
+  clampDuration,
+  durationForFps,
+  frameDurations,
+  frameTagsFor,
+  playbackOrder,
+  sheetLayout,
+  tagLanes,
+  tagsAfterDelete,
+  tagsAfterInsert,
+} from "@/lib/sprite-animation";
 import { useOpenParam, useTrackOpenAsset, useStorageVersion } from "@/hooks/useStorage";
 import { useAutosave } from "@/hooks/useAutosave";
 import { LinkedAssets } from "@/components/LinkedAssets";
@@ -45,6 +66,8 @@ import { ExportMenu } from "@/components/ExportMenu";
 import { ImportDropZone } from "@/components/ImportDropZone";
 import { ImportMenu } from "@/components/ImportMenu";
 import { PixelImportDialog } from "@/components/pixel-art/PixelImportDialog";
+import { FrameDurationInput } from "@/components/pixel-art/FrameDurationInput";
+import { TagEditor } from "@/components/pixel-art/TagEditor";
 import { useImport, type ImportController } from "@/hooks/useImport";
 import { findImporter, importAsNewAssets, type ImportResult, type ImportStep, type Importer } from "@/lib/import";
 import { MAX_IMAGE_BYTES } from "@/lib/import/image/limits";
@@ -57,7 +80,7 @@ import type { ContextMenuEntry } from "@/components/ContextMenu";
 import { useToast } from "@/components/Toast";
 import { copyToSystemClipboard } from "@/lib/clipboard";
 import { AssetMenuButton, AssetPinButton, PasteButton } from "@/components/AssetMenuButton";
-import type { Sprite, SpriteFrame } from "@/types";
+import type { AnimationDirection, FrameTag, Sprite, SpriteFrame } from "@/types";
 
 // ─── types ───────────────────────────────────────────────────────────
 type Tool = "pencil" | "eraser" | "fill" | "line" | "rect" | "circle" | "picker" | "move";
@@ -77,6 +100,7 @@ interface FrameData {
 
 interface HistoryEntry {
   frames: FrameData[];
+  tags: FrameTag[];
   activeFrame: number;
   activeLayer: number;
   w: number;
@@ -199,6 +223,10 @@ const TOOL_BY_KEY = Object.fromEntries(
   (Object.keys(TOOL_META) as Tool[]).map((t) => [TOOL_META[t].key.toLowerCase(), t])
 ) as Record<string, Tool>;
 const DEFAULT_NAME = "Untitled sprite";
+// one frame thumbnail (w-14) plus the gap-1.5 between thumbnails, for placing tag bands over them
+const FRAME_SLOT = 62;
+const TAG_LANE = 18;
+const DIRECTION_ICONS: Record<AnimationDirection, typeof ArrowRight> = { forward: ArrowRight, reverse: ArrowLeft, pingpong: ArrowLeftRight };
 
 function isTypingTarget(el: EventTarget | null): boolean {
   if (!(el instanceof HTMLElement)) return false;
@@ -248,6 +276,17 @@ export default function PixelArtPage() {
   framesRef.current = frames;
   const [activeFrame, setActiveFrame] = useState(0);
   const [activeLayer, setActiveLayer] = useState(0);
+  // Frames picked with Shift/Ctrl-click (or "Add to selection"), besides the active one: durations and new tags apply to all.
+  const [selectedFrameIds, setSelectedFrameIds] = useState<string[]>([]);
+  const [frameTags, setFrameTags] = useState<FrameTag[]>([]);
+  // Current tags for history, like sizeRef: readable in the handler that changed them.
+  const tagsRef = useRef<FrameTag[]>([]);
+  function setTags(tags: FrameTag[]) {
+    tagsRef.current = tags;
+    setFrameTags(tags);
+  }
+  const [editingTagId, setEditingTagId] = useState<string | null>(null);
+  const [previewTagId, setPreviewTagId] = useState("");
 
   // ── tool state ──
   const [tool, setTool] = useState<Tool>("pencil");
@@ -270,7 +309,7 @@ export default function PixelArtPage() {
   const [pickH, setPickH] = useState("32");
   const [playing, setPlaying] = useState(false);
   const [fps, setFps] = useState(8);
-  const [previewFrame, setPreviewFrame] = useState(0);
+  const [playStep, setPlayStep] = useState(0);
   const [showNewDialog, setShowNewDialog] = useState(false);
   const [newName, setNewName] = useState(DEFAULT_NAME);
   const [customW, setCustomW] = useState("32");
@@ -299,12 +338,20 @@ export default function PixelArtPage() {
 
 
   // ── build initial blank frame ──
-  function makeBlankFrame(w: number, h: number): FrameData {
+  function makeBlankFrame(w: number, h: number, duration = durationForFps(fps)): FrameData {
     return {
       id: uuid(),
       layers: [{ id: uuid(), name: "Layer 1", visible: true, pixels: blankBase64(w, h) }],
-      duration: 100,
+      duration,
     };
+  }
+
+  function resetAnimationState(tags: FrameTag[]) {
+    setTags(tags);
+    setSelectedFrameIds([]);
+    setEditingTagId(null);
+    setPreviewTagId("");
+    setPlaying(false);
   }
 
   // ── new sprite ──
@@ -319,10 +366,11 @@ export default function PixelArtPage() {
     setActiveSpriteId(id);
     setNewName(DEFAULT_NAME);
     setTouched(save);
+    resetAnimationState([]);
     historyRef.current = [];
     historyIdxRef.current = -1;
     pushHistory([frame], 0, 0, false);
-    if (save) void persist({ id, name: DEFAULT_NAME, w, h, frames: [frame], fps });
+    if (save) void persist({ id, name: DEFAULT_NAME, w, h, frames: [frame], fps, tags: [] });
   }
 
   function createNewSprite(w: number, h: number) {
@@ -338,19 +386,21 @@ export default function PixelArtPage() {
     setNewName(sprite.name);
     setFps(sprite.fps);
 
+    const durations = frameDurations(sprite);
     const loaded: FrameData[] = [];
-    for (const sf of sprite.frames) {
+    sprite.frames.forEach((sf, i) => {
       const layers: Layer[] = sf.layers?.length
         ? sf.layers.map((l) => ({ id: l.id, name: l.name, visible: l.visible, pixels: l.pixels }))
         : [{ id: uuid(), name: "Layer 1", visible: true, pixels: sf.pixels }];
-      loaded.push({ id: sf.id, layers, duration: sf.duration });
-    }
-    if (loaded.length === 0) loaded.push(makeBlankFrame(sprite.width, sprite.height));
+      loaded.push({ id: sf.id, layers, duration: durations[i] });
+    });
+    if (loaded.length === 0) loaded.push(makeBlankFrame(sprite.width, sprite.height, durationForFps(sprite.fps)));
     setFrames(loaded);
     setActiveFrame(0);
     setActiveLayer(0);
     setTouched(true);
     setMobilePanel(false);
+    resetAnimationState(frameTagsFor(sprite.frameTags, loaded.length));
     historyRef.current = [];
     historyIdxRef.current = -1;
     pushHistory(loaded, 0, 0, false);
@@ -363,10 +413,10 @@ export default function PixelArtPage() {
   useTrackOpenAsset(activeSpriteId ? { type: "sprite", id: activeSpriteId } : null);
 
   // ── autosave ──
-  type Doc = { id: string | null; name: string; w: number; h: number; frames: FrameData[]; fps: number };
+  type Doc = { id: string | null; name: string; w: number; h: number; frames: FrameData[]; fps: number; tags: FrameTag[] };
   const doc = useMemo<Doc>(
-    () => ({ id: activeSpriteId, name: newName, w: canvasW, h: canvasH, frames, fps }),
-    [activeSpriteId, newName, canvasW, canvasH, frames, fps]
+    () => ({ id: activeSpriteId, name: newName, w: canvasW, h: canvasH, frames, fps, tags: frameTags }),
+    [activeSpriteId, newName, canvasW, canvasH, frames, fps, frameTags]
   );
 
   async function persist(d: Doc) {
@@ -394,6 +444,8 @@ export default function PixelArtPage() {
       height: d.h,
       frames: spriteFrames,
       fps: d.fps,
+      hasFrameDurations: true,
+      frameTags: d.tags,
       tags: existing?.tags ?? [],
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
@@ -426,6 +478,7 @@ export default function PixelArtPage() {
     if (edit) setTouched(true);
     const entry: HistoryEntry = {
       frames: JSON.parse(JSON.stringify(f)),
+      tags: tagsRef.current.map((tag) => ({ ...tag })),
       activeFrame: af,
       activeLayer: al,
       w: sizeRef.current.w,
@@ -444,6 +497,7 @@ export default function PixelArtPage() {
     const e = historyRef.current[historyIdxRef.current];
     setCanvasSize(e.w, e.h);
     setFrames(JSON.parse(JSON.stringify(e.frames)));
+    setTags(e.tags.map((tag) => ({ ...tag })));
     setActiveFrame(e.activeFrame);
     setActiveLayer(e.activeLayer);
     syncHistoryState();
@@ -455,6 +509,7 @@ export default function PixelArtPage() {
     const e = historyRef.current[historyIdxRef.current];
     setCanvasSize(e.w, e.h);
     setFrames(JSON.parse(JSON.stringify(e.frames)));
+    setTags(e.tags.map((tag) => ({ ...tag })));
     setActiveFrame(e.activeFrame);
     setActiveLayer(e.activeLayer);
     syncHistoryState();
@@ -506,6 +561,11 @@ export default function PixelArtPage() {
     const byH = Math.floor((window.innerHeight * 0.42) / canvasH);
     setZoom(Math.max(2, Math.min(40, byW, byH)));
   }, [canvasW, canvasH]);
+
+  // ── preview: one tag (or every frame) in its play order, each frame for its own duration ──
+  const previewTag = frameTags.find((tag) => tag.id === previewTagId) ?? null;
+  const playOrder = useMemo(() => playbackOrder(frames.length, previewTag), [frames.length, previewTag]);
+  const previewFrame = playOrder.length ? playOrder[playStep % playOrder.length] : 0;
 
   // ── render canvas ──
   const renderCanvas = useCallback(async () => {
@@ -591,13 +651,17 @@ export default function PixelArtPage() {
   useEffect(() => { renderCanvas(); }, [renderCanvas]);
 
   // ── animation playback ──
+  const previewDuration = frames[previewFrame]?.duration ?? durationForFps(fps);
   useEffect(() => {
-    if (!playing || frames.length <= 1) return;
-    const interval = setInterval(() => {
-      setPreviewFrame((p) => (p + 1) % frames.length);
-    }, 1000 / fps);
-    return () => clearInterval(interval);
-  }, [playing, fps, frames.length]);
+    if (!playing || playOrder.length <= 1) return;
+    const timeout = setTimeout(() => setPlayStep((step) => step + 1), previewDuration);
+    return () => clearTimeout(timeout);
+  }, [playing, playStep, playOrder.length, previewDuration]);
+
+  function togglePreview() {
+    setPlayStep(0);
+    setPlaying(!playing);
+  }
 
   // ── get active layer image data ──
   async function getActiveLayerData(): Promise<ImageData> {
@@ -814,6 +878,8 @@ export default function PixelArtPage() {
       width: w,
       height: h,
       fps,
+      hasFrameDurations: true,
+      frameTags: tagsRef.current.map((tag) => ({ ...tag, id: uuid() })),
       frames: await Promise.all(
         next.map(async (f) => ({
           id: uuid(),
@@ -837,7 +903,7 @@ export default function PixelArtPage() {
 
   // ── frame management ──
   function addFrame() {
-    const newFrame = makeBlankFrame(canvasW, canvasH);
+    const newFrame = makeBlankFrame(canvasW, canvasH, frames[activeFrame]?.duration);
     const next = [...frames, newFrame];
     setFrames(next);
     setActiveFrame(next.length - 1);
@@ -850,6 +916,7 @@ export default function PixelArtPage() {
     clone.layers = clone.layers.map((l) => ({ ...l, id: uuid() }));
     const next = [...frames];
     next.splice(index + 1, 0, clone);
+    setTags(tagsAfterInsert(tagsRef.current, index + 1, true));
     setFrames(next);
     setActiveFrame(index + 1);
     pushHistory(next, index + 1, activeLayer);
@@ -859,6 +926,7 @@ export default function PixelArtPage() {
     if (frames.length <= 1) return;
     const next = frames.filter((_, i) => i !== index);
     const newActive = index < activeFrame ? activeFrame - 1 : Math.min(activeFrame, next.length - 1);
+    setTags(tagsAfterDelete(tagsRef.current, index));
     setFrames(next);
     setActiveFrame(newActive);
     pushHistory(next, newActive, activeLayer);
@@ -881,8 +949,83 @@ export default function PixelArtPage() {
     showToast({ message: isCopied ? "Copied" : COPY_FAILED_MESSAGE });
   }
 
+  // ── frame selection, durations and tags ──
+  const selectedIndices = frames.flatMap((frame, i) => (i === activeFrame || selectedFrameIds.includes(frame.id) ? [i] : []));
+
+  function clickFrame(index: number, event: React.MouseEvent) {
+    setPlaying(false);
+    if (event.shiftKey) {
+      const [from, to] = [Math.min(activeFrame, index), Math.max(activeFrame, index)];
+      setSelectedFrameIds(frames.slice(from, to + 1).map((frame) => frame.id));
+    } else if (event.ctrlKey || event.metaKey) {
+      toggleFrameSelected(index);
+      return;
+    } else {
+      setSelectedFrameIds([]);
+    }
+    setActiveFrame(index);
+  }
+
+  /** Adds a frame to the selection (making it the active one) or takes it out. */
+  function toggleFrameSelected(index: number) {
+    const id = frames[index].id;
+    const isSelected = selectedIndices.includes(index);
+    const others = selectedIndices.filter((i) => i !== index).map((i) => frames[i].id);
+    if (!isSelected) {
+      setSelectedFrameIds([...others, frames[activeFrame].id, id]);
+      setActiveFrame(index);
+    } else if (others.length) {
+      setSelectedFrameIds(others);
+      if (index === activeFrame) setActiveFrame(frames.findIndex((frame) => frame.id === others[0]));
+    }
+  }
+
+  function setDurations(indices: number[], ms: number) {
+    const duration = clampDuration(ms);
+    const next = frames.map((frame, i) => (indices.includes(i) ? { ...frame, duration } : frame));
+    setFrames(next);
+    pushHistory(next, activeFrame, activeLayer);
+  }
+
+  function changeFps(value: number) {
+    const nextFps = Math.max(1, Math.min(30, value || 1));
+    setFps(nextFps);
+    setDurations(frames.map((_, i) => i), durationForFps(nextFps));
+  }
+
+  function addTag() {
+    const from = Math.min(...selectedIndices);
+    const to = Math.max(...selectedIndices);
+    const tag: FrameTag = { id: uuid(), name: `Tag ${frameTags.length + 1}`, from, to, color: unusedTagColor(frameTags), direction: "forward" };
+    setTags([...frameTags, tag]);
+    setEditingTagId(tag.id);
+    pushHistory(frames, activeFrame, activeLayer);
+  }
+
+  /** `commit` adds an undo step; typing a name commits once, when the field loses focus. */
+  function updateTag(id: string, patch: Partial<FrameTag>, commit = true) {
+    setTags(frameTags.map((tag) => (tag.id === id ? { ...tag, ...patch } : tag)));
+    setTouched(true);
+    if (commit) pushHistory(frames, activeFrame, activeLayer);
+  }
+
+  function deleteTag(id: string) {
+    setTags(frameTags.filter((tag) => tag.id !== id));
+    setEditingTagId(null);
+    if (previewTagId === id) setPreviewTagId("");
+    pushHistory(frames, activeFrame, activeLayer);
+  }
+
   function frameMenuEntries(index: number): ContextMenuEntry[] {
+    const isSelected = selectedIndices.includes(index);
     return [
+      {
+        kind: "item",
+        key: "select",
+        label: isSelected ? "Remove from selection" : "Add to selection",
+        disabled: isSelected && selectedIndices.length === 1,
+        onSelect: () => toggleFrameSelected(index),
+      },
       { kind: "item", key: "duplicate", label: "Duplicate", onSelect: () => duplicateFrame(index) },
       { kind: "item", key: "delete", label: "Delete", danger: true, disabled: frames.length <= 1, onSelect: () => deleteFrame(index) },
       { kind: "item", key: "copy-png", label: "Copy as PNG", onSelect: () => void copyFrameAsPng(index) },
@@ -952,40 +1095,50 @@ export default function PixelArtPage() {
     a.click();
   }
 
+  const exportName = newName.trim() || "sprite";
+
   async function exportSpriteSheet() {
-    const cols = Math.ceil(Math.sqrt(frames.length));
-    const rows = Math.ceil(frames.length / cols);
+    const { columns, rows, rects } = sheetLayout(frames.length, canvasW, canvasH);
     const c = document.createElement("canvas");
-    c.width = canvasW * cols;
+    c.width = canvasW * columns;
     c.height = canvasH * rows;
     const ctx = c.getContext("2d")!;
     for (let i = 0; i < frames.length; i++) {
-      await drawLayers(ctx, frames[i].layers, (i % cols) * canvasW, Math.floor(i / cols) * canvasH);
+      await drawLayers(ctx, frames[i].layers, rects[i].x, rects[i].y);
     }
     const a = document.createElement("a");
     a.href = c.toDataURL("image/png");
-    a.download = `${newName.trim() || "sprite"}_sheet.png`;
+    a.download = `${exportName}_sheet.png`;
     a.click();
   }
 
-  async function exportGif(scale: number) {
-    const gifFrames = await Promise.all(
+  function exportSheetJson() {
+    const json = asepriteSheetJson({
+      name: exportName,
+      image: `${exportName}_sheet.png`,
+      width: canvasW,
+      height: canvasH,
+      durations: frames.map((frame) => frame.duration),
+      tags: frameTags,
+      app: APP.url,
+    });
+    downloadBlob(`${exportName}_sheet.json`, new Blob([JSON.stringify(json, null, 2)], { type: "application/json" }));
+  }
+
+  /** All frames, or one tag played in its direction, each frame shown for its own duration. */
+  async function exportGif(scale: number, tag?: FrameTag) {
+    const images = await Promise.all(
       frames.map(async (f) => {
         const c = document.createElement("canvas");
         c.width = canvasW;
         c.height = canvasH;
         const ctx = c.getContext("2d")!;
         await drawLayers(ctx, f.layers);
-        return { image: ctx.getImageData(0, 0, canvasW, canvasH), delay: f.duration ?? 1000 / fps };
+        return ctx.getImageData(0, 0, canvasW, canvasH);
       })
     );
-    const blob = encodeGif(gifFrames, { scale });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${newName.trim() || "sprite"}.gif`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    const gifFrames = playbackOrder(frames.length, tag).map((i) => ({ image: images[i], delay: frames[i].duration }));
+    downloadBlob(`${exportName}${tag ? `_${tag.name.trim() || "tag"}` : ""}.gif`, encodeGif(gifFrames, { scale }));
   }
 
   // ── import ──
@@ -1058,6 +1211,11 @@ export default function PixelArtPage() {
   }, []);
 
   // ─── render ──
+  const lanes = tagLanes(frameTags);
+  const editingTag = frameTags.find((tag) => tag.id === editingTagId) ?? null;
+  const selectedDurations = new Set(selectedIndices.map((i) => frames[i].duration));
+  const selectedDuration = selectedDurations.size === 1 ? [...selectedDurations][0] : null;
+
   const btnStyle = (active?: boolean): React.CSSProperties => ({
     background: active ? "var(--accent)" : "var(--bg-card)",
     color: active ? "var(--on-accent, #fff)" : "var(--text-primary)",
@@ -1427,8 +1585,14 @@ export default function PixelArtPage() {
           items={[
             { label: "PNG (current frame)", description: `Frame ${activeFrame + 1} at ${canvasW}×${canvasH}`, onClick: exportPNG },
             { label: "Sprite sheet PNG (all frames)", description: `${frames.length} frame${frames.length === 1 ? "" : "s"} in a grid`, onClick: exportSpriteSheet },
+            { label: "Sprite sheet JSON (Aseprite)", description: "Frame positions, durations and tags; save it next to the sheet PNG", onClick: exportSheetJson },
             { label: "Animated GIF", description: "All frames, loops, 4× size", onClick: () => exportGif(4) },
             { label: "Animated GIF (1× size)", description: `All frames, loops, ${canvasW}×${canvasH}`, onClick: () => exportGif(1) },
+            ...frameTags.map((tag) => ({
+              label: `GIF: ${tag.name} (frames ${tag.from + 1}–${tag.to + 1})`,
+              description: `The "${tag.name}" tag, ${ANIMATION_DIRECTIONS.find((d) => d.value === tag.direction)?.label.toLowerCase()}, 4× size`,
+              onClick: () => exportGif(4, tag),
+            })),
           ]}
         />
       </div>
@@ -1626,58 +1790,129 @@ export default function PixelArtPage() {
           </button>
         </div>
 
+        {editingTag && (
+          <TagEditor
+            tag={editingTag}
+            frameCount={frames.length}
+            className={showFrames ? "" : "max-md:hidden"}
+            onChange={(patch, commit) => updateTag(editingTag.id, patch, commit)}
+            onCommit={() => pushHistory(frames, activeFrame, activeLayer)}
+            onDelete={() => deleteTag(editingTag.id)}
+            onClose={() => setEditingTagId(null)}
+          />
+        )}
+
         <div className={`flex items-center gap-3 max-md:flex-wrap max-md:gap-2 ${showFrames ? "" : "max-md:hidden"}`}>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0 max-md:flex-wrap max-md:basis-full">
             <button
-              onClick={() => setPlaying(!playing)}
+              onClick={togglePreview}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium"
               style={{ background: playing ? "var(--red)" : "var(--accent)", color: playing ? "#fff" : "var(--on-accent, #fff)" }}
-              title={playing ? "Stop the preview" : "Play all frames in a loop"}
+              title={playing ? "Stop the preview" : previewTag ? `Play the "${previewTag.name}" tag in a loop` : "Play all frames in a loop"}
             >
               {playing ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
               {playing ? "Stop" : "Preview"}
             </button>
-            <label className="flex items-center gap-1 text-xs" style={{ color: "var(--text-muted)" }} title="How many frames play per second">
+            {frameTags.length > 0 && (
+              <select
+                value={previewTag?.id ?? ""}
+                onChange={(e) => { setPreviewTagId(e.target.value); setPlayStep(0); }}
+                className="max-w-28 text-xs px-1 py-0.5 rounded outline-none"
+                style={{ background: "var(--bg-primary)", color: "var(--text-primary)", border: "1px solid var(--border)" }}
+                aria-label="What the preview plays"
+                title="Play every frame, or just one tag"
+              >
+                <option value="">All frames</option>
+                {frameTags.map((tag) => (
+                  <option key={tag.id} value={tag.id}>{tag.name}</option>
+                ))}
+              </select>
+            )}
+            <label className="flex items-center gap-1 text-xs" style={{ color: "var(--text-muted)" }} title="Sets every frame to this many frames per second">
               Speed
               <input
                 type="number"
                 min={1}
                 max={30}
                 value={fps}
-                onChange={(e) => { setFps(Math.max(1, Math.min(30, Number(e.target.value) || 1))); setTouched(true); }}
+                onChange={(e) => changeFps(Number(e.target.value))}
                 className="w-10 text-xs px-1 py-0.5 rounded outline-none text-center"
                 style={{ background: "var(--bg-primary)", color: "var(--text-primary)", border: "1px solid var(--border)" }}
               />
               fps
             </label>
+            <FrameDurationInput
+              key={`${selectedIndices.join(",")}:${selectedDuration ?? "mixed"}`}
+              duration={selectedDuration}
+              frameCount={selectedIndices.length}
+              onCommit={(ms) => setDurations(selectedIndices, ms)}
+            />
           </div>
 
-          <div className="flex-1 flex items-center gap-1.5 overflow-x-auto py-1 max-md:order-last max-md:basis-full max-md:min-w-0">
-            {frames.map((frame, i) => {
-              const selected = (playing ? previewFrame : activeFrame) === i;
-              return (
-                <button
-                  key={frame.id}
-                  onClick={() => { setActiveFrame(i); setPlaying(false); }}
-                  className="shrink-0 w-14 h-14 rounded border relative overflow-hidden"
-                  style={{
-                    background: "repeating-conic-gradient(#1a1a2a 0% 25%, #222238 0% 50%) 0 0 / 8px 8px",
-                    borderColor: selected ? "var(--accent)" : "var(--border)",
-                    boxShadow: selected ? "0 0 0 1px var(--accent)" : undefined,
-                  }}
-                  title={`Frame ${i + 1}`}
-                  {...menuTriggerProps(() => frameMenuEntries(i), `Frame ${i + 1}`)}
-                >
-                  {frame.layers.filter((l) => l.visible).map((l) => (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img key={l.id} src={l.pixels} alt="" className="absolute inset-1 w-[calc(100%-8px)] h-[calc(100%-8px)] object-contain" style={{ imageRendering: "pixelated" }} />
-                  ))}
-                  <span className="absolute bottom-0 right-0 px-1 text-[9px] rounded-tl" style={{ background: "rgba(0,0,0,0.6)", color: "var(--text-secondary)" }}>
-                    {i + 1}
-                  </span>
-                </button>
-              );
-            })}
+          <div className="flex-1 overflow-x-auto py-1 max-md:order-last max-md:basis-full max-md:min-w-0">
+            {frameTags.length > 0 && (
+              <div className="relative mb-1" style={{ width: frames.length * FRAME_SLOT - 6, height: (Math.max(...lanes) + 1) * TAG_LANE }}>
+                {frameTags.map((tag, i) => {
+                  const DirectionIcon = DIRECTION_ICONS[tag.direction];
+                  return (
+                    <button
+                      key={tag.id}
+                      onClick={() => setEditingTagId(editingTagId === tag.id ? null : tag.id)}
+                      className="absolute flex items-center gap-1 px-1.5 rounded-sm text-[10px] font-medium overflow-hidden whitespace-nowrap"
+                      style={{
+                        left: tag.from * FRAME_SLOT,
+                        width: (tag.to - tag.from + 1) * FRAME_SLOT - 6,
+                        top: lanes[i] * TAG_LANE,
+                        height: TAG_LANE - 2,
+                        background: tag.color,
+                        color: TAG_TEXT_COLOR,
+                        outline: editingTagId === tag.id ? "2px solid var(--text-primary)" : undefined,
+                      }}
+                      title={`${tag.name}: frames ${tag.from + 1}–${tag.to + 1}. Click to edit.`}
+                      aria-label={`Edit tag ${tag.name}`}
+                      aria-pressed={editingTagId === tag.id}
+                    >
+                      <DirectionIcon className="w-3 h-3 shrink-0" />
+                      <span className="truncate">{tag.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            <div className="flex items-center gap-1.5 w-max">
+              {frames.map((frame, i) => {
+                const current = (playing ? previewFrame : activeFrame) === i;
+                const selected = !playing && selectedIndices.length > 1 && selectedIndices.includes(i);
+                return (
+                  <button
+                    key={frame.id}
+                    onClick={(e) => clickFrame(i, e)}
+                    className="shrink-0 w-14 h-14 rounded border relative overflow-hidden"
+                    style={{
+                      background: "repeating-conic-gradient(#1a1a2a 0% 25%, #222238 0% 50%) 0 0 / 8px 8px",
+                      borderColor: current || selected ? "var(--accent)" : "var(--border)",
+                      boxShadow: current ? "0 0 0 1px var(--accent)" : undefined,
+                      borderStyle: selected && !current ? "dashed" : undefined,
+                    }}
+                    title={`Frame ${i + 1}, ${frame.duration} ms. Shift-click or Ctrl-click to select several.`}
+                    aria-label={`Frame ${i + 1}, ${frame.duration} ms`}
+                    aria-pressed={selected || current}
+                    {...menuTriggerProps(() => frameMenuEntries(i), `Frame ${i + 1}`)}
+                  >
+                    {frame.layers.filter((l) => l.visible).map((l) => (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img key={l.id} src={l.pixels} alt="" className="absolute inset-1 w-[calc(100%-8px)] h-[calc(100%-8px)] object-contain" style={{ imageRendering: "pixelated" }} />
+                    ))}
+                    <span className="absolute top-0 left-0 px-1 text-[9px] rounded-br tabular-nums" style={{ background: "rgba(0,0,0,0.6)", color: "var(--text-secondary)" }}>
+                      {frame.duration}ms
+                    </span>
+                    <span className="absolute bottom-0 right-0 px-1 text-[9px] rounded-tl" style={{ background: "rgba(0,0,0,0.6)", color: "var(--text-secondary)" }}>
+                      {i + 1}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <div className="flex items-center gap-1 shrink-0">
@@ -1689,6 +1924,9 @@ export default function PixelArtPage() {
             </button>
             <button onClick={() => deleteFrame()} disabled={frames.length <= 1} className="flex items-center gap-1 px-2 py-1.5 rounded-md text-xs disabled:opacity-40" style={{ color: "var(--red)", border: "1px solid var(--border)" }} title="Delete the selected frame" aria-label="Delete frame">
               <Trash2 className="w-3.5 h-3.5" /> <span className="md:max-xl:hidden">Delete</span>
+            </button>
+            <button onClick={addTag} className="flex items-center gap-1 px-2 py-1.5 rounded-md text-xs" style={{ color: "var(--text-primary)", border: "1px solid var(--border)" }} title="Name the selected frames as one animation, like idle or walk" aria-label="New tag">
+              <Tag className="w-3.5 h-3.5" /> <span className="md:max-xl:hidden">Tag</span>
             </button>
           </div>
         </div>

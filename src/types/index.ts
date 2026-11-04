@@ -27,10 +27,26 @@ export interface Sprite {
   height: number;
   frames: SpriteFrame[];
   fps: number;
+  /** True once each frame's `duration` sets the timing. Missing (older sprites) means `fps` did. */
+  hasFrameDurations?: boolean;
+  /** Named frame ranges, like Aseprite's tags ("idle", "walk"). Not the asset tags in `tags`. */
+  frameTags?: FrameTag[];
   paletteId?: string;
   tags: string[];
   createdAt: string;
   updatedAt: string;
+}
+
+export type AnimationDirection = "forward" | "reverse" | "pingpong";
+
+export interface FrameTag {
+  id: string;
+  name: string;
+  /** First and last frame, 0-based and inclusive. */
+  from: number;
+  to: number;
+  color: string;
+  direction: AnimationDirection;
 }
 
 export interface SpriteLayer {

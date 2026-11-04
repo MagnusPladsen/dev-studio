@@ -119,9 +119,9 @@ export const HELP: Record<HelpTopic, HelpContent> = {
     canDo: [
       { icon: Pencil, text: "Draw with pencil, eraser, fill, line, rectangle, circle and move tools." },
       { icon: Layers, text: "Use layers, and frames for animation with onion skin." },
-      { icon: Play, text: "Play the animation and set its speed (fps)." },
+      { icon: Play, text: "Give each frame its own duration, tag frame ranges (idle, walk) and preview one tag or all frames." },
       { icon: Scaling, text: "Resize the canvas, scale a sprite up (8×8 → 16×16 and more) or swap in a project palette." },
-      { icon: Download, text: "Export a PNG, a sprite sheet or an animated GIF." },
+      { icon: Download, text: "Export a PNG, a sprite sheet with Aseprite JSON, or an animated GIF (one per tag too)." },
     ],
     steps: [
       "Press New sprite and pick a size.",
@@ -135,6 +135,7 @@ export const HELP: Record<HelpTopic, HelpContent> = {
       "To make a sprite bigger without redrawing it, open the Canvas menu and use Scale up.",
       UNDO_TIP,
       "Right-click a frame to duplicate, move or copy it as PNG.",
+      "Shift-click or Ctrl-click frames to select several, then set their duration or press Tag.",
     ],
   },
   sfx: {

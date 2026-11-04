@@ -17,6 +17,10 @@ export const spriteSchema = z.looseObject({
   height: z.number().int().positive(),
   frames: z.array(spriteFrameSchema).min(1),
   fps: z.number(),
+  hasFrameDurations: z.boolean().optional(),
+  frameTags: z
+    .array(z.looseObject({ id, name: z.string(), from: z.number().int(), to: z.number().int(), color: z.string(), direction: z.enum(["forward", "reverse", "pingpong"]) }))
+    .optional(),
   paletteId: z.string().optional(),
   tags,
 });
