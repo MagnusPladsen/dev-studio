@@ -130,12 +130,15 @@ function registerNoteTools(ctx: ToolContext): void {
     },
     (input) =>
       guarded(async () => {
+        const id = uuid();
         const { project, note } = await studio.write(scope(input.projectId), () => {
           const project = requireProject(input.projectId);
+          const saved = storage.getById("notes", id, project.id);
+          if (saved) return { project, note: saved };
           const template = noteTemplate(project, input.template);
           const now = new Date().toISOString();
           const note: Note = {
-            id: uuid(),
+            id,
             projectId: project.id,
             title: input.title ?? template?.title ?? "Untitled note",
             content: input.content ?? template?.content ?? "",
@@ -250,12 +253,13 @@ function registerWikiTools(ctx: ToolContext): void {
     },
     (input) =>
       guarded(async () => {
+        const id = uuid();
         const { project, page } = await studio.write(wikiScope(input.projectId), () => {
           const project = requireProject(input.projectId);
           const type = entryType(project, input.type);
           const now = new Date().toISOString();
-          const page: StoryEntry = {
-            id: uuid(),
+          const page: StoryEntry = storage.getById("stories", id, project.id) ?? {
+            id,
             projectId: project.id,
             title: input.title,
             content: input.content ?? copyFor(projectApp(project)).story.templates[type] ?? "",
@@ -265,7 +269,7 @@ function registerWikiTools(ctx: ToolContext): void {
             createdAt: now,
             updatedAt: now,
           };
-          storage.save("stories", page, project.id);
+          if (!storage.getById("stories", id, project.id)) storage.save("stories", page, project.id);
           linkPages(project.id, page, input.links);
           return { project, page };
         });
@@ -348,28 +352,35 @@ function decisionPatch(input: DecisionInput): Partial<Decision> {
   return patch;
 }
 
-function newDecision(projectId: string, input: DecisionInput): Decision {
-  const decision = createDecision(projectId, storage.getAll("decisions", projectId), decisionPatch(input));
+function newDecision(projectId: string, id: string, input: DecisionInput): Decision {
+  const saved = storage.getById("decisions", id, projectId);
+  if (saved) return saved;
+  const decision = { ...createDecision(projectId, storage.getAll("decisions", projectId), decisionPatch(input)), id };
   storage.save("decisions", decision, projectId);
   return decision;
 }
 
-/** As the app's Supersede button: the new decision starts from the old one, the old one is marked superseded and points to it. */
-function supersede(projectId: string, value: string, input: DecisionInput): { decision: Decision; replaced: Decision } {
+/**
+ * As the app's Supersede button: the new decision starts from the old one, the old one is marked superseded and points to it.
+ * The two rows save one by one, so a retry may find the old one already pointing at `id`: it then finishes the job.
+ */
+function supersede(projectId: string, value: string, id: string, input: DecisionInput): { decision: Decision; replaced: Decision } {
   const old = findDoc<Decision>(projectId, "decision", "decisions", value);
-  const all = storage.getAll("decisions", projectId);
-  if (old.supersededBy) {
+  const all = storage.getAll("decisions", projectId).filter((d) => d.id !== id);
+  const saved = storage.getById("decisions", id, projectId);
+  if (old.supersededBy && old.supersededBy !== id) {
     const by = all.find((d) => d.id === old.supersededBy);
     throw new Error(`${decisionCode(old.number)} is already superseded${by ? ` by ${decisionCode(by.number)}` : ""}.`);
   }
   const { replaced, replacement } = supersedeDecision(old, all);
   const patch = decisionPatch(input);
   if (input.context !== undefined) patch.context = `Replaces ${decisionCode(old.number)} (${old.title}).\n\n${input.context}`.trim();
-  const decision = { ...replacement, ...patch };
-  storage.save("decisions", replaced, projectId);
-  storage.save("decisions", decision, projectId);
-  addLink(projectId, { type: "decision", id: decision.id }, { type: "decision", id: replaced.id });
-  return { decision, replaced };
+  const decision = saved ?? { ...replacement, ...patch, id };
+  const marked = old.supersededBy === id ? old : { ...replaced, supersededBy: id };
+  if (marked !== old) storage.save("decisions", marked, projectId);
+  if (!saved) storage.save("decisions", decision, projectId);
+  addLink(projectId, { type: "decision", id }, { type: "decision", id: old.id });
+  return { decision, replaced: marked };
 }
 
 function decisionResult(project: Project, decision: Decision, replaced?: Decision) {
@@ -405,9 +416,10 @@ function registerDecisionTools(ctx: ToolContext): void {
     },
     ({ projectId, supersedes, ...input }) =>
       guarded(async () => {
+        const id = uuid();
         const saved = await studio.write(scope(projectId), () => {
           const project = requireProject(projectId);
-          const made = supersedes ? supersede(projectId, supersedes, input) : { decision: newDecision(projectId, input), replaced: undefined };
+          const made = supersedes ? supersede(projectId, supersedes, id, input) : { decision: newDecision(projectId, id, input), replaced: undefined };
           return { project, ...made };
         });
         return decisionResult(saved.project, saved.decision, saved.replaced);

@@ -176,6 +176,23 @@ describe("decision tools", () => {
     expect(saves()).toHaveLength(2);
   });
 
+  it("finishes a supersede whose old ADR was saved before the new one lost its number", async () => {
+    db.forcedStatuses = [["ok", "duplicate", "ok"]];
+    const { data } = await call("create_decision", { projectId: P, supersedes: "ADR-001" });
+    expect(data).toMatchObject({ code: "ADR-002", supersedes: { code: "ADR-001" } });
+    const decisions = db.assets.filter((a) => a.collection === "decisions");
+    expect(decisions).toHaveLength(2);
+    expect(stored("adr-1").supersededBy).toBe((data.ref as { id: string }).id);
+    expect(db.assets.filter((a) => a.collection === "links")).toHaveLength(1);
+  });
+
+  it("makes a wiki page once when its link lost a race after the page was saved", async () => {
+    db.forcedStatuses = [["ok", "conflict"]];
+    await call("create_wiki_page", { projectId: P, title: "Ana", type: "person", links: [{ type: "issue", id: "issue-1" }] });
+    expect(db.assets.filter((a) => a.data.title === "Ana")).toHaveLength(1);
+    expect(db.assets.filter((a) => a.collection === "links")).toHaveLength(1);
+  });
+
   it("updates sections by ADR code and refuses a bare superseded status", async () => {
     await call("update_decision", { projectId: P, adr: "ADR-1", status: "deprecated", consequences: "None now." });
     expect(stored("adr-1")).toMatchObject({ status: "deprecated", consequences: "None now.", context: "We need sync." });
