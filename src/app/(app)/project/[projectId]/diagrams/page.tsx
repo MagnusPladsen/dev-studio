@@ -37,6 +37,8 @@ import {
   restoreLinks,
 } from "@/lib/links";
 import { migrateElementAssetLinks } from "@/lib/diagrams/element-links";
+import { mergeDiagram } from "@/lib/diagrams/merge";
+import { followRemoteChange, rebaseOnStored } from "@/lib/sync/open-document";
 import { elementName } from "@/lib/diagrams/elements";
 import { boardMenuEntries, edgeMenuEntries, elementMenuEntries, type MenuLink } from "@/lib/diagrams/canvas-menu";
 import { GROUP_HEADER } from "@/lib/diagrams/geometry";
@@ -149,6 +151,10 @@ export default function DiagramsPage() {
 
   const [diagrams, setDiagrams] = useState<Diagram[]>([]);
   const [current, setCurrent] = useState<Diagram | null>(null);
+  /** Per canvas, the stored version it was loaded from or last saved as: the base for merging changes made elsewhere. */
+  const bases = useRef(new Map<string, Diagram>());
+  /** Goes up when a change from elsewhere is merged into unsaved local edits, to restart the undo history. */
+  const [mergeCount, setMergeCount] = useState(0);
   const [showList, setShowList] = useState(true);
 
   const [mode, setMode] = useState<BoardTool>("select");
@@ -226,11 +232,21 @@ export default function DiagramsPage() {
       setShowList(true);
       return false;
     }
-    if (stored === current || isInteracting || autosave.state !== "saved") return false;
-    setCurrent(stored);
-    setSelectedIds((ids) => ids.filter((id) => stored.nodes.some((n) => n.id === id)));
-    setSelectedEdgeId((id) => (id && stored.edges.some((e) => e.id === id) ? id : null));
-    return true;
+    // mid-drag the release saves and merges then (see the autosave below)
+    if (isInteracting) return false;
+    // the autosave state can lag a just-finished drag, so an edit is also anything on screen that differs from the base
+    const base = bases.current.get(stored.id);
+    const update = followRemoteChange(base, current, stored, current !== base || autosave.state !== "saved", mergeDiagram);
+    if (update.kind === "unchanged") return false;
+    bases.current.set(stored.id, stored);
+    const next = update.next;
+    if (update.kind === "merge") {
+      setCurrent((c) => (c?.id === next.id ? mergeDiagram(current, c, next) : c));
+      setMergeCount((n) => n + 1);
+    } else setCurrent(next);
+    setSelectedIds((ids) => ids.filter((id) => next.nodes.some((n) => n.id === id)));
+    setSelectedEdgeId((id) => (id && next.edges.some((e) => e.id === id) ? id : null));
+    return update.kind === "replace";
   });
   const openKey = current ? `${current.id}:${remoteRevision}` : undefined;
 
@@ -242,7 +258,7 @@ export default function DiagramsPage() {
       setSelectedIds([]);
       setSelectedEdgeId(null);
     },
-    openKey
+    openKey && `${openKey}:${mergeCount}`
   );
 
   // Every edit is saved a moment later; a drag saves once, on release.
@@ -250,8 +266,13 @@ export default function DiagramsPage() {
     current,
     (d) => {
       // skip diagrams deleted meanwhile, so a late save can't bring them back
-      if (!d || !storage.getById("diagrams", d.id, projectId)) return;
-      storage.save("diagrams", d, projectId);
+      const stored = d && storage.getById("diagrams", d.id, projectId);
+      if (!d || !stored) return;
+      // a change from elsewhere that landed since this canvas was loaded is merged in, never overwritten
+      const merged = rebaseOnStored(bases.current.get(d.id), d, stored, mergeDiagram);
+      storage.save("diagrams", merged, projectId);
+      bases.current.set(d.id, merged);
+      if (merged !== d) setCurrent((c) => (c?.id === d.id ? mergeDiagram(d, c, merged) : c));
       setDiagrams(storage.getAll("diagrams", projectId));
     },
     { resetKey: openKey, enabled: !isInteracting }
@@ -298,6 +319,7 @@ export default function DiagramsPage() {
     const all = storage.getAll("diagrams", projectId);
     setDiagrams(all);
     if (all.length > 0) {
+      bases.current.set(all[0].id, all[0]);
       setCurrent(all[0]);
       setShowList(false);
     }
@@ -1123,6 +1145,7 @@ export default function DiagramsPage() {
 
   // --- Diagrams ---
   function loadDiagram(d: Diagram) {
+    bases.current.set(d.id, d);
     setCurrent(d);
     setShowList(false);
     setSelectedIds([]);
@@ -1153,6 +1176,7 @@ export default function DiagramsPage() {
     const all = storage.getAll("diagrams", projectId);
     setDiagrams(all);
     if (current?.id === id) {
+      if (all[0]) bases.current.set(all[0].id, all[0]);
       setCurrent(all[0] || null);
       if (all.length === 0) setShowList(true);
     }
