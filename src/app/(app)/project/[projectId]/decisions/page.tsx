@@ -26,6 +26,7 @@ import {
 } from "@/lib/decisions";
 import { useOpenParam, useTrackOpenAsset, useStorageVersion } from "@/hooks/useStorage";
 import { useRemoteChanges } from "@/hooks/useRemoteChanges";
+import { mergeDocuments, rebaseOnStored } from "@/lib/sync/open-document";
 import { useHistory } from "@/hooks/useHistory";
 import { useAssetMenu } from "@/components/AssetContextMenu";
 import { LinkedAssets } from "@/components/LinkedAssets";
@@ -57,6 +58,8 @@ function hasWriting(decision: Decision): boolean {
 function useDecisionDraft(projectId: string) {
   const [draft, setDraft] = useState<Decision | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  /** Goes up when a save merged in a change made elsewhere, to restart the undo history. */
+  const [mergeCount, setMergeCount] = useState(0);
   const savedRef = useRef<Decision | null>(null);
   const draftRef = useRef<Decision | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -66,9 +69,15 @@ function useDecisionDraft(projectId: string) {
 
   const writeNow = useCallback(
     (decision: Decision) => {
-      // skip if the decision was deleted meanwhile
-      if (storage.getById("decisions", decision.id, projectId)) storage.save("decisions", { ...decision, updatedAt: new Date().toISOString() }, projectId);
-      savedRef.current = decision;
+      const stored = storage.getById("decisions", decision.id, projectId);
+      // skip if the decision was deleted meanwhile; merge in a change made elsewhere since it was opened
+      const merged = rebaseOnStored(savedRef.current?.id === decision.id ? savedRef.current : null, decision, stored);
+      if (stored) storage.save("decisions", { ...merged, updatedAt: new Date().toISOString() }, projectId);
+      savedRef.current = merged;
+      if (merged !== decision) {
+        setDraft((d) => (d === decision ? merged : d?.id === decision.id ? mergeDocuments(decision, d, merged) : d));
+        setMergeCount((n) => n + 1);
+      }
       setIsSaving(false);
     },
     [projectId]
@@ -124,7 +133,7 @@ function useDecisionDraft(projectId: string) {
 
   const hasPending = useCallback(() => timerRef.current !== null || draftRef.current !== savedRef.current, []);
 
-  return { draft, setDraft, isSaving, flush, load, discard, hasPending };
+  return { draft, setDraft, isSaving, flush, load, discard, hasPending, mergeCount };
 }
 
 export default function DecisionLogPage() {
@@ -133,7 +142,7 @@ export default function DecisionLogPage() {
   const projectId = params.projectId as string;
   const version = useStorageVersion();
   const { assetTriggerProps } = useAssetMenu();
-  const { draft, setDraft, isSaving, flush, load, discard, hasPending } = useDecisionDraft(projectId);
+  const { draft, setDraft, isSaving, flush, load, discard, hasPending, mergeCount } = useDecisionDraft(projectId);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<StatusFilter>("all");
   const [mode, setMode] = useState<FieldsMode>("read");
@@ -153,7 +162,7 @@ export default function DecisionLogPage() {
     load(stored);
     return true;
   });
-  const history = useHistory<Decision | null>(draft, (v) => setDraft(v), draft ? `${draft.id}:${remoteRevision}` : undefined);
+  const history = useHistory<Decision | null>(draft, (v) => setDraft(v), draft ? `${draft.id}:${remoteRevision}:${mergeCount}` : undefined);
   const rootRef = useRef<HTMLDivElement>(null);
 
   const select = useCallback(
