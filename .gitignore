@@ -53,3 +53,4 @@ next-env.d.ts
 
 # MCP server bundle
 /packages/*/dist
+/packages/*/release

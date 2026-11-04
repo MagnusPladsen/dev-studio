@@ -9,17 +9,32 @@ is no telemetry.
 
 ## Use it
 
-Claude Code:
+Needs [Node.js](https://nodejs.org) 20.9 or newer for the npm route; the Claude Desktop extension brings its own.
+
+**Claude Code** (`--scope user` makes it work in every folder):
 
 ```bash
-claude mcp add dev-studio -- npx -y dev-studio-mcp
+claude mcp add --scope user dev-studio -- npx -y dev-studio-mcp
 ```
 
-Claude Desktop (Settings → Developer → Edit config):
+A team can commit it to a repo's `.mcp.json` instead:
 
 ```json
 { "mcpServers": { "dev-studio": { "command": "npx", "args": ["-y", "dev-studio-mcp"] } } }
 ```
+
+**Claude Desktop extension:** download `dev-studio-mcp-<version>.mcpb` from the newest
+[`mcp-v*` release](https://github.com/MagnusPladsen/dev-studio/releases?q=mcp-v&expanded=true) and double-click it, or
+use Settings → Extensions → Install Extension. Its one setting picks the app new projects go to. The bundle isn't
+signed yet, so Claude Desktop may say it comes from an unverified developer.
+
+**Claude Desktop without the extension** (Settings → Developer → Edit config):
+
+```json
+{ "mcpServers": { "dev-studio": { "command": "npx", "args": ["-y", "dev-studio-mcp"] } } }
+```
+
+Any other MCP client: run `npx -y dev-studio-mcp` as a stdio server.
 
 The first time, ask Claude to sign in (the `sign_in` tool), or run `npx dev-studio-mcp login` in a terminal. A browser
 tab opens on the GameDev Studio site (it serves both apps); sign in, press **Allow**, and go back to Claude.
@@ -124,3 +139,5 @@ MCP SDK: `@modelcontextprotocol/server` 2.x. Claude Code 2.1 and Claude Desktop 
    <word>", "Show me TIDE-3", "Link the note <title> to the canvas <name>", "Create a Dev Studio project called MCP test".
 5. Open the links Claude gives in the browser and check the link and project show up (the open tab updates live).
 6. Clean up: `claude mcp remove dev-studio-local --scope user`; delete the test project in the app.
+
+Releasing to npm and building the Claude Desktop extension: [PUBLISHING.md](PUBLISHING.md).

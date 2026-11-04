@@ -7,7 +7,7 @@ export const MCP_LOOPBACK_PORTS = [53682, 53683, 53684, 53685] as const;
 
 export const MCP_DISPLAY_NAME = "Dev Studio & GameDev Studio";
 
-export const MCP_INSTALL_COMMAND = "claude mcp add dev-studio -- npx -y dev-studio-mcp";
+export const MCP_INSTALL_COMMAND = "claude mcp add --scope user dev-studio -- npx -y dev-studio-mcp";
 
 export const MCP_DESKTOP_CONFIG = JSON.stringify({ mcpServers: { "dev-studio": { command: "npx", args: ["-y", "dev-studio-mcp"] } } }, null, 2);
 
