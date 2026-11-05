@@ -37,6 +37,11 @@ export const CHANGELOG: ChangelogEntry[] = [
         text: "Sound Effects Finish panel: trim with drag handles, fade in/out, normalize, gain, pitch & speed and reverse, all still editable later.",
         tool: "sound",
       },
+      { text: "Lock the grid to a key and scale so every note you place fits, and hear each note as you place it.", tool: "music" },
+      {
+        text: "Export WAV at 22/44.1/48 kHz in 8 or 16-bit, zip 5 variations or all your sounds, lock settings while you Random or Mutate, and get back any of your last 10 drafts.",
+        tool: "sound",
+      },
     ],
   },
   {
