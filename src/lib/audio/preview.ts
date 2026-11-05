@@ -3,7 +3,8 @@ import { getStoredAsset } from "@/lib/asset-actions";
 import type { AssetRef, MusicTrack, SoundEffect } from "@/types";
 import { getAudioContext } from "./context";
 import { scheduleNote, trackLengthSeconds } from "./music-synth";
-import { SAMPLE_RATE, synthesize } from "./sfx-synth";
+import { renderSound } from "./sfx-finish";
+import { SAMPLE_RATE } from "./sfx-synth";
 
 let stopCurrent: (() => void) | null = null;
 let previewing: AssetRef | null = null;
@@ -46,7 +47,7 @@ function trackEnding(ref: AssetRef, sources: AudioScheduledSourceNode[], endsAft
 }
 
 function startSound(ref: AssetRef, sound: SoundEffect): void {
-  const samples = synthesize(sound.params);
+  const samples = renderSound(sound.params);
   if (samples.length === 0) return;
   const audio = getAudioContext();
   const buffer = audio.createBuffer(1, samples.length, SAMPLE_RATE);
