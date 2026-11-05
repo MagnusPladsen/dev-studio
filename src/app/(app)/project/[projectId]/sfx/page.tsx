@@ -26,7 +26,7 @@ import { rowButtonProps } from "@/lib/row-button";
 import { useAssetMenu } from "@/components/AssetContextMenu";
 import { AssetMenuButton, AssetPinButton, PasteButton } from "@/components/AssetMenuButton";
 import { getAudioContext } from "@/lib/audio/context";
-import { SAMPLE_RATE, synthesize } from "@/lib/audio/sfx-synth";
+import { SAMPLE_RATE, SFX_VERSION, randomSeed, synthesize } from "@/lib/audio/sfx-synth";
 import type { SoundEffect, SfxParams } from "@/types";
 
 const DEFAULT_PARAMS: SfxParams = {
@@ -43,6 +43,7 @@ const DEFAULT_PARAMS: SfxParams = {
   volume: 0.7,
   vibratoDepth: 0,
   vibratoSpeed: 0,
+  version: SFX_VERSION,
 };
 
 const WAVE_TYPES: SfxParams["waveType"][] = ["square", "sawtooth", "sine", "triangle", "noise"];
@@ -349,7 +350,7 @@ export default function SfxPage() {
   function applyPreset(presetName: string) {
     const gen = PRESETS[presetName];
     if (!gen) return;
-    const p = gen();
+    const p = { ...gen(), seed: randomSeed() };
     setActiveId(null);
     setName(presetName);
     setSfxParams(p);
