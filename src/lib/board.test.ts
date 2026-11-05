@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Board, Issue } from "@/types";
-import { csvCell } from "@/components/board/meta";
+import { csvCell } from "@/lib/csv";
 import {
   DEFAULT_COLUMNS,
   activeSprintOf,

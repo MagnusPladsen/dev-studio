@@ -47,15 +47,14 @@ import { useAssetMenu } from "@/components/AssetContextMenu";
 import { AssetMenuButton, AssetPinButton, PasteButton } from "@/components/AssetMenuButton";
 import { IssueDetail } from "@/components/board/IssueDetail";
 import { positionMenu, type MenuPlacement } from "@/lib/menu-position";
+import { CSV_BOM, csvCell } from "@/lib/csv";
 import {
   CATEGORY_LABEL,
-  CSV_BOM,
   PRIORITY_META,
   PriorityIcon,
   TYPES,
   TypeIcon,
   typeLabel,
-  csvCell,
   fieldStyle,
   formatDate,
   relativeTime,

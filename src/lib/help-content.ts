@@ -49,16 +49,18 @@ export const HELP: Record<HelpTopic, HelpContent> = {
     title: "Dialogue Trees",
     summary: "Write branching conversations for your characters.",
     canDo: [
-      { icon: Waypoints, text: "Build a tree from Start, Dialogue, Choice, Condition, Action and End nodes." },
-      { icon: MessageSquare, text: "Give each line a speaker, and choices their own branches." },
-      { icon: Play, text: "Play through a conversation with Preview." },
-      { icon: FileCode, text: "Export as JSON or a Yarn Spinner script." },
+      { icon: Waypoints, text: "Build a tree from Start, Dialogue, Choice, Condition, Set, Action and End nodes." },
+      { icon: MessageSquare, text: "Give each line a speaker, choices their own branches, and conditions a true and an else exit." },
+      { icon: Play, text: "Play through a conversation with Preview: it runs your variables and shows their values." },
+      { icon: FileCode, text: "Export as JSON, a Yarn Spinner script or a Localisation CSV to translate." },
     ],
     steps: [
       "Press New Dialogue to start a tree.",
       "Add nodes from the toolbar.",
       "Drag from a node's coloured dot to the next node to connect them.",
       "Double-click a node to edit its text, then press Preview.",
+      "Press Variables to add what the conversation remembers (gold, met_elder), then check it in a Condition and change it with Set.",
+      "To translate, add languages under Variables, export the Localisation CSV, fill in the columns and import it back.",
     ],
     tips: [
       "Select a node and press Delete to remove it.",

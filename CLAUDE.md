@@ -105,7 +105,6 @@ errors and horizontal overflow on phones, and exercise the feature changed. Do t
 ## Known gaps
 
 - Task Board: on touch screens cards move via a "Move to…" menu, not drag.
-- Dialogue condition nodes have a single exit (no "else" branch).
 - Cloud sign-in hasn't been tested end to end yet, and neither have Realtime live updates (unit-tested with mocks).
 - Folder sync has no live updates: edits made to the JSON files on disk show up only after reconnecting the folder
   or reloading.
@@ -115,5 +114,5 @@ errors and horizontal overflow on phones, and exercise the feature changed. Do t
 
 Pixel Art animation tags + per-frame durations · Tilemap auto-tiling and collision layer · one-click engine exports
 (Godot, Unity, Phaser, Tiled) · mirror / pixel-perfect / dither tools and Lospec palette import · Tilemap object layer
-· dialogue variables and localisation CSV · story timeline and world map · multi-pattern songs, envelopes, MIDI ·
+· story timeline and world map · multi-pattern songs, envelopes, MIDI ·
 pixel font maker · read-only share links and a "play this level" preview.
