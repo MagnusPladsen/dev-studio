@@ -38,7 +38,9 @@ import { rowButtonProps } from "@/lib/row-button";
 import { useAssetMenu } from "@/components/AssetContextMenu";
 import { AssetMenuButton, AssetPinButton, PasteButton } from "@/components/AssetMenuButton";
 import { getAudioContext } from "@/lib/audio/context";
-import { midiToFreq, scheduleNote } from "@/lib/audio/music-synth";
+import { scheduleNote } from "@/lib/audio/music-synth";
+import { RENDER_SAMPLE_RATE, renderLoop } from "@/lib/audio/music-render";
+import { encodeWav } from "@/lib/audio/wav";
 import { beatAt, scheduleWindow, type LiveSong, type PlayCursor } from "@/lib/audio/music-scheduler";
 import { cellsBetween, coversCell, eraseCells, paintCells, type GridCell, type NoteCell } from "@/lib/music-draw";
 import type { MusicTrack, MusicChannel, MusicNote } from "@/types";
@@ -485,85 +487,10 @@ export default function MusicPage() {
     setSoloed((prev) => prev.map((v, i) => (i === idx ? !v : v)));
   }
 
-  function exportWav() {
+  async function exportWav() {
     if (!activeTrack) return;
-    const sampleRate = 44100;
-    const beatDur = 60 / activeTrack.bpm;
-    const totalDur = patternLen * beatDur;
-    const numSamples = Math.ceil(sampleRate * totalDur);
-    const buffer = new Float32Array(numSamples);
-    const anySoloed = soloed.some(Boolean);
-
-    activeTrack.channels.forEach((ch, ci) => {
-      const isMuted = muted[ci] || (anySoloed && !soloed[ci]);
-      if (isMuted) return;
-      const pattern = ch.patterns[0];
-      if (!pattern) return;
-
-      pattern.notes.forEach((note) => {
-        if (note.start >= patternLen) return;
-        const startSample = Math.floor(note.start * beatDur * sampleRate);
-        const durSamples = Math.floor(note.duration * beatDur * sampleRate);
-        const freq = midiToFreq(note.pitch);
-        const vol = ch.volume * note.velocity * 0.3;
-
-        for (let i = 0; i < durSamples && startSample + i < numSamples; i++) {
-          const t = i / sampleRate;
-          const env = Math.max(0, 1 - t / (note.duration * beatDur));
-          let sample = 0;
-
-          if (ch.instrument === "noise") {
-            sample = (Math.random() * 2 - 1) * vol * env;
-          } else if (ch.instrument === "square") {
-            sample = (Math.sin(2 * Math.PI * freq * t) > 0 ? 1 : -1) * vol * env;
-          } else if (ch.instrument === "sawtooth") {
-            sample = (2 * ((freq * t) % 1) - 1) * vol * env;
-          } else if (ch.instrument === "sine") {
-            sample = Math.sin(2 * Math.PI * freq * t) * vol * env;
-          } else if (ch.instrument === "triangle") {
-            sample = (2 * Math.abs(2 * ((freq * t) % 1) - 1) - 1) * vol * env;
-          }
-
-          buffer[startSample + i] += sample;
-        }
-      });
-    });
-
-    // clamp
-    for (let i = 0; i < numSamples; i++) {
-      buffer[i] = Math.max(-1, Math.min(1, buffer[i]));
-    }
-
-    const wavBuffer = new ArrayBuffer(44 + numSamples * 2);
-    const view = new DataView(wavBuffer);
-    function writeStr(offset: number, str: string) {
-      for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
-    }
-    writeStr(0, "RIFF");
-    view.setUint32(4, 36 + numSamples * 2, true);
-    writeStr(8, "WAVE");
-    writeStr(12, "fmt ");
-    view.setUint32(16, 16, true);
-    view.setUint16(20, 1, true);
-    view.setUint16(22, 1, true);
-    view.setUint32(24, sampleRate, true);
-    view.setUint32(28, sampleRate * 2, true);
-    view.setUint16(32, 2, true);
-    view.setUint16(34, 16, true);
-    writeStr(36, "data");
-    view.setUint32(40, numSamples * 2, true);
-    for (let i = 0; i < numSamples; i++) {
-      const s = Math.max(-1, Math.min(1, buffer[i]));
-      view.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7fff, true);
-    }
-
-    const blob = new Blob([wavBuffer], { type: "audio/wav" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${activeTrack.name}.wav`;
-    a.click();
-    URL.revokeObjectURL(url);
+    const samples = await renderLoop(activeTrack, { patternLen, muted, soloed });
+    downloadBlob(`${activeTrack.name}.wav`, new Blob([encodeWav(samples, RENDER_SAMPLE_RATE)], { type: "audio/wav" }));
   }
 
   function exportJson() {
