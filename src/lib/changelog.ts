@@ -28,6 +28,11 @@ export const CHANGELOG: ChangelogEntry[] = [
       { text: "Canvas auto-layout arranges a board as a grid, flow, tree or table diagram." },
       { text: "Tilemap auto-tiling and a collision layer.", tool: "tilemap" },
       { text: "Pixel Art animation tags and per-frame durations.", tool: "sprite" },
+      { text: "Music WAV export now sounds the same as Play: notes fade out the same way and drums keep their filter.", tool: "music" },
+      {
+        text: "Sound Effects sound the same in the waveform, on Play and in the WAV. The high-pass filter really filters, pitch slides curve, and Repeat Speed works like sfxr. Sounds you already saved keep their old sound.",
+        tool: "sound",
+      },
     ],
   },
   {
