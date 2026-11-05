@@ -106,6 +106,10 @@ export interface MusicTrack {
   projectId: string;
   name: string;
   bpm: number;
+  /** Key note as a pitch class (0 = C … 11 = B). Missing means C. */
+  key?: number;
+  /** Notes outside the scale can't be placed. Missing means chromatic: no lock. */
+  scale?: "chromatic" | "major" | "minor" | "majorPentatonic" | "minorPentatonic" | "blues";
   channels: MusicChannel[];
   tags: string[];
   createdAt: string;

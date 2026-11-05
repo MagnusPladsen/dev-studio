@@ -73,7 +73,7 @@ export const HELP: Record<HelpTopic, HelpContent> = {
     canDo: [
       { icon: Music, text: "Write notes for melody, harmony, bass and drums channels." },
       { icon: Piano, text: "Pick an instrument per channel: square, triangle, noise and more." },
-      { icon: Gauge, text: "Set tempo (BPM), loop length and note length." },
+      { icon: Gauge, text: "Set tempo (BPM), loop length, note length, and a key and scale so every note fits." },
       { icon: VolumeX, text: "Mute or solo channels while you listen." },
       { icon: Download, text: "Export the pattern as a WAV file." },
     ],
@@ -86,6 +86,7 @@ export const HELP: Record<HelpTopic, HelpContent> = {
     tips: [
       "Click a note again to remove it, or start a drag on a note to erase along the way.",
       "Ctrl/⌘ + scroll zooms time; add Shift to zoom pitch.",
+      "Scale greys out the rows outside the key. Chromatic turns the lock off; drums are never locked.",
       UNDO_TIP,
     ],
   },
