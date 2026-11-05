@@ -147,7 +147,7 @@ export const HELP: Record<HelpTopic, HelpContent> = {
       { icon: Shuffle, text: "Randomise a sound, or Mutate it a little." },
       { icon: SlidersHorizontal, text: "Fine-tune wave type, pitch, length and more with sliders." },
       { icon: Scissors, text: "Finish it here: trim, fade, normalize, change pitch or reverse." },
-      { icon: Download, text: "Keep sounds in your project and export them as WAV." },
+      { icon: Download, text: "Export WAV at 22, 44.1 or 48 kHz, 8 or 16-bit, or zip 5 variations or all your sounds." },
     ],
     steps: [
       "Click a generator, for example Jump. Each click makes a new variant.",
@@ -157,6 +157,8 @@ export const HELP: Record<HelpTopic, HelpContent> = {
     ],
     tips: [
       "Drag the handles at the ends of the waveform to trim the sound.",
+      "Space plays the sound. Lock a group of settings to keep it while you press Random or Mutate.",
+      "Recent keeps your last 10 drafts: click one to hear it and get it back.",
       "Once kept, every change saves by itself.",
       "Ctrl/⌘+Z undoes, Ctrl/⌘+Shift+Z redoes.",
       MENU_TIP,

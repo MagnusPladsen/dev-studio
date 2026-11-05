@@ -9,7 +9,7 @@ import { useOpenParam, useTrackOpenAsset, useStorageVersion } from "@/hooks/useS
 import { LinkedAssets } from "@/components/LinkedAssets";
 import { VolumeControl } from "@/components/VolumeControl";
 import { UndoRedoButtons } from "@/components/UndoRedoButtons";
-import { useHistory } from "@/hooks/useHistory";
+import { isTextField, useHistory } from "@/hooks/useHistory";
 import { previewGain, usePreviewVolume } from "@/hooks/usePreviewVolume";
 import { useAutosave } from "@/hooks/useAutosave";
 import { SaveIndicator } from "@/components/SaveIndicator";
@@ -28,9 +28,13 @@ import { AssetMenuButton, AssetPinButton, PasteButton } from "@/components/Asset
 import { getAudioContext } from "@/lib/audio/context";
 import { SAMPLE_RATE, SFX_VERSION, randomSeed, synthesize } from "@/lib/audio/sfx-synth";
 import { NO_FINISH, finishUntrimmed, peakOf, readFinish, renderSound, untrimmed } from "@/lib/audio/sfx-finish";
-import { encodeWav } from "@/lib/audio/wav";
+import { keepLocked, mutateParams, type SfxGroupId } from "@/lib/audio/sfx-explore";
+import { DEFAULT_WAV_FORMAT, describeWavFormat, safeFileName, soundToWav, soundsToZip, type WavFormat } from "@/lib/audio/sfx-export";
 import { SfxWaveform } from "@/components/sfx/SfxWaveform";
 import { SfxFinishPanel } from "@/components/sfx/SfxFinishPanel";
+import { SfxParameterGroups } from "@/components/sfx/SfxParameterGroups";
+import { MAX_DRAFTS, SfxDraftsStrip, type SfxDraft } from "@/components/sfx/SfxDraftsStrip";
+import { SfxWavFormatPicker } from "@/components/sfx/SfxWavFormatPicker";
 import type { SoundEffect, SfxFinish, SfxParams } from "@/types";
 
 const DEFAULT_PARAMS: SfxParams = {
@@ -50,7 +54,9 @@ const DEFAULT_PARAMS: SfxParams = {
   version: SFX_VERSION,
 };
 
-const WAVE_TYPES: SfxParams["waveType"][] = ["square", "sawtooth", "sine", "triangle", "noise"];
+const VARIATION_COUNT = 5;
+/** Play on change waits until a slider rests this long, so dragging doesn't restart the sound on every step. */
+const PLAY_ON_CHANGE_DELAY_MS = 150;
 
 function rand(min: number, max: number) {
   return Math.random() * (max - min) + min;
@@ -190,6 +196,14 @@ function playBuffer(buffer: Float32Array) {
   };
 }
 
+/** Space activates these natively, so it only plays the sound when focus is elsewhere. */
+function isSpaceTarget(target: EventTarget | null): boolean {
+  if (isTextField(target)) return true;
+  return target instanceof Element && !!target.closest("button, a, select, summary, input[type=checkbox], input[type=radio], [role=button], [role=menuitem]");
+}
+
+const zipBlob = (zip: Uint8Array<ArrayBuffer>) => new Blob([zip], { type: "application/zip" });
+
 const btnSecondary: React.CSSProperties = { background: "var(--bg-hover)", color: "var(--text-primary)", border: "1px solid var(--border)" };
 
 export default function SfxPage() {
@@ -208,6 +222,12 @@ export default function SfxPage() {
   const [activeId, setActiveId] = useState<string | null>(null);
   // bumps when a different sound is opened, so undo history starts fresh
   const [historyKey, setHistoryKey] = useState(0);
+  const [locked, setLocked] = useState<ReadonlySet<SfxGroupId>>(new Set());
+  const [drafts, setDrafts] = useState<SfxDraft[]>([]);
+  const [wavFormat, setWavFormat] = useState<WavFormat>(DEFAULT_WAV_FORMAT);
+  const [isPlayOnChange, setIsPlayOnChange] = useState(true);
+  // set by a settings change, so the effect below plays the result once it's rendered
+  const playAfterChange = useRef(false);
   const history = useHistory(sfxParams, (p) => setSfxParams(p), historyKey);
   const imports = useImport<SoundEffect>({
     importers: SFX_IMPORTERS,
@@ -269,43 +289,84 @@ export default function SfxPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, [autosave]);
 
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== " " || e.repeat || e.ctrlKey || e.metaKey || e.altKey || isSpaceTarget(e.target)) return;
+      e.preventDefault();
+      playBuffer(finished);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [finished]);
+
+  useEffect(() => {
+    if (!playAfterChange.current) return;
+    playAfterChange.current = false;
+    const timer = setTimeout(() => playBuffer(finished), PLAY_ON_CHANGE_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [finished]);
+
   function playSound() {
     playBuffer(finished);
   }
 
+  function markChanged() {
+    if (!isPlayOnChange) return;
+    // creating the audio context inside the input event lets the delayed play start on every browser
+    getAudioContext();
+    playAfterChange.current = true;
+  }
+
   function updateFinish(next: SfxFinish | undefined) {
+    markChanged();
     setSfxParams((p) => ({ ...p, finish: next }));
   }
 
   function updateParam<K extends keyof SfxParams>(key: K, value: SfxParams[K]) {
+    markChanged();
     setSfxParams((p) => ({ ...p, [key]: value }));
   }
 
+  function toggleLock(id: SfxGroupId) {
+    setLocked((current) => {
+      const next = new Set(current);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
+  }
+
+  function rememberDraft(label: string, p: SfxParams) {
+    setDrafts((current) => [{ id: uuid(), label, params: p }, ...current].slice(0, MAX_DRAFTS));
+  }
+
+  /** Each explore step is its own undo step, however fast the clicks come. */
+  function exploreTo(label: string, p: SfxParams) {
+    history.checkpoint();
+    setSfxParams(p);
+    rememberDraft(label, p);
+    playBuffer(renderSound(p));
+  }
+
   /** Generators always start a fresh draft, so exploring never overwrites a saved sound. */
-  function applyPreset(presetName: string) {
-    const gen = PRESETS[presetName];
-    if (!gen) return;
-    const p = { ...gen(), seed: randomSeed() };
+  function applyPreset(presetName: string, p: SfxParams = { ...PRESETS[presetName](), seed: randomSeed() }) {
     setActiveId(null);
     setName(presetName);
-    setSfxParams(p);
-    playBuffer(renderSound(p));
+    exploreTo(presetName, p);
   }
 
   function randomize() {
-    applyPreset(pick(Object.keys(PRESETS)));
+    const presetName = pick(Object.keys(PRESETS));
+    applyPreset(presetName, keepLocked({ ...PRESETS[presetName](), seed: randomSeed() }, sfxParams, locked));
   }
 
   function mutate() {
-    const p = { ...sfxParams };
-    p.frequency = Math.max(20, p.frequency + rand(-100, 100));
-    p.frequencySlide = Math.max(-1, Math.min(1, p.frequencySlide + rand(-0.1, 0.1)));
-    p.sustainTime = Math.max(0.01, p.sustainTime + rand(-0.05, 0.05));
-    p.decayTime = Math.max(0.01, p.decayTime + rand(-0.1, 0.1));
-    p.lpFilterCutoff = Math.max(0, Math.min(1, p.lpFilterCutoff + rand(-0.1, 0.1)));
-    p.vibratoDepth = Math.max(0, Math.min(1, p.vibratoDepth + rand(-0.02, 0.02)));
-    setSfxParams(p);
-    playBuffer(renderSound(p));
+    exploreTo("Mutate", mutateParams(sfxParams, locked));
+  }
+
+  function restoreDraft(draft: SfxDraft) {
+    history.checkpoint();
+    setSfxParams(draft.params);
+    playBuffer(renderSound(draft.params));
   }
 
   function createSound(soundName: string, p: SfxParams): SoundEffect {
@@ -364,37 +425,22 @@ export default function SfxPage() {
   }
 
   function exportWav() {
-    downloadBlob(`${name.trim() || "sound"}.wav`, new Blob([encodeWav(finished, SAMPLE_RATE)], { type: "audio/wav" }));
+    downloadBlob(`${safeFileName(name.trim())}.wav`, new Blob([soundToWav(sfxParams, wavFormat)], { type: "audio/wav" }));
   }
 
-  const sliderStyle: React.CSSProperties = { width: "100%", accentColor: "var(--accent)", cursor: "pointer" };
-  const labelStyle: React.CSSProperties = {
-    color: "var(--text-secondary)",
-    fontSize: "0.75rem",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: "2px",
-  };
+  function exportVariations() {
+    const base = safeFileName(name.trim());
+    const variations = Array.from({ length: VARIATION_COUNT }, (_, i) => ({
+      name: `${base} variation ${i + 1}`,
+      params: mutateParams(sfxParams, locked),
+    }));
+    downloadBlob(`${base} variations.zip`, zipBlob(soundsToZip(variations, wavFormat)));
+  }
 
-  const slider = (key: keyof SfxParams, label: string, min: number, max: number, step: number, fmt: (v: number) => string) => (
-    <div key={key}>
-      <div style={labelStyle}>
-        <span>{label}</span>
-        <span style={{ color: "var(--text-muted)" }}>{fmt(sfxParams[key] as number)}</span>
-      </div>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={sfxParams[key] as number}
-        onChange={(e) => updateParam(key, Number(e.target.value) as never)}
-        style={sliderStyle}
-        aria-label={label}
-      />
-    </div>
-  );
+  function exportAllSounds() {
+    const projectName = storage.getById("projects", projectId)?.name ?? "";
+    downloadBlob(`${safeFileName(projectName, "project")} sounds.zip`, zipBlob(soundsToZip(savedSounds, wavFormat)));
+  }
 
   return (
     <div ref={rootRef} className="p-4 md:p-6 h-full overflow-auto" style={{ background: "var(--bg-primary)" }}>
@@ -415,8 +461,20 @@ export default function SfxPage() {
           <HelpButton topic="sfx" />
           <ImportMenu imports={imports} note="WAV and MP3 can't be imported: a recording has no settings to edit." />
           <ExportMenu
+            options={<SfxWavFormatPicker format={wavFormat} onChange={setWavFormat} />}
             items={[
-              { label: "WAV", description: "16-bit mono, 44.1 kHz", onClick: exportWav },
+              { label: "WAV", description: describeWavFormat(wavFormat), onClick: exportWav },
+              {
+                label: `${VARIATION_COUNT} variations (zip)`,
+                description: "Mutated copies of this sound; locked groups stay the same",
+                onClick: exportVariations,
+              },
+              {
+                label: "All sounds (zip)",
+                description: savedSounds.length ? `The ${savedSounds.length} sounds in this project, one WAV each` : "Keep a sound first",
+                onClick: exportAllSounds,
+                disabled: savedSounds.length === 0,
+              },
               { label: "Sound JSON", description: "The settings, to import again later", onClick: exportJson },
             ]}
           />
@@ -442,19 +500,25 @@ export default function SfxPage() {
               >
                 <Play className="w-4 h-4" />
                 Play
+                <kbd className="text-[10px] opacity-75 font-normal max-md:hidden">Space</kbd>
               </button>
-              <button onClick={randomize} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm" style={btnSecondary} title="Generate a random sound of any kind">
+              <button onClick={randomize} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm" style={btnSecondary} title="Generate a random sound of any kind; locked groups stay the same">
                 <Shuffle className="w-4 h-4" />
                 Random
               </button>
-              <button onClick={mutate} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm" style={btnSecondary} title="Nudge the current sound a little">
+              <button onClick={mutate} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm" style={btnSecondary} title="Nudge every unlocked setting a little">
                 <Dices className="w-4 h-4" />
                 Mutate
               </button>
+              <label className="flex items-center gap-1.5 text-xs cursor-pointer" style={{ color: "var(--text-secondary)" }}>
+                <input type="checkbox" checked={isPlayOnChange} onChange={(e) => setIsPlayOnChange(e.target.checked)} style={{ accentColor: "var(--accent)" }} />
+                Play on change
+              </label>
               <div className="ml-auto">
                 <VolumeControl />
               </div>
             </div>
+            <SfxDraftsStrip drafts={drafts} current={sfxParams} onRestore={restoreDraft} />
           </div>
 
           {/* Generators */}
@@ -490,46 +554,7 @@ export default function SfxPage() {
             onReset={() => updateFinish(undefined)}
           />
 
-          {/* Parameters */}
-          <div className="rounded-xl border p-4 space-y-3" style={{ background: "var(--bg-card)", borderColor: "var(--border)" }}>
-            <div className="text-xs font-medium mb-1" style={{ color: "var(--text-muted)" }}>
-              PARAMETERS
-            </div>
-            <div>
-              <div style={labelStyle}>
-                <span>Wave Type</span>
-                <span style={{ color: "var(--accent)" }}>{sfxParams.waveType}</span>
-              </div>
-              <div className="flex gap-1">
-                {WAVE_TYPES.map((wt) => (
-                  <button
-                    key={wt}
-                    onClick={() => updateParam("waveType", wt)}
-                    className="flex-1 min-w-0 py-1.5 rounded-md text-xs font-medium truncate"
-                    style={{
-                      background: sfxParams.waveType === wt ? "var(--accent)" : "var(--bg-hover)",
-                      color: sfxParams.waveType === wt ? "white" : "var(--text-primary)",
-                      border: `1px solid ${sfxParams.waveType === wt ? "var(--accent)" : "var(--border)"}`,
-                    }}
-                  >
-                    {wt}
-                  </button>
-                ))}
-              </div>
-            </div>
-            {slider("frequency", "Frequency", 20, 2400, 1, (v) => `${v.toFixed(0)} Hz`)}
-            {slider("frequencySlide", "Frequency Slide", -1, 1, 0.01, (v) => v.toFixed(2))}
-            {slider("attackTime", "Attack Time", 0, 1, 0.001, (v) => `${v.toFixed(3)}s`)}
-            {slider("sustainTime", "Sustain Time", 0.01, 1, 0.001, (v) => `${v.toFixed(3)}s`)}
-            {slider("decayTime", "Decay Time", 0.01, 2, 0.001, (v) => `${v.toFixed(3)}s`)}
-            {slider("vibratoDepth", "Vibrato Depth", 0, 1, 0.001, (v) => v.toFixed(3))}
-            {slider("vibratoSpeed", "Vibrato Speed", 0, 50, 0.1, (v) => v.toFixed(1))}
-            {slider("lpFilterCutoff", "LP Filter Cutoff", 0, 1, 0.01, (v) => v.toFixed(2))}
-            {slider("lpFilterResonance", "LP Filter Resonance", 0, 1, 0.01, (v) => v.toFixed(2))}
-            {slider("hpFilterCutoff", "HP Filter Cutoff", 0, 1, 0.01, (v) => v.toFixed(2))}
-            {slider("volume", "Volume", 0, 1, 0.01, (v) => v.toFixed(2))}
-            {slider("repeatSpeed", "Repeat Speed", 0, 1, 0.01, (v) => v.toFixed(2))}
-          </div>
+          <SfxParameterGroups params={sfxParams} locked={locked} onToggleLock={toggleLock} onChange={updateParam} />
         </div>
 
         {/* Right: this sound + your sounds */}
