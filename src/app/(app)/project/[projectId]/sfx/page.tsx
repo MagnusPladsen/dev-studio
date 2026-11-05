@@ -27,7 +27,11 @@ import { useAssetMenu } from "@/components/AssetContextMenu";
 import { AssetMenuButton, AssetPinButton, PasteButton } from "@/components/AssetMenuButton";
 import { getAudioContext } from "@/lib/audio/context";
 import { SAMPLE_RATE, SFX_VERSION, randomSeed, synthesize } from "@/lib/audio/sfx-synth";
-import type { SoundEffect, SfxParams } from "@/types";
+import { NO_FINISH, finishUntrimmed, peakOf, readFinish, renderSound, untrimmed } from "@/lib/audio/sfx-finish";
+import { encodeWav } from "@/lib/audio/wav";
+import { SfxWaveform } from "@/components/sfx/SfxWaveform";
+import { SfxFinishPanel } from "@/components/sfx/SfxFinishPanel";
+import type { SoundEffect, SfxFinish, SfxParams } from "@/types";
 
 const DEFAULT_PARAMS: SfxParams = {
   waveType: "square",
@@ -155,42 +159,6 @@ const PRESETS: Record<string, () => SfxParams> = {
   }),
 };
 
-function bufferToWav(buffer: Float32Array): ArrayBuffer {
-  const numSamples = buffer.length;
-  const bytesPerSample = 2;
-  const dataSize = numSamples * bytesPerSample;
-  const headerSize = 44;
-  const arrayBuffer = new ArrayBuffer(headerSize + dataSize);
-  const view = new DataView(arrayBuffer);
-
-  function writeString(offset: number, str: string) {
-    for (let i = 0; i < str.length; i++) {
-      view.setUint8(offset + i, str.charCodeAt(i));
-    }
-  }
-
-  writeString(0, "RIFF");
-  view.setUint32(4, headerSize + dataSize - 8, true);
-  writeString(8, "WAVE");
-  writeString(12, "fmt ");
-  view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true);
-  view.setUint16(22, 1, true);
-  view.setUint32(24, SAMPLE_RATE, true);
-  view.setUint32(28, SAMPLE_RATE * bytesPerSample, true);
-  view.setUint16(32, bytesPerSample, true);
-  view.setUint16(34, 16, true);
-  writeString(36, "data");
-  view.setUint32(40, dataSize, true);
-
-  for (let i = 0; i < numSamples; i++) {
-    const s = Math.max(-1, Math.min(1, buffer[i]));
-    view.setInt16(headerSize + i * bytesPerSample, s * 0x7fff, true);
-  }
-
-  return arrayBuffer;
-}
-
 let masterGain: GainNode | null = null;
 let currentSource: AudioBufferSourceNode | null = null;
 
@@ -222,41 +190,6 @@ function playBuffer(buffer: Float32Array) {
   };
 }
 
-function drawWaveform(canvas: HTMLCanvasElement, buffer: Float32Array) {
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return;
-  const w = canvas.width;
-  const h = canvas.height;
-  ctx.clearRect(0, 0, w, h);
-
-  ctx.fillStyle = "rgba(10,10,15,1)";
-  ctx.fillRect(0, 0, w, h);
-
-  ctx.strokeStyle = "rgba(42,42,58,0.5)";
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(0, h / 2);
-  ctx.lineTo(w, h / 2);
-  ctx.stroke();
-
-  if (buffer.length === 0) return;
-
-  ctx.strokeStyle = getComputedStyle(canvas).getPropertyValue("--tool-color").trim() || "#fbbf24";
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-
-  const step = buffer.length / w;
-  for (let i = 0; i < w; i++) {
-    const idx = Math.floor(i * step);
-    const val = buffer[idx] || 0;
-    const y = (1 - val) * h / 2;
-    if (i === 0) ctx.moveTo(i, y);
-    else ctx.lineTo(i, y);
-  }
-  ctx.stroke();
-}
-
-
 const btnSecondary: React.CSSProperties = { background: "var(--bg-hover)", color: "var(--text-primary)", border: "1px solid var(--border)" };
 
 export default function SfxPage() {
@@ -267,7 +200,6 @@ export default function SfxPage() {
   const params = useParams();
   const projectId = params.projectId as string;
   const { assetTriggerProps, pasteTriggerProps } = useAssetMenu();
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const storeVersion = useStorageVersion();
   const [sfxParams, setSfxParams] = useState<SfxParams>({ ...DEFAULT_PARAMS });
@@ -303,10 +235,9 @@ export default function SfxPage() {
   useTrackOpenAsset(activeId ? { type: "sound", id: activeId } : null);
 
   // the waveform always shows the current settings, not only after pressing Play
-  const waveform = useMemo(() => synthesize(sfxParams), [sfxParams]);
-  useEffect(() => {
-    if (canvasRef.current) drawWaveform(canvasRef.current, waveform);
-  }, [waveform]);
+  const finish = useMemo(() => readFinish(sfxParams.finish), [sfxParams.finish]);
+  const uncut = useMemo(() => untrimmed(synthesize(sfxParams), finish), [sfxParams, finish]);
+  const finished = useMemo(() => finishUntrimmed(uncut, finish), [uncut, finish]);
 
   const draftValue = useMemo(
     () => (activeId ? { id: activeId, name, params: sfxParams } : null),
@@ -339,7 +270,11 @@ export default function SfxPage() {
   }, [autosave]);
 
   function playSound() {
-    playBuffer(synthesize(sfxParams));
+    playBuffer(finished);
+  }
+
+  function updateFinish(next: SfxFinish | undefined) {
+    setSfxParams((p) => ({ ...p, finish: next }));
   }
 
   function updateParam<K extends keyof SfxParams>(key: K, value: SfxParams[K]) {
@@ -354,7 +289,7 @@ export default function SfxPage() {
     setActiveId(null);
     setName(presetName);
     setSfxParams(p);
-    playBuffer(synthesize(p));
+    playBuffer(renderSound(p));
   }
 
   function randomize() {
@@ -370,7 +305,7 @@ export default function SfxPage() {
     p.lpFilterCutoff = Math.max(0, Math.min(1, p.lpFilterCutoff + rand(-0.1, 0.1)));
     p.vibratoDepth = Math.max(0, Math.min(1, p.vibratoDepth + rand(-0.02, 0.02)));
     setSfxParams(p);
-    playBuffer(synthesize(p));
+    playBuffer(renderSound(p));
   }
 
   function createSound(soundName: string, p: SfxParams): SoundEffect {
@@ -411,7 +346,7 @@ export default function SfxPage() {
     setActiveId(sound.id);
     setName(sound.name);
     setSfxParams({ ...sound.params });
-    if (play) playBuffer(synthesize(sound.params));
+    if (play) playBuffer(renderSound(sound.params));
     setHistoryKey((k) => k + 1);
   }
 
@@ -429,14 +364,7 @@ export default function SfxPage() {
   }
 
   function exportWav() {
-    const wav = bufferToWav(synthesize(sfxParams));
-    const blob = new Blob([wav], { type: "audio/wav" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${name.trim() || "sound"}.wav`;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadBlob(`${name.trim() || "sound"}.wav`, new Blob([encodeWav(finished, SAMPLE_RATE)], { type: "audio/wav" }));
   }
 
   const sliderStyle: React.CSSProperties = { width: "100%", accentColor: "var(--accent)", cursor: "pointer" };
@@ -499,7 +427,13 @@ export default function SfxPage() {
         {/* Left: sound + controls */}
         <div className="flex-1 min-w-0 space-y-4">
           <div className="rounded-xl border p-3" style={{ background: "var(--bg-card)", borderColor: "var(--border)" }}>
-            <canvas ref={canvasRef} width={600} height={120} style={{ width: "100%", height: "120px", borderRadius: "8px" }} />
+            <SfxWaveform
+              untrimmed={uncut}
+              finished={finished}
+              finish={finish}
+              onTrim={(trimStart, trimEnd) => updateFinish({ ...finish, trimStart, trimEnd })}
+              onTrimDone={history.checkpoint}
+            />
             <div className="flex items-center gap-2 mt-3 flex-wrap">
               <button
                 onClick={playSound}
@@ -546,6 +480,15 @@ export default function SfxPage() {
               ))}
             </div>
           </div>
+
+          <SfxFinishPanel
+            finish={finish}
+            lengthSeconds={uncut.length / SAMPLE_RATE}
+            isClipping={peakOf(finished) > 1}
+            isEdited={!!sfxParams.finish && JSON.stringify(finish) !== JSON.stringify(NO_FINISH)}
+            onChange={updateFinish}
+            onReset={() => updateFinish(undefined)}
+          />
 
           {/* Parameters */}
           <div className="rounded-xl border p-4 space-y-3" style={{ background: "var(--bg-card)", borderColor: "var(--border)" }}>
@@ -675,7 +618,7 @@ export default function SfxPage() {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          playBuffer(synthesize(sound.params));
+                          playBuffer(renderSound(sound.params));
                         }}
                         className="p-1 rounded"
                         style={{ color: "var(--green)" }}

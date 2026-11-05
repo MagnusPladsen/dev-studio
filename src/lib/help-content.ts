@@ -1,4 +1,4 @@
-import { ArrowLeftRight, Film, SquareDashed, ArrowRight, Box, CalendarRange, CirclePlay, Columns3, Copy, Download, GitPullRequestArrow, Hash, FileCode, FileText, FlipHorizontal2, FolderOpen, Gauge, Grid3X3, Image, Layers, LayoutGrid, LayoutTemplate, Link2, List, ListChecks, ListTodo, Maximize2, MessageSquare, MousePointer2, Music, Network, NotebookPen, PaintBucket, Paintbrush, Palette, Pencil, Piano, Pipette, Play, Rows3, Ruler, Scaling, Search, Shapes, Shuffle, SlidersHorizontal, Sparkles, SquareCheck, StickyNote, VolumeX, WandSparkles, Waypoints, type LucideIcon } from "lucide-react";
+import { ArrowLeftRight, Film, SquareDashed, ArrowRight, Box, CalendarRange, CirclePlay, Columns3, Copy, Download, GitPullRequestArrow, Hash, FileCode, FileText, FlipHorizontal2, FolderOpen, Gauge, Grid3X3, Image, Layers, LayoutGrid, LayoutTemplate, Link2, List, ListChecks, ListTodo, Maximize2, MessageSquare, MousePointer2, Music, Network, NotebookPen, PaintBucket, Paintbrush, Palette, Pencil, Piano, Pipette, Play, Rows3, Ruler, Scaling, Scissors, Search, Shapes, Shuffle, SlidersHorizontal, Sparkles, SquareCheck, StickyNote, VolumeX, WandSparkles, Waypoints, type LucideIcon } from "lucide-react";
 import { COPY, type HelpText } from "@/copy";
 import { MENU_TIP, UNDO_TIP } from "@/copy/shared";
 
@@ -145,6 +145,7 @@ export const HELP: Record<HelpTopic, HelpContent> = {
       { icon: WandSparkles, text: "Generate sounds like Jump, Coin, Laser, Explosion and Hit." },
       { icon: Shuffle, text: "Randomise a sound, or Mutate it a little." },
       { icon: SlidersHorizontal, text: "Fine-tune wave type, pitch, length and more with sliders." },
+      { icon: Scissors, text: "Finish it here: trim, fade, normalize, change pitch or reverse." },
       { icon: Download, text: "Keep sounds in your project and export them as WAV." },
     ],
     steps: [
@@ -154,6 +155,7 @@ export const HELP: Record<HelpTopic, HelpContent> = {
       "Export it as WAV for your game.",
     ],
     tips: [
+      "Drag the handles at the ends of the waveform to trim the sound.",
       "Once kept, every change saves by itself.",
       "Ctrl/⌘+Z undoes, Ctrl/⌘+Shift+Z redoes.",
       MENU_TIP,

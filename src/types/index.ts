@@ -99,6 +99,25 @@ export interface SfxParams {
   version?: 2;
   /** Seeds the noise, so a noise sound is the same every time it plays or exports. */
   seed?: number;
+  /** Editing applied after the synth (trim, fades, level, pitch, reverse). Missing = none. */
+  finish?: SfxFinish;
+}
+
+export interface SfxFinish {
+  /** Share (0-1) of the sound's length cut from the start. */
+  trimStart: number;
+  /** Share (0-1) of the sound's length cut from the end. */
+  trimEnd: number;
+  /** Seconds. */
+  fadeIn: number;
+  /** Seconds. */
+  fadeOut: number;
+  /** Bring the loudest point to -1 dB before the gain. */
+  normalize: boolean;
+  gainDb: number;
+  /** Semitones; changes speed and length too, like a tape. */
+  pitch: number;
+  reverse: boolean;
 }
 
 export interface MusicTrack {
