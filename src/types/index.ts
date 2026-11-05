@@ -95,6 +95,10 @@ export interface SfxParams {
   volume: number;
   vibratoDepth: number;
   vibratoSpeed: number;
+  /** 2 = the fixed synth (curved slide, real high-pass, sfxr-style repeat). Missing = the original synth. */
+  version?: 2;
+  /** Seeds the noise, so a noise sound is the same every time it plays or exports. */
+  seed?: number;
 }
 
 export interface MusicTrack {

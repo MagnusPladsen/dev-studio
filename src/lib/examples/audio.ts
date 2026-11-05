@@ -1,4 +1,5 @@
 import type { MusicChannel, MusicNote, SfxParams } from "@/types";
+import { SFX_VERSION } from "@/lib/audio/sfx-synth";
 import type { ExampleContext, ExampleModule } from "./types";
 
 // ── Sound effects ─────────────────────────────────────────────────────
@@ -17,37 +18,39 @@ const BASE: SfxParams = {
   volume: 0.5,
   vibratoDepth: 0,
   vibratoSpeed: 0,
+  version: SFX_VERSION,
 };
 
+// Slides are for the version 2 synth (octaves, curved); each ends on the same pitch as the original straight slide.
 const SOUNDS: { slug: string; name: string; tags: string[]; params: Partial<SfxParams> }[] = [
   // short upward chirp: the classic platformer hop
-  { slug: "jump", name: "Jump", tags: ["player"], params: { waveType: "square", frequency: 300, frequencySlide: 0.25, sustainTime: 0.08, decayTime: 0.2 } },
+  { slug: "jump", name: "Jump", tags: ["player"], params: { waveType: "square", frequency: 300, frequencySlide: 0.23, sustainTime: 0.08, decayTime: 0.2 } },
   // bright and quick so it can play many times in a row
-  { slug: "coin", name: "Coin pickup", tags: ["pickup"], params: { waveType: "square", frequency: 900, frequencySlide: 0.15, sustainTime: 0.05, decayTime: 0.15, volume: 0.4 } },
-  { slug: "laser", name: "Laser", tags: ["weapon"], params: { waveType: "sawtooth", frequency: 1100, frequencySlide: -0.35, sustainTime: 0.08, decayTime: 0.18 } },
+  { slug: "coin", name: "Coin pickup", tags: ["pickup"], params: { waveType: "square", frequency: 900, frequencySlide: 0.11, sustainTime: 0.05, decayTime: 0.15, volume: 0.4 } },
+  { slug: "laser", name: "Laser", tags: ["weapon"], params: { waveType: "sawtooth", frequency: 1100, frequencySlide: -0.16, sustainTime: 0.08, decayTime: 0.18 } },
   // low filtered noise with a long tail
   {
     slug: "explosion",
     name: "Explosion",
     tags: ["impact"],
-    params: { waveType: "noise", frequency: 120, frequencySlide: -0.05, sustainTime: 0.25, decayTime: 0.6, lpFilterCutoff: 0.4, lpFilterResonance: 0.2, volume: 0.8 },
+    params: { waveType: "noise", frequency: 120, frequencySlide: -0.19, sustainTime: 0.25, decayTime: 0.6, lpFilterCutoff: 0.4, lpFilterResonance: 0.2, volume: 0.8 },
   },
   // falling pitch reads as "ouch"
-  { slug: "hurt", name: "Hurt", tags: ["player"], params: { waveType: "square", frequency: 420, frequencySlide: -0.9, sustainTime: 0.04, decayTime: 0.18, hpFilterCutoff: 0.1, volume: 0.55 } },
+  { slug: "hurt", name: "Hurt", tags: ["player"], params: { waveType: "square", frequency: 420, frequencySlide: -0.46, sustainTime: 0.04, decayTime: 0.18, hpFilterCutoff: 0.1, volume: 0.55 } },
   // long rising sweep with a little wobble
   {
     slug: "powerup",
     name: "Power-up",
     tags: ["pickup"],
-    params: { waveType: "square", frequency: 330, frequencySlide: 1.2, sustainTime: 0.14, decayTime: 0.35, vibratoDepth: 0.03, vibratoSpeed: 12, volume: 0.45 },
+    params: { waveType: "square", frequency: 330, frequencySlide: 0.39, sustainTime: 0.14, decayTime: 0.35, vibratoDepth: 0.03, vibratoSpeed: 12, volume: 0.45 },
   },
-  { slug: "select", name: "Menu select", tags: ["ui"], params: { waveType: "square", frequency: 740, frequencySlide: 0.05, sustainTime: 0.04, decayTime: 0.08, lpFilterCutoff: 0.8, volume: 0.35 } },
+  { slug: "select", name: "Menu select", tags: ["ui"], params: { waveType: "square", frequency: 740, frequencySlide: 0.07, sustainTime: 0.04, decayTime: 0.08, lpFilterCutoff: 0.8, volume: 0.35 } },
   // slow low sawtooth with vibrato sounds like a creaky hinge
   {
     slug: "door",
     name: "Door open",
     tags: ["world"],
-    params: { waveType: "sawtooth", frequency: 70, frequencySlide: 0.02, sustainTime: 0.3, decayTime: 0.25, vibratoDepth: 0.15, vibratoSpeed: 9, lpFilterCutoff: 0.35, volume: 0.6 },
+    params: { waveType: "sawtooth", frequency: 70, frequencySlide: 0.14, sustainTime: 0.3, decayTime: 0.25, vibratoDepth: 0.15, vibratoSpeed: 9, lpFilterCutoff: 0.35, volume: 0.6 },
   },
 ];
 
