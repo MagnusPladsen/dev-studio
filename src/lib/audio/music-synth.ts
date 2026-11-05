@@ -4,7 +4,7 @@ export function midiToFreq(midi: number): number {
   return 440 * Math.pow(2, (midi - 69) / 12);
 }
 
-function createNoiseBuffer(ctx: AudioContext, duration: number): AudioBuffer {
+function createNoiseBuffer(ctx: BaseAudioContext, duration: number): AudioBuffer {
   const sampleRate = ctx.sampleRate;
   const length = Math.ceil(sampleRate * duration);
   const buffer = ctx.createBuffer(1, length, sampleRate);
@@ -16,7 +16,7 @@ function createNoiseBuffer(ctx: AudioContext, duration: number): AudioBuffer {
 }
 
 export function scheduleNote(
-  ctx: AudioContext,
+  ctx: BaseAudioContext,
   destination: AudioNode,
   note: MusicNote,
   instrument: string,
