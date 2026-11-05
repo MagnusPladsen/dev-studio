@@ -15,6 +15,7 @@ import {
   ZoomOut,
   MoveHorizontal,
   MoveVertical,
+  SlidersHorizontal,
 } from "lucide-react";
 import { storage } from "@/lib/storage";
 import { useOpenParam, useTrackOpenAsset } from "@/hooks/useStorage";
@@ -39,6 +40,8 @@ import { useAssetMenu } from "@/components/AssetContextMenu";
 import { AssetMenuButton, AssetPinButton, PasteButton } from "@/components/AssetMenuButton";
 import { getAudioContext } from "@/lib/audio/context";
 import { scheduleNote } from "@/lib/audio/music-synth";
+import { applyPreset } from "@/lib/audio/music-instruments";
+import { InstrumentPanel, PresetSelect } from "@/components/music/InstrumentPanel";
 import { RENDER_SAMPLE_RATE, renderLoop } from "@/lib/audio/music-render";
 import { encodeWav } from "@/lib/audio/wav";
 import { beatAt, scheduleWindow, type LiveSong, type PlayCursor } from "@/lib/audio/music-scheduler";
@@ -64,22 +67,8 @@ const CHANNEL_COLORS = [
   "#fbbf24",        // drums
 ];
 
-const INSTRUMENTS: { label: string; value: OscillatorType | "noise" }[] = [
-  { label: "Square", value: "square" },
-  { label: "Sawtooth", value: "sawtooth" },
-  { label: "Sine", value: "sine" },
-  { label: "Triangle", value: "triangle" },
-  { label: "Noise", value: "noise" },
-];
-
-function defaultChannel(name: string, instrument: string, color: number): MusicChannel {
-  return {
-    id: uuid(),
-    name,
-    instrument,
-    volume: 0.5,
-    patterns: [{ id: uuid(), notes: [] }],
-  };
+function defaultChannel(name: string, preset: string): MusicChannel {
+  return applyPreset({ id: uuid(), name, instrument: "square", volume: 0.5, patterns: [{ id: uuid(), notes: [] }] }, preset);
 }
 
 function createEmptyTrack(projectId: string): MusicTrack {
@@ -89,10 +78,10 @@ function createEmptyTrack(projectId: string): MusicTrack {
     name: "Untitled track",
     bpm: 120,
     channels: [
-      defaultChannel("Melody", "square", 0),
-      defaultChannel("Harmony", "triangle", 1),
-      defaultChannel("Bass", "sawtooth", 2),
-      defaultChannel("Drums", "noise", 3),
+      defaultChannel("Melody", "lead"),
+      defaultChannel("Harmony", "soft-pad"),
+      defaultChannel("Bass", "bass"),
+      defaultChannel("Drums", "drum-kit"),
     ],
     tags: [],
     createdAt: new Date().toISOString(),
@@ -139,6 +128,7 @@ export default function MusicPage() {
   const [zoom, setZoom] = useState({ x: 1, y: 1 });
   const [noteLen, setNoteLen] = useState(0.5);
   const [tracksOpen, setTracksOpen] = useState(false);
+  const [isInstrumentOpen, setIsInstrumentOpen] = useState(false);
   const rollRef = useRef<HTMLDivElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const [rollW, setRollW] = useState(0);
@@ -314,7 +304,7 @@ export default function MusicPage() {
       if (!song) return;
       const scheduled = scheduleWindow(song, cursor, ctx.currentTime + LOOKAHEAD_SECONDS);
       scheduled.notes.forEach((due) => {
-        track(scheduleNote(ctx, masterGainRef.current ?? ctx.destination, due.note, due.instrument, due.volume, due.passStart, due.beatDuration));
+        track(scheduleNote(ctx, masterGainRef.current ?? ctx.destination, due.note, due.voice, due.volume, due.passStart, due.beatDuration));
       });
       cursor = scheduled.cursor;
       if (scheduled.ended && ctx.currentTime >= cursor.time) {
@@ -391,7 +381,7 @@ export default function MusicPage() {
     if (!ch || playing || muted[activeChannelIdx]) return;
     const ctx = getAudioCtx();
     const note = { pitch, start: 0, duration: Math.min(noteLen, PLACE_PREVIEW_BEATS), velocity: 0.8 };
-    scheduleNote(ctx, masterGainRef.current ?? ctx.destination, note, ch.instrument, ch.volume, ctx.currentTime, 60 / activeTrack.bpm);
+    scheduleNote(ctx, masterGainRef.current ?? ctx.destination, note, ch, ch.volume, ctx.currentTime, 60 / activeTrack.bpm);
   }
 
   function onGridPointerMove(e: React.PointerEvent<HTMLDivElement>) {
@@ -491,13 +481,13 @@ export default function MusicPage() {
     setTracks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
   }
 
-  function updateChannelInstrument(chIdx: number, instrument: string) {
+  /** A channel's sound. Picking a preset or wave is its own undo step; a slider drag is grouped by `onStartEdit`. */
+  function updateChannelSound(chIdx: number, next: MusicChannel, isNewStep = false) {
     if (!activeTrack) return;
+    if (isNewStep) history.checkpoint();
     const updated = {
       ...activeTrack,
-      channels: activeTrack.channels.map((c, i) =>
-        i === chIdx ? { ...c, instrument } : c
-      ),
+      channels: activeTrack.channels.map((c, i) => (i === chIdx ? next : c)),
       updatedAt: new Date().toISOString(),
     };
     setActiveTrack(updated);
@@ -811,18 +801,26 @@ export default function MusicPage() {
                     <div className="w-2 h-2 rounded-full" style={{ background: color }} />
                     <span style={{ color: isActive ? "var(--text-primary)" : "var(--text-secondary)" }}>{ch.name}</span>
 
-                    {/* Instrument select */}
-                    <select
-                      value={ch.instrument}
-                      onChange={(e) => { e.stopPropagation(); updateChannelInstrument(ci, e.target.value); }}
+                    <PresetSelect
+                      channel={ch}
+                      onChange={(next) => updateChannelSound(ci, next, true)}
                       className="bg-transparent text-xs outline-none"
-                      style={{ color: "var(--text-muted)", maxWidth: 70 }}
-                      onClick={(e) => e.stopPropagation()}
+                      style={{ color: "var(--text-muted)", maxWidth: 84 }}
+                    />
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveChannelIdx(ci);
+                        setIsInstrumentOpen((open) => !(open && isActive));
+                      }}
+                      className="p-0.5 rounded"
+                      style={{ color: isInstrumentOpen && isActive ? color : "var(--text-muted)" }}
+                      title={`Edit ${ch.name} instrument`}
+                      aria-label={`Edit ${ch.name} instrument`}
+                      aria-pressed={isInstrumentOpen && isActive}
                     >
-                      {INSTRUMENTS.map((inst) => (
-                        <option key={inst.value} value={inst.value}>{inst.label}</option>
-                      ))}
-                    </select>
+                      <SlidersHorizontal className="w-3 h-3" />
+                    </button>
 
                     {/* Volume */}
                     <input
@@ -863,6 +861,16 @@ export default function MusicPage() {
                 );
               })}
             </div>
+
+            {isInstrumentOpen && activeTrack.channels[activeChannelIdx] && (
+              <InstrumentPanel
+                channel={activeTrack.channels[activeChannelIdx]}
+                color={CHANNEL_COLORS[activeChannelIdx] || "var(--text-secondary)"}
+                onChange={(next) => updateChannelSound(activeChannelIdx, next)}
+                onStartEdit={() => history.checkpoint()}
+                onClose={() => setIsInstrumentOpen(false)}
+              />
+            )}
 
             {/* How to draw notes */}
             <div

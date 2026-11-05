@@ -37,6 +37,11 @@ export const musicSchema = z.looseObject({
       id,
       name: z.string(),
       instrument: z.string(),
+      preset: z.string().optional(),
+      envelope: z
+        .looseObject({ attack: z.number().min(0), decay: z.number().min(0), sustain: z.number().min(0).max(1), release: z.number().min(0) })
+        .optional(),
+      vibrato: z.looseObject({ rate: z.number().positive(), depth: z.number().min(0), delay: z.number().min(0) }).optional(),
       volume: z.number(),
       patterns: z.array(z.looseObject({ id, notes: z.array(musicNoteSchema) })),
     })

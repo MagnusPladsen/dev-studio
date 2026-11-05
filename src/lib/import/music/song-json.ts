@@ -1,6 +1,7 @@
 import type { MusicTrack } from "@/types";
 import { ImportError, jsonReimporter, oneOrMany, type Importer } from "@/lib/import";
 import { assertFileSize } from "@/lib/import/file-size";
+import { playableSound } from "@/lib/audio/music-instruments";
 
 const MAX_BYTES = 5 * 1024 * 1024;
 
@@ -25,6 +26,7 @@ function readSong(value: unknown): MusicTrack {
   if (!value.channels.every(isChannel)) throw new ImportError("This song file is damaged: some channels or notes are incomplete.");
   return {
     ...(value as unknown as MusicTrack),
+    channels: (value.channels as MusicTrack["channels"]).map(playableSound),
     id: typeof value.id === "string" ? value.id : "song",
     name: typeof value.name === "string" && value.name.trim() ? value.name : "Imported song",
     tags: Array.isArray(value.tags) ? value.tags.filter((tag): tag is string => typeof tag === "string") : [],

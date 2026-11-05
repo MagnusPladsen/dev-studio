@@ -1,4 +1,6 @@
-import type { MusicNote, MusicTrack } from "@/types";
+import type { MusicNote, MusicTrack, MusicVibrato } from "@/types";
+import { envelopeSteps, releaseSeconds, SILENT } from "./music-envelope";
+import type { MusicVoice } from "./music-instruments";
 
 export function midiToFreq(midi: number): number {
   return 440 * Math.pow(2, (midi - 69) / 12);
@@ -15,23 +17,53 @@ function createNoiseBuffer(ctx: BaseAudioContext, duration: number): AudioBuffer
   return buffer;
 }
 
+/** Seconds the vibrato takes to fade in once its delay is over, so it doesn't jump in. */
+const VIBRATO_FADE = 0.1;
+
+function applyEnvelope(param: AudioParam, voice: MusicVoice, peak: number, startTime: number, held: number): number {
+  if (!voice.envelope) {
+    // Classic: full volume at the start, fading out over the note
+    param.setValueAtTime(peak, startTime);
+    param.exponentialRampToValueAtTime(SILENT, startTime + held);
+    return held;
+  }
+  for (const step of envelopeSteps(voice.envelope, peak, held)) {
+    if (step.kind === "set") param.setValueAtTime(step.value, startTime + step.time);
+    else if (step.kind === "linear") param.linearRampToValueAtTime(step.value, startTime + step.time);
+    else param.exponentialRampToValueAtTime(step.value, startTime + step.time);
+  }
+  return held + releaseSeconds(voice.envelope);
+}
+
+function addVibrato(ctx: BaseAudioContext, osc: OscillatorNode, vibrato: MusicVibrato, startTime: number, endTime: number) {
+  const lfo = ctx.createOscillator();
+  lfo.frequency.setValueAtTime(vibrato.rate, startTime);
+  const depth = ctx.createGain();
+  depth.gain.setValueAtTime(0, startTime + vibrato.delay);
+  depth.gain.linearRampToValueAtTime(vibrato.depth, startTime + vibrato.delay + VIBRATO_FADE);
+  lfo.connect(depth);
+  depth.connect(osc.detune);
+  lfo.start(startTime);
+  lfo.stop(endTime);
+}
+
+/** Schedule one note on the channel's voice; Play, the placing preview and WAV export all come through here. */
 export function scheduleNote(
   ctx: BaseAudioContext,
   destination: AudioNode,
   note: MusicNote,
-  instrument: string,
+  voice: MusicVoice,
   volume: number,
   when: number,
   beatDuration: number
 ): AudioScheduledSourceNode {
   const startTime = when + note.start * beatDuration;
-  const dur = note.duration * beatDuration;
+  const held = note.duration * beatDuration;
   const gain = ctx.createGain();
-  gain.gain.setValueAtTime(volume * note.velocity * 0.3, startTime);
-  gain.gain.exponentialRampToValueAtTime(0.001, startTime + dur);
+  const dur = applyEnvelope(gain.gain, voice, volume * note.velocity * 0.3, startTime, held);
   gain.connect(destination);
 
-  if (instrument === "noise") {
+  if (voice.instrument === "noise") {
     const src = ctx.createBufferSource();
     src.buffer = createNoiseBuffer(ctx, dur);
     const bpf = ctx.createBiquadFilter();
@@ -45,8 +77,9 @@ export function scheduleNote(
     return src;
   }
   const osc = ctx.createOscillator();
-  osc.type = instrument as OscillatorType;
+  osc.type = voice.instrument as OscillatorType;
   osc.frequency.setValueAtTime(midiToFreq(note.pitch), startTime);
+  if (voice.vibrato && voice.vibrato.depth > 0) addVibrato(ctx, osc, voice.vibrato, startTime, startTime + dur);
   osc.connect(gain);
   osc.start(startTime);
   osc.stop(startTime + dur);
