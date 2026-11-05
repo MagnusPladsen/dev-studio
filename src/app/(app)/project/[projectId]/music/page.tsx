@@ -42,15 +42,14 @@ import { scheduleNote } from "@/lib/audio/music-synth";
 import { RENDER_SAMPLE_RATE, renderLoop } from "@/lib/audio/music-render";
 import { encodeWav } from "@/lib/audio/wav";
 import { beatAt, scheduleWindow, type LiveSong, type PlayCursor } from "@/lib/audio/music-scheduler";
+import { isInScale, isScaleLocked, KEY_NAMES, SCALE_IDS, SCALES, songScale, type ScaleId } from "@/lib/music-scale";
 import { cellsBetween, coversCell, eraseCells, paintCells, type GridCell, type NoteCell } from "@/lib/music-draw";
 import type { MusicTrack, MusicChannel, MusicNote } from "@/types";
 import { v4 as uuid } from "uuid";
 
-const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
-
 function midiToName(midi: number): string {
   const octave = Math.floor(midi / 12) - 1;
-  return `${NOTE_NAMES[midi % 12]}${octave}`;
+  return `${KEY_NAMES[midi % 12]}${octave}`;
 }
 
 // C3 (48) to C6 (84) – 37 notes
@@ -117,6 +116,8 @@ const NOTE_LENGTHS = [
 const PATTERN_LENGTHS = [8, 16, 32];
 /** How far ahead notes are handed to the audio clock; edits land after at most this long. */
 const LOOKAHEAD_SECONDS = 0.2;
+/** Longest a placed note is heard for, in beats, so long notes don't drone while you draw. */
+const PLACE_PREVIEW_BEATS = 0.5;
 
 /** Shortest loop length that shows every note in the track. */
 function fitPatternLength(track: MusicTrack): number {
@@ -344,6 +345,10 @@ export default function MusicPage() {
   }
 
   const snap = noteLen < 0.5 ? 0.25 : 0.5;
+  const scale = songScale(activeTrack ?? {});
+  // noise "pitches" are drum colours, not notes, so the drums channel is never locked
+  const isLocked = isScaleLocked(scale) && activeTrack?.channels[activeChannelIdx]?.instrument !== "noise";
+  const isPlayable = (pitch: number) => !isLocked || isInScale(pitch, scale);
   // a stroke paints notes into empty cells, or erases notes when it starts on one
   const strokeRef = useRef<{ mode: "paint" | "erase"; last: GridCell } | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -360,7 +365,7 @@ export default function MusicPage() {
   }
 
   function drawCells(mode: "paint" | "erase", cells: GridCell[]) {
-    const noteCells = toNoteCells(cells);
+    const noteCells = toNoteCells(cells).filter((c) => mode === "erase" || isPlayable(c.pitch));
     if (noteCells.length === 0) return;
     setActiveNotes((ns) => (mode === "erase" ? eraseCells(ns, noteCells) : paintCells(ns, noteCells, noteLen, patternLen)));
   }
@@ -371,11 +376,22 @@ export default function MusicPage() {
     const [start] = toNoteCells([cell]);
     if (!start) return;
     const mode = activeNotes.some((n) => coversCell(n, start)) ? "erase" : "paint";
+    if (mode === "paint" && !isPlayable(start.pitch)) return;
+    if (mode === "paint") previewPitch(start.pitch);
     strokeRef.current = { mode, last: cell };
     history.checkpoint();
     e.currentTarget.setPointerCapture(e.pointerId);
     setIsDrawing(true);
     drawCells(mode, [cell]);
+  }
+
+  /** Play a just-placed note through the playback synth. Skipped while the song plays, which is heard anyway. */
+  function previewPitch(pitch: number) {
+    const ch = activeTrack?.channels[activeChannelIdx];
+    if (!ch || playing || muted[activeChannelIdx]) return;
+    const ctx = getAudioCtx();
+    const note = { pitch, start: 0, duration: Math.min(noteLen, PLACE_PREVIEW_BEATS), velocity: 0.8 };
+    scheduleNote(ctx, masterGainRef.current ?? ctx.destination, note, ch.instrument, ch.volume, ctx.currentTime, 60 / activeTrack.bpm);
   }
 
   function onGridPointerMove(e: React.PointerEvent<HTMLDivElement>) {
@@ -453,6 +469,15 @@ export default function MusicPage() {
     setTracks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
   }
 
+  /** Key and scale changes are each their own undo step. */
+  function updateScale(change: { key?: number; scale?: ScaleId }) {
+    if (!activeTrack) return;
+    history.checkpoint();
+    const updated = { ...activeTrack, ...change, updatedAt: new Date().toISOString() };
+    setActiveTrack(updated);
+    setTracks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+  }
+
   function updateChannelVolume(chIdx: number, vol: number) {
     if (!activeTrack) return;
     const updated = {
@@ -508,6 +533,7 @@ export default function MusicPage() {
 
   const activeNotes =
     activeTrack?.channels[activeChannelIdx]?.patterns[0]?.notes ?? [];
+  const outOfKeyCount = activeNotes.filter((n) => n.start < patternLen && !isPlayable(n.pitch)).length;
 
 
   // Also collect all channel notes for background display
@@ -732,6 +758,34 @@ export default function MusicPage() {
                 </select>
               </label>
 
+              {/* Key and scale */}
+              <div className="flex items-center gap-1" title="Lock the grid to a scale so every note you place fits. Chromatic turns the lock off. Drums are never locked.">
+                <span className="text-xs" style={{ color: "var(--text-muted)" }}>Scale</span>
+                <select
+                  value={scale.key}
+                  onChange={(e) => updateScale({ key: Number(e.target.value) })}
+                  disabled={!isScaleLocked(scale)}
+                  className="bg-transparent text-xs rounded px-1 py-0.5 outline-none disabled:opacity-40"
+                  style={{ color: "var(--text-primary)", border: "1px solid var(--border)" }}
+                  aria-label="Key"
+                >
+                  {KEY_NAMES.map((name, i) => (
+                    <option key={name} value={i}>{name}</option>
+                  ))}
+                </select>
+                <select
+                  value={scale.scale}
+                  onChange={(e) => updateScale({ scale: e.target.value as ScaleId })}
+                  className="bg-transparent text-xs rounded px-1 py-0.5 outline-none"
+                  style={{ color: "var(--text-primary)", border: "1px solid var(--border)" }}
+                  aria-label="Scale"
+                >
+                  {SCALE_IDS.map((id) => (
+                    <option key={id} value={id}>{SCALES[id].label}</option>
+                  ))}
+                </select>
+              </div>
+
               <div className="w-px h-5" style={{ background: "var(--border)" }} />
               <LinkedAssets projectId={projectId} type="music" id={activeTrack.id} layout="row" />
             </div>
@@ -834,6 +888,11 @@ export default function MusicPage() {
                 <span className="max-md:hidden">Click or drag in any direction to draw notes. Start on a note to erase instead.</span>
                 <span className="md:hidden">Tap or drag to draw notes, start on a note to erase. Drag the piano keys to scroll.</span>
               </span>
+              {outOfKeyCount > 0 && (
+                <span className="text-xs" style={{ color: "var(--red)" }}>
+                  {outOfKeyCount === 1 ? "1 note is" : `${outOfKeyCount} notes are`} outside the scale (dashed). Click or tap one to erase it.
+                </span>
+              )}
             </div>
 
             {/* Piano roll */}
@@ -851,6 +910,7 @@ export default function MusicPage() {
                         className="flex items-center justify-end pr-1 border-b text-[9px] select-none"
                         style={{
                           height: ROW_H,
+                          opacity: isPlayable(midi) ? 1 : 0.35,
                           background: isBlack ? "var(--bg-primary)" : "var(--bg-secondary)",
                           borderColor: "var(--border)",
                           color: isBlack ? "var(--text-muted)" : "var(--text-secondary)",
@@ -866,6 +926,13 @@ export default function MusicPage() {
                 <div className="relative" style={{ width: gridW, height: gridH }}>
                   {/* Grid lines */}
                   <svg className="absolute inset-0" width={gridW} height={gridH}>
+                    {/* Rows outside the scale */}
+                    {isLocked &&
+                      Array.from({ length: PITCH_COUNT }, (_, i) =>
+                        isPlayable(MAX_MIDI - i) ? null : (
+                          <rect key={`off${i}`} x={0} y={i * ROW_H} width={gridW} height={ROW_H} fill="var(--bg-secondary)" opacity={0.85} />
+                        )
+                      )}
                     {/* Row lines */}
                     {Array.from({ length: PITCH_COUNT + 1 }, (_, i) => (
                       <line
@@ -920,17 +987,21 @@ export default function MusicPage() {
                     if (row < 0 || row >= PITCH_COUNT) return null;
                     if (n.start >= patternLen) return null;
                     const color = CHANNEL_COLORS[activeChannelIdx] || "var(--accent)";
+                    const isOutOfKey = !isPlayable(n.pitch);
                     return (
                       <div
                         key={`note-${i}`}
                         className="absolute rounded-sm cursor-pointer"
+                        data-out-of-key={isOutOfKey || undefined}
                         style={{
+                          outline: isOutOfKey ? "2px dashed var(--red)" : undefined,
+                          outlineOffset: -2,
                           left: n.start * BEAT_W + 1,
                           top: row * ROW_H + 1,
                           width: n.duration * BEAT_W - 2,
                           height: ROW_H - 2,
                           background: color,
-                          opacity: 0.85,
+                          opacity: isOutOfKey ? 0.5 : 0.85,
                         }}
                       />
                     );

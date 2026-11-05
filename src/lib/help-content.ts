@@ -73,7 +73,7 @@ export const HELP: Record<HelpTopic, HelpContent> = {
     canDo: [
       { icon: Music, text: "Write notes for melody, harmony, bass and drums channels." },
       { icon: Piano, text: "Pick an instrument per channel: square, triangle, noise and more." },
-      { icon: Gauge, text: "Set tempo (BPM), loop length and note length." },
+      { icon: Gauge, text: "Set tempo (BPM), loop length, note length, and a key and scale so every note fits." },
       { icon: VolumeX, text: "Mute or solo channels while you listen." },
       { icon: Download, text: "Export the pattern as a WAV file." },
     ],
@@ -86,6 +86,7 @@ export const HELP: Record<HelpTopic, HelpContent> = {
     tips: [
       "Click a note again to remove it, or start a drag on a note to erase along the way.",
       "Ctrl/⌘ + scroll zooms time; add Shift to zoom pitch.",
+      "Scale greys out the rows outside the key. Chromatic turns the lock off; drums are never locked.",
       UNDO_TIP,
     ],
   },
@@ -146,7 +147,7 @@ export const HELP: Record<HelpTopic, HelpContent> = {
       { icon: Shuffle, text: "Randomise a sound, or Mutate it a little." },
       { icon: SlidersHorizontal, text: "Fine-tune wave type, pitch, length and more with sliders." },
       { icon: Scissors, text: "Finish it here: trim, fade, normalize, change pitch or reverse." },
-      { icon: Download, text: "Keep sounds in your project and export them as WAV." },
+      { icon: Download, text: "Export WAV at 22, 44.1 or 48 kHz, 8 or 16-bit, or zip 5 variations or all your sounds." },
     ],
     steps: [
       "Click a generator, for example Jump. Each click makes a new variant.",
@@ -156,6 +157,8 @@ export const HELP: Record<HelpTopic, HelpContent> = {
     ],
     tips: [
       "Drag the handles at the ends of the waveform to trim the sound.",
+      "Space plays the sound. Lock a group of settings to keep it while you press Random or Mutate.",
+      "Recent keeps your last 10 drafts: click one to hear it and get it back.",
       "Once kept, every change saves by itself.",
       "Ctrl/⌘+Z undoes, Ctrl/⌘+Shift+Z redoes.",
       MENU_TIP,

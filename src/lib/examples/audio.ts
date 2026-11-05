@@ -132,6 +132,8 @@ const musicExamples: ExampleModule = {
       id: ctx.id("title-theme"),
       name: "Title Theme",
       bpm: 90,
+      key: 0,
+      scale: "major",
       tags: ["menu"],
       channels: [
         channel(ctx, "title", "Melody", "square", 0.32, [
