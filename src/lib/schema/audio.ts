@@ -30,6 +30,8 @@ export const musicSchema = z.looseObject({
   ...projectRow,
   name: z.string(),
   bpm: z.number().positive(),
+  key: z.number().int().min(0).max(11).optional(),
+  scale: z.enum(["chromatic", "major", "minor", "majorPentatonic", "minorPentatonic", "blues"]).optional(),
   channels: z.array(
     z.looseObject({
       id,
