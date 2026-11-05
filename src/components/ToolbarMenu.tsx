@@ -18,10 +18,12 @@ interface ToolbarMenuProps {
   disabled?: boolean;
   /** Small print under the items. */
   footer?: string;
+  /** Settings above the items, e.g. a format choice that applies to them. */
+  header?: React.ReactNode;
 }
 
 /** A "Label ▾" toolbar button with a drop-down list of actions; the look shared by `ExportMenu` and `ImportMenu`. */
-export function ToolbarMenu({ icon: Icon, label, title, items, disabled, footer }: ToolbarMenuProps) {
+export function ToolbarMenu({ icon: Icon, label, title, items, disabled, footer, header }: ToolbarMenuProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -66,6 +68,7 @@ export function ToolbarMenu({ icon: Icon, label, title, items, disabled, footer 
           className="absolute right-0 top-full mt-1 z-50 min-w-56 rounded-lg p-1 shadow-xl overflow-y-auto"
           style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)" }}
         >
+          {header}
           {items.map((it) => (
             <button
               key={it.label}
