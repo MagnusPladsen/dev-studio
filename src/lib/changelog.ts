@@ -33,6 +33,10 @@ export const CHANGELOG: ChangelogEntry[] = [
         text: "Sound Effects sound the same in the waveform, on Play and in the WAV. The high-pass filter really filters, pitch slides curve, and Repeat Speed works like sfxr. Sounds you already saved keep their old sound.",
         tool: "sound",
       },
+      {
+        text: "Sound Effects Finish panel: trim with drag handles, fade in/out, normalize, gain, pitch & speed and reverse, all still editable later.",
+        tool: "sound",
+      },
     ],
   },
   {
