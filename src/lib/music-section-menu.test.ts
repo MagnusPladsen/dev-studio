@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ContextMenuEntry } from "@/components/ContextMenu";
-import type { MusicSection, MusicTrack } from "@/types";
-import { buildSectionMenu, type SectionMenuActions } from "./music-section-menu";
+import type { MusicChannel, MusicPattern, MusicSection, MusicTrack } from "@/types";
+import { buildCellMenu, buildSectionMenu, type CellMenuActions, type SectionMenuActions } from "./music-section-menu";
 
 function section(id: string, repeat?: number): MusicSection {
   return { id, name: id.toUpperCase(), length: 8, repeat, patterns: [] };
@@ -99,5 +99,63 @@ describe("buildSectionMenu", () => {
     expect(actions.rename).toHaveBeenCalled();
     expect(actions.duplicate).toHaveBeenCalled();
     expect(actions.loopFromHere).toHaveBeenCalled();
+  });
+});
+
+describe("buildCellMenu", () => {
+  const pattern = (id: string): MusicPattern => ({ id, notes: [] });
+  const channel = (id: string, patterns: MusicPattern[]): MusicChannel => ({ id, name: id, instrument: "square", volume: 1, patterns });
+  const entry = (channelId: string, patternId: string) => ({ channelId, patternId });
+  const linkedSong: MusicTrack = {
+    ...track([
+      { id: "a", name: "A", length: 8, patterns: [entry("lead", "p1"), entry("bass", "b1")] },
+      { id: "b", name: "B", length: 8, patterns: [entry("lead", "p2")] },
+      { id: "chorus", name: "Chorus", length: 8, patterns: [entry("lead", "p1")] },
+    ]),
+    channels: [channel("lead", [pattern("p2"), pattern("p1"), pattern("spare")]), channel("bass", [pattern("b1")])],
+  };
+  const makeCellActions = (): CellMenuActions => ({ usePattern: vi.fn(), newPattern: vi.fn(), makeSilent: vi.fn(), unlink: vi.fn() });
+
+  it("lists the entries in order for a linked cell", () => {
+    expect(labels(buildCellMenu(linkedSong, "a", "lead", makeCellActions()))).toEqual([
+      "Use pattern", "New empty pattern", "Make silent", "—", "Unlink",
+    ]);
+  });
+
+  it("leaves out Unlink when the pattern plays only here", () => {
+    expect(labels(buildCellMenu(linkedSong, "b", "lead", makeCellActions()))).toEqual(["Use pattern", "New empty pattern", "Make silent"]);
+  });
+
+  it("lists this channel's patterns by label with where each plays, the current one disabled", () => {
+    const use = find(buildCellMenu(linkedSong, "a", "lead", makeCellActions()), "use-pattern");
+    const patterns = (use?.submenu ?? []).filter((candidate): candidate is Item => candidate.kind === "item");
+    expect(patterns.map((candidate) => [candidate.label, candidate.detail, Boolean(candidate.disabled)])).toEqual([
+      ["✓ Pattern 1", "Plays in A, Chorus", true],
+      ["Pattern 2", "Plays in B", false],
+      ["Pattern 3", "Not used yet", false],
+    ]);
+  });
+
+  it("calls usePattern with the picked pattern's id", () => {
+    const actions = makeCellActions();
+    const use = find(buildCellMenu(linkedSong, "b", "lead", actions), "use-pattern");
+    find(use?.submenu ?? [], "use-pattern-p1")?.onSelect?.();
+    expect(actions.usePattern).toHaveBeenCalledWith("p1");
+  });
+
+  it("disables Make silent when the channel is already silent here", () => {
+    expect(find(buildCellMenu(linkedSong, "b", "bass", makeCellActions()), "make-silent")?.disabled).toBe(true);
+    expect(find(buildCellMenu(linkedSong, "a", "bass", makeCellActions()), "make-silent")?.disabled).toBeFalsy();
+  });
+
+  it("wires New empty pattern, Make silent and Unlink", () => {
+    const actions = makeCellActions();
+    const entries = buildCellMenu(linkedSong, "a", "lead", actions);
+    find(entries, "new-pattern")?.onSelect?.();
+    find(entries, "make-silent")?.onSelect?.();
+    find(entries, "unlink")?.onSelect?.();
+    expect(actions.newPattern).toHaveBeenCalled();
+    expect(actions.makeSilent).toHaveBeenCalled();
+    expect(actions.unlink).toHaveBeenCalled();
   });
 });

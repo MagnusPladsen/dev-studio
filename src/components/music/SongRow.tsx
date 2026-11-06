@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, Plus, Repeat } from "lucide-react";
+import { Link, Plus, Repeat, Rows3 } from "lucide-react";
 import { ContextMenu, type ContextMenuEntry } from "@/components/ContextMenu";
+import { ChannelLanes, LaneLabel } from "@/components/music/ChannelLanes";
 import { createLongPress, type LongPress } from "@/lib/long-press";
 import type { Point } from "@/lib/menu-position";
 import { buildSectionMenu, type SectionMenuActions } from "@/lib/music-section-menu";
@@ -15,6 +16,8 @@ export interface SongRowProps {
   /** The block that is sounding and the beat inside it (repeats count on), or null when stopped. */
   playing: { sectionId: string; beat: number } | null;
   showChannels: boolean;
+  /** The channel open in the piano roll; its cell in the open section is highlighted in the lanes. */
+  activeChannelIndex: number;
   onSelect(sectionId: string): void;
   /** A section edit; `selectId` is the section to open afterwards. */
   onChange(track: MusicTrack, selectId?: string): void;
@@ -218,34 +221,64 @@ function SectionBlocks(props: SongRowProps): React.JSX.Element {
   });
 
   return (
-    <div
-      className="flex items-center gap-1 px-4 max-md:px-2 py-1.5 border-b shrink-0 overflow-x-auto"
-      style={{ background: "var(--bg-secondary)", borderColor: "var(--border)" }}
-      aria-label="Song sections"
-      data-song-row
-    >
-      {sections.map((section, index) => (
-        <SectionBlock
-          key={section.id}
-          section={section}
-          isSelected={section.id === selectedId}
-          isLoopStart={section.id === loopStartId}
-          isLinked={isLinked(track, section)}
-          playingBeat={playing?.sectionId === section.id ? playing.beat : null}
-          dropEdge={drag.dropIndex === index ? "left" : drag.dropIndex === sections.length && index === sections.length - 1 ? "right" : null}
-          isRenaming={renamingId === section.id}
-          onRename={(name) => {
-            setRenamingId(null);
-            const trimmed = name.trim();
-            if (trimmed && trimmed !== section.name) props.onChange(updateSection(track, section.id, { name: trimmed }));
-          }}
-          onCancelRename={() => setRenamingId(null)}
-          handlers={blockHandlers(section)}
-        />
-      ))}
-      <AddSectionButton track={track} selectedId={selectedId} onChange={props.onChange} />
+    <div className="flex items-start border-b shrink-0" style={{ background: "var(--bg-secondary)", borderColor: "var(--border)" }} data-song-row>
+      <div className="flex-1 min-w-0 overflow-x-auto py-1.5">
+        <div className="flex items-center gap-1 w-max px-4 max-md:px-2" aria-label="Song sections">
+          {props.showChannels && <LaneLabel text="Sections" />}
+          {sections.map((section, index) => (
+            <SectionBlock
+              key={section.id}
+              section={section}
+              isSelected={section.id === selectedId}
+              isLoopStart={section.id === loopStartId}
+              isLinked={isLinked(track, section)}
+              playingBeat={playing?.sectionId === section.id ? playing.beat : null}
+              dropEdge={drag.dropIndex === index ? "left" : drag.dropIndex === sections.length && index === sections.length - 1 ? "right" : null}
+              isRenaming={renamingId === section.id}
+              onRename={(name) => {
+                setRenamingId(null);
+                const trimmed = name.trim();
+                if (trimmed && trimmed !== section.name) props.onChange(updateSection(track, section.id, { name: trimmed }));
+              }}
+              onCancelRename={() => setRenamingId(null)}
+              handlers={blockHandlers(section)}
+            />
+          ))}
+          <AddSectionButton track={track} selectedId={selectedId} onChange={props.onChange} />
+        </div>
+        {props.showChannels && (
+          <ChannelLanes
+            track={track}
+            selectedId={selectedId}
+            activeChannelIndex={props.activeChannelIndex}
+            beatWidth={BLOCK_BEAT_PX}
+            onChange={props.onChange}
+            onSelectCell={props.onSelectCell}
+          />
+        )}
+      </div>
+      <ShowChannelsButton isOn={props.showChannels} onToggle={props.onToggleChannels} />
       {menu && <ContextMenu anchor={menu.anchor} entries={menu.entries} label={menu.label} onClose={close} />}
     </div>
+  );
+}
+
+function ShowChannelsButton({ isOn, onToggle }: { isOn: boolean; onToggle(): void }): React.JSX.Element {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className="flex items-center gap-1 px-2 py-0.5 my-2.5 mr-4 max-md:mr-2 rounded text-xs shrink-0"
+      style={{
+        color: "var(--text-primary)",
+        border: `1px solid ${isOn ? "var(--accent)" : "var(--border)"}`,
+        background: isOn ? "var(--bg-hover)" : undefined,
+      }}
+      aria-pressed={isOn}
+      title={isOn ? "Hide the channel lanes" : "See and change which pattern each channel plays in each section"}
+    >
+      <Rows3 className="w-3 h-3" /> Show channels
+    </button>
   );
 }
 

@@ -42,8 +42,10 @@ import { getAudioContext } from "@/lib/audio/context";
 import { scheduleNote } from "@/lib/audio/music-synth";
 import { applyPreset } from "@/lib/audio/music-instruments";
 import { InstrumentPanel, PresetSelect } from "@/components/music/InstrumentPanel";
+import { LinkedPatternNotice } from "@/components/music/LinkedPatternNotice";
 import { SongRow } from "@/components/music/SongRow";
 import { useSelectedSection } from "@/hooks/useSelectedSection";
+import { useShowChannels } from "@/hooks/useShowChannels";
 import { RENDER_SAMPLE_RATE, renderSong } from "@/lib/audio/music-render";
 import { encodeWav } from "@/lib/audio/wav";
 import { getSections, SECTION_LENGTHS, sectionNotes, setSectionNotes, songSteps, updateSection, type SongStep } from "@/lib/music-sections";
@@ -151,6 +153,7 @@ export default function MusicPage() {
   const [activeTrack, setActiveTrack] = useState<MusicTrack | null>(null);
   const [activeChannelIdx, setActiveChannelIdx] = useState(0);
   const selection = useSelectedSection(activeTrack);
+  const { showChannels, toggleChannels } = useShowChannels();
   const selectedSectionId = selection.section?.id ?? "";
   const patternLen = selection.section?.length ?? 8;
   const [playMode, setPlayMode] = useState<"song" | "section">("song");
@@ -817,6 +820,7 @@ export default function MusicPage() {
                   selectedId={selectedSectionId}
                   playing={null}
                   showChannels={false}
+                  activeChannelIndex={activeChannelIdx}
                   onSelect={selection.select}
                   onChange={applySectionEdit}
                   onToggleChannels={() => {}}
@@ -861,11 +865,15 @@ export default function MusicPage() {
                 track={activeTrack}
                 selectedId={selectedSectionId}
                 playing={playingBlock}
-                showChannels={false}
+                showChannels={showChannels}
+                activeChannelIndex={activeChannelIdx}
                 onSelect={selection.select}
                 onChange={applySectionEdit}
-                onToggleChannels={() => {}}
-                onSelectCell={() => {}}
+                onToggleChannels={toggleChannels}
+                onSelectCell={(sectionId, channelIndex) => {
+                  selection.select(sectionId);
+                  setActiveChannelIdx(channelIndex);
+                }}
               />
             )}
 
@@ -991,6 +999,10 @@ export default function MusicPage() {
                 </span>
               )}
             </div>
+
+            {activeChannel && selection.section && (
+              <LinkedPatternNotice track={activeTrack} section={selection.section} channelId={activeChannel.id} onChange={applySectionEdit} />
+            )}
 
             {/* Piano roll */}
             <div ref={rollRef} className="flex-1 overflow-auto relative">

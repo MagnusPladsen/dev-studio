@@ -1,8 +1,8 @@
 import type { ContextMenuEntry } from "@/components/ContextMenu";
-import { getSections } from "@/lib/music-sections";
+import { findPattern, getSections, patternLabel, patternUses } from "@/lib/music-sections";
 import type { MusicTrack } from "@/types";
 
-// The right-click (and long-press) menu of a block in the Music song row.
+// The right-click (and long-press) menus of a block and of a channel cell in the Music song row.
 
 export interface SectionMenuActions {
   rename(): void;
@@ -44,4 +44,42 @@ export function buildSectionMenu(track: MusicTrack, sectionId: string, actions: 
   ];
   if (sections.length <= 1) return entries;
   return [...entries, separator("separator-delete"), item("delete", "Delete", actions.remove, { danger: true })];
+}
+
+export interface CellMenuActions {
+  usePattern(patternId: string): void;
+  newPattern(): void;
+  makeSilent(): void;
+  unlink(): void;
+}
+
+function whereItPlays(track: MusicTrack, patternId: string): string {
+  const uses = patternUses(track, patternId);
+  return uses.length ? `Plays in ${uses.map((section) => section.name).join(", ")}` : "Not used yet";
+}
+
+function patternEntries(track: MusicTrack, channelId: string, currentId: string | undefined, usePattern: (id: string) => void): ContextMenuEntry[] {
+  const patterns = track.channels.find((channel) => channel.id === channelId)?.patterns ?? [];
+  const labelled = patterns.map((pattern) => ({ pattern, label: patternLabel(track, channelId, pattern.id) }));
+  labelled.sort((left, right) => Number(left.label) - Number(right.label));
+  return labelled.map(({ pattern, label }) => {
+    const isCurrent = pattern.id === currentId;
+    return item(`use-pattern-${pattern.id}`, `${isCurrent ? "✓ " : ""}Pattern ${label}`, () => usePattern(pattern.id), {
+      disabled: isCurrent,
+      detail: whereItPlays(track, pattern.id),
+    });
+  });
+}
+
+export function buildCellMenu(track: MusicTrack, sectionId: string, channelId: string, actions: CellMenuActions): ContextMenuEntry[] {
+  const section = getSections(track).find((candidate) => candidate.id === sectionId);
+  const current = section && findPattern(track, section, channelId);
+  const submenu = patternEntries(track, channelId, current?.id, actions.usePattern);
+  const entries: ContextMenuEntry[] = [
+    { kind: "item", key: "use-pattern", label: "Use pattern", submenu, disabled: submenu.length === 0, hint: "This channel has no patterns yet" },
+    item("new-pattern", "New empty pattern", actions.newPattern),
+    item("make-silent", "Make silent", actions.makeSilent, { disabled: !current, hint: "Already silent here" }),
+  ];
+  if (!current || patternUses(track, current.id).length <= 1) return entries;
+  return [...entries, separator("separator-unlink"), item("unlink", "Unlink", actions.unlink, { detail: "Give this section its own copy" })];
 }
