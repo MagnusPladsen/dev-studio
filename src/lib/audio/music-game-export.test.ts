@@ -223,6 +223,19 @@ describe("buildGameExport", () => {
     expect(samples[Math.round(9.5 * rate)]).toBe(0);
   });
 
+  it("keeps the intro ringing on past the loop start in the looping file", async () => {
+    const song = ringingSong();
+    const ringingIntro = { pitch: 60, start: 7, duration: 2, velocity: 1 };
+    song.channels = [{ ...song.channels[0], patterns: [...song.channels[0].patterns, { id: "intro-p", notes: [ringingIntro] }] }];
+    song.sections = [{ id: "intro", name: "I", length: 8, patterns: [{ channelId: "a", patternId: "intro-p" }] }, ...(song.sections ?? [])];
+    song.loopStartId = "loop";
+    const { deps, decode } = fakeOgg();
+    const samples = decode((await buildGameExport(song, { ...DEFAULT_GAME_EXPORT, normalise: false }, deps)).bytes);
+    expect(samples.length).toBe(16 * rate);
+    // just after the loop start: the intro's ring-out plus the loop's own wrapped tail
+    expect(samples[Math.round(8.5 * rate)]).toBeCloseTo(2 * BOX_LEVEL);
+  });
+
   it("zips an intro file and a loop file for intro-and-loop", async () => {
     const { deps, decode } = fakeOgg();
     const file = await buildGameExport(sectioned(70), { ...DEFAULT_GAME_EXPORT, mode: "intro-and-loop" }, deps);
@@ -233,15 +246,14 @@ describe("buildGameExport", () => {
     expect(decode(entries["Theme - loop.ogg"]).length).toBe(loopSamples);
   });
 
-  it("plays N loops, fades over F seconds and ends in silence after the tail", async () => {
+  it("plays N loops, fades over F seconds and ends when the fade reaches silence", async () => {
     const song = ringingSong();
     const { deps, decode } = fakeOgg();
     const options: GameExportOptions = { ...DEFAULT_GAME_EXPORT, mode: "fade-out", loops: 3, fadeSeconds: 10, normalise: false };
     const samples = decode((await buildGameExport(song, options, deps)).bytes);
-    const tail = Math.round(tailSeconds(song) * rate);
-    expect(samples.length).toBe(3 * 8 * rate + 10 * rate + tail);
+    expect(samples.length).toBe(3 * 8 * rate + 10 * rate);
     expect(samples[Math.round(16.5 * rate)]).toBeCloseTo(BOX_LEVEL);
-    expect(Array.from(samples.slice(-tail)).every((sample) => sample === 0)).toBe(true);
+    expect(samples[samples.length - 1]).toBeCloseTo(0, 6);
     // the loop keeps playing under the fade
     expect(samples[Math.round(24.5 * rate)]).toBeGreaterThan(0);
   });
@@ -273,7 +285,7 @@ describe("buildGameExport", () => {
   it("names stems of intro-and-loop by channel", async () => {
     const { deps } = fakeOgg();
     const zip = await buildGameExport(sectioned(70), { ...DEFAULT_GAME_EXPORT, mode: "intro-and-loop", stems: true }, deps);
-    expect(Object.keys(unzipSync(zip.bytes))).toEqual(["Lead - intro.ogg", "Lead - loop.ogg", "Drums - intro.ogg", "Drums - loop.ogg"]);
+    expect(Object.keys(unzipSync(zip.bytes))).toEqual(["Theme - Lead - intro.ogg", "Theme - Lead - loop.ogg", "Theme - Drums - intro.ogg", "Theme - Drums - loop.ogg"]);
   });
 
   it("includes every channel: mute and solo are not part of a game export", async () => {

@@ -125,13 +125,6 @@ function fitLength(samples: Float32Array, length: number): Float32Array {
   return out;
 }
 
-function concatenate(first: Float32Array, second: Float32Array): Float32Array {
-  const out = new Float32Array(first.length + second.length);
-  out.set(first);
-  out.set(second, first.length);
-  return out;
-}
-
 type Renderer = (steps: SongStep[]) => Promise<Float32Array>;
 
 interface RenderedPart {
@@ -160,9 +153,13 @@ async function renderWrappedLoop(track: MusicTrack, render: Renderer): Promise<F
   return wrapTail(rendered, 0, loopLength);
 }
 
+/** Intro and one loop pass rendered in one go, so the intro rings on into the loop; the tail wraps onto the loop start. */
 async function renderLoopingFile(track: MusicTrack, render: Renderer): Promise<RenderedPart[]> {
-  const samples = concatenate(await renderIntro(track, render), await renderWrappedLoop(track, render));
-  return [{ part: null, samples, loop: { start: toSamples(introSeconds(track)), end: samples.length - 1 } }];
+  const { intro, loop } = songParts(track);
+  const loopStart = toSamples(introSeconds(track));
+  const loopEnd = loopStart + toSamples(stepsSeconds(track, loop));
+  const rendered = fitLength(await render(withTail(track, [...intro, ...loop])), loopEnd + toSamples(tailSeconds(track)));
+  return [{ part: null, samples: wrapTail(rendered, loopStart, loopEnd), loop: { start: loopStart, end: loopEnd - 1 } }];
 }
 
 async function renderIntroAndLoop(track: MusicTrack, render: Renderer): Promise<RenderedPart[]> {
@@ -176,10 +173,10 @@ async function renderFadeOut(track: MusicTrack, options: GameExportOptions, rend
   const { intro, loop } = songParts(track);
   const loopSeconds = stepsSeconds(track, loop);
   const passes = options.loops + Math.ceil(options.fadeSeconds / loopSeconds);
-  const steps = withTail(track, [...intro, ...Array.from({ length: passes }, () => loop).flat()]);
+  const steps = [...intro, ...Array.from({ length: passes }, () => loop).flat()];
   const fadeStart = toSamples(introSeconds(track)) + options.loops * toSamples(loopSeconds);
   const fadeLength = toSamples(options.fadeSeconds);
-  const rendered = fitLength(await render(steps), fadeStart + fadeLength + toSamples(tailSeconds(track)));
+  const rendered = fitLength(await render(steps), fadeStart + fadeLength);
   return [{ part: null, samples: fadeOut(rendered, fadeStart, fadeLength) }];
 }
 
@@ -209,7 +206,7 @@ async function renderNamedParts(track: MusicTrack, options: GameExportOptions, d
   for (const [index, channel] of track.channels.entries()) {
     const stem = safeFileName(channel.name, "channel");
     for (const part of await renderParts(track, options, rendererFor(track, index, deps))) {
-      named.push({ ...part, name: part.part ? `${stem} - ${part.part}` : `${song} - ${stem}` });
+      named.push({ ...part, name: part.part ? `${song} - ${stem} - ${part.part}` : `${song} - ${stem}` });
     }
   }
   return named;
