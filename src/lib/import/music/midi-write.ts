@@ -1,4 +1,4 @@
-import type { MusicChannel, MusicTrack } from "@/types";
+import type { MusicChannel, MusicSection, MusicTrack } from "@/types";
 import { getSections, sectionNotes, songSteps } from "@/lib/music-sections";
 
 const TICKS_PER_BEAT = 480;
@@ -88,7 +88,7 @@ function songNoteEvents(track: MusicTrack, channel: MusicChannel, midiChannel: n
   return events;
 }
 
-function sectionNoteEvents(track: MusicTrack, channel: MusicChannel, midiChannel: number, section: ReturnType<typeof getSections>[number], startBeat: number): TimedEvent[] {
+function sectionNoteEvents(track: MusicTrack, channel: MusicChannel, midiChannel: number, section: MusicSection, startBeat: number): TimedEvent[] {
   return sectionNotes(track, section, channel.id).flatMap((note) => {
     const key = isDrumChannel(channel) ? drumKey(note.pitch) : note.pitch;
     const startTick = Math.round((startBeat + note.start) * TICKS_PER_BEAT);
