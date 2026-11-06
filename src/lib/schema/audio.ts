@@ -61,6 +61,9 @@ export const musicSchema = z.looseObject({
   tags,
 });
 
+const dialogueValue = z.union([z.boolean(), z.number(), z.string()]);
+const translations = z.record(z.string(), z.string());
+
 const dialogueNodeSchema = z.looseObject({
   id,
   type: z.enum(["dialogue", "choice", "condition", "action", "start", "end"]),
@@ -68,9 +71,13 @@ const dialogueNodeSchema = z.looseObject({
   y: z.number(),
   speaker: z.string().optional(),
   text: z.string().optional(),
-  choices: z.array(z.looseObject({ text: z.string(), targetId: z.string() })).optional(),
+  translations: translations.optional(),
+  choices: z.array(z.looseObject({ id: z.string().optional(), text: z.string(), targetId: z.string(), translations: translations.optional() })).optional(),
   nextId: z.string().optional(),
+  elseId: z.string().optional(),
   condition: z.string().optional(),
+  check: z.looseObject({ variable: z.string(), op: z.enum(["==", "!=", "<", "<=", ">", ">="]), value: dialogueValue }).optional(),
+  set: z.looseObject({ variable: z.string(), op: z.enum(["set", "add", "toggle"]), value: dialogueValue.optional() }).optional(),
 });
 
 export const dialogueSchema = z
@@ -78,6 +85,8 @@ export const dialogueSchema = z
     ...projectRow,
     name: z.string(),
     nodes: z.array(dialogueNodeSchema),
+    variables: z.array(z.looseObject({ name: z.string(), type: z.enum(["bool", "number", "string"]), defaultValue: dialogueValue })).optional(),
+    languages: z.array(z.string()).optional(),
     tags,
   })
   .refine((tree) => new Set(tree.nodes.map((n) => n.id)).size === tree.nodes.length, { message: "Dialogue node ids must be unique", path: ["nodes"] });

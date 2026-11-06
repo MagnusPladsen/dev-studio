@@ -31,10 +31,20 @@ import {
   ZoomOut,
   RotateCcw,
   ChevronDown,
+  Variable,
 } from "lucide-react";
 import { v4 as uuid } from "uuid";
 import { storage } from "@/lib/storage";
-import type { DialogueTree, DialogueNode } from "@/types";
+import type { DialogueTree, DialogueNode, DialogueVariable } from "@/types";
+import { describeCheck, describeSet } from "@/lib/dialogue/logic";
+import { applyTranslations, toLocalisationCsv, withChoiceIds, type TranslationSheet } from "@/lib/dialogue/localisation";
+import { toYarn } from "@/lib/dialogue/yarn-export";
+import { translationsCsvImporter } from "@/lib/import/dialogue/translations-csv";
+import type { Importer } from "@/lib/import";
+import { DialoguePreview } from "@/components/dialogue/DialoguePreview";
+import { VariablesPanel } from "@/components/dialogue/VariablesPanel";
+import { ActionFields, ConditionFields } from "@/components/dialogue/LogicFields";
+import { FIELD_STYLE } from "@/components/dialogue/ValueInput";
 import { useOpenParam, useTrackOpenAsset } from "@/hooks/useStorage";
 import { LinkedAssets } from "@/components/LinkedAssets";
 
@@ -63,10 +73,14 @@ function tint(color: string, pct: number) {
   return `color-mix(in srgb, ${color} ${pct}%, transparent)`;
 }
 
-const NODE_TYPES: NodeType[] = ["start", "dialogue", "choice", "condition", "action", "end"];
+/** What "Add node" offers: the node types, plus Set (an action that changes a variable). */
+type AddKind = NodeType | "set";
+const ADD_KINDS: AddKind[] = ["start", "dialogue", "choice", "condition", "set", "action", "end"];
+const ADD_LABELS: Record<AddKind, string> = { ...NODE_LABELS, set: "Set" };
+const ADD_COLORS: Record<AddKind, string> = { ...NODE_COLORS, set: NODE_COLORS.action };
 
 /** "Add node" as one dropdown, for desktop widths where the row of node buttons doesn't fit beside the title. */
-function AddNodeMenu({ onPick }: { onPick(type: NodeType): void }) {
+function AddNodeMenu({ onPick }: { onPick(kind: AddKind): void }) {
   const [isOpen, setIsOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -97,19 +111,19 @@ function AddNodeMenu({ onPick }: { onPick(type: NodeType): void }) {
       </button>
       {isOpen && (
         <div role="menu" className="absolute top-full left-0 mt-1 py-1 w-40 rounded-lg border z-30" style={{ background: "var(--bg-card)", borderColor: "var(--border)" }}>
-          {NODE_TYPES.map((type) => (
+          {ADD_KINDS.map((kind) => (
             <button
-              key={type}
+              key={kind}
               role="menuitem"
               onClick={() => {
                 setIsOpen(false);
-                onPick(type);
+                onPick(kind);
               }}
               className="flex items-center gap-2 w-full px-3 py-1.5 text-sm text-left hover:bg-[var(--bg-hover)]"
               style={{ color: "var(--text-primary)" }}
             >
-              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: NODE_COLORS[type] }} />
-              {NODE_LABELS[type]}
+              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: ADD_COLORS[kind] }} />
+              {ADD_LABELS[kind]}
             </button>
           ))}
         </div>
@@ -131,33 +145,9 @@ function downloadText(name: string, text: string, type: string) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-/** Converts a tree to Yarn Spinner script: one Yarn node per tree node, choices as -> options. */
-function toYarn(tree: DialogueTree): string {
-  const titles = new Map<string, string>();
-  tree.nodes.forEach((n, i) => {
-    titles.set(n.id, n.type === "start" ? "Start" : `${NODE_LABELS[n.type]}_${i}`.replace(/[^A-Za-z0-9_]/g, "_"));
-  });
-  const jump = (id?: string) => (id && titles.has(id) ? `<<jump ${titles.get(id)}>>` : "<<stop>>");
-  const cond = (c: string) => (/^[A-Za-z_][A-Za-z0-9_]*$/.test(c) ? `$${c}` : c);
-  const blocks = tree.nodes.map((n) => {
-    const body: string[] = [];
-    if (n.type === "start") body.push(jump(n.nextId));
-    else if (n.type === "end") body.push("<<stop>>");
-    else if (n.type === "dialogue") body.push(`${n.speaker ? `${n.speaker}: ` : ""}${n.text ?? ""}`, jump(n.nextId));
-    else if (n.type === "choice") {
-      if (n.text) body.push(n.text);
-      for (const c of n.choices ?? []) body.push(`-> ${c.text}`, `    ${jump(c.targetId)}`);
-    } else if (n.type === "condition") {
-      body.push(`<<if ${cond(n.condition || n.text || "true")}>>`, `    ${jump(n.nextId)}`, "<<endif>>", "<<stop>>");
-    } else if (n.type === "action") body.push(`<<${n.text || "action"}>>`, jump(n.nextId));
-    return `title: ${titles.get(n.id)}\n---\n${body.join("\n")}\n===`;
-  });
-  return `// ${tree.name}, exported from GameDev Studio\n${blocks.join("\n\n")}\n`;
-}
-
 function getNodeWidth(node: DialogueNode): number {
   if (node.type === "start" || node.type === "end") return 60;
-  if (node.type === "condition") return 140;
+  if (node.type === "condition") return 160;
   return 200;
 }
 
@@ -168,12 +158,17 @@ function getNodeHeight(node: DialogueNode): number {
   return 90;
 }
 
+/** A condition's two exits: true at a third of its height, else at two thirds. */
+const conditionExitTop = (node: DialogueNode, isElse?: boolean) => (getNodeHeight(node) * (isElse ? 2 : 1)) / 3;
+
 function getOutputPoint(
   node: DialogueNode,
-  choiceIdx?: number
+  choiceIdx?: number,
+  isElse?: boolean
 ): { x: number; y: number } {
   const w = getNodeWidth(node);
   const h = getNodeHeight(node);
+  if (node.type === "condition") return { x: node.x + w, y: node.y + conditionExitTop(node, isElse) };
   if (node.type === "start" || node.type === "end") {
     return { x: node.x + w, y: node.y + h / 2 };
   }
@@ -215,6 +210,7 @@ export default function DialoguePage() {
   const [connecting, setConnecting] = useState<{
     fromId: string;
     choiceIdx?: number;
+    isElse?: boolean;
     mx: number;
     my: number;
   } | null>(null);
@@ -222,10 +218,8 @@ export default function DialoguePage() {
   const [zoom, setZoom] = useState(1);
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
-  const [preview, setPreview] = useState<{
-    currentId: string;
-    history: string[];
-  } | null>(null);
+  const [isPreviewing, setIsPreviewing] = useState(false);
+  const [isVariablesOpen, setIsVariablesOpen] = useState(false);
   const [editingNode, setEditingNode] = useState<string | null>(null);
 
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -251,7 +245,7 @@ export default function DialoguePage() {
       setActiveTree(tree);
       setSelectedNode(null);
       setEditingNode(null);
-      setPreview(null);
+      setIsPreviewing(false);
     }
   }, loaded);
   useTrackOpenAsset(activeTree?.id ? { type: "dialogue", id: activeTree?.id } : null);
@@ -270,8 +264,8 @@ export default function DialoguePage() {
 
   // Undo history tracks content only; a node drag counts once, when released.
   const content = useMemo(
-    () => (activeTree ? { name: activeTree.name, nodes: activeTree.nodes } : null),
-    [activeTree?.name, activeTree?.nodes] // eslint-disable-line react-hooks/exhaustive-deps
+    () => (activeTree ? { name: activeTree.name, nodes: activeTree.nodes, variables: activeTree.variables, languages: activeTree.languages } : null),
+    [activeTree?.name, activeTree?.nodes, activeTree?.variables, activeTree?.languages] // eslint-disable-line react-hooks/exhaustive-deps
   );
   const [stableContent, setStableContent] = useState(content);
   if (!draggingNode && stableContent !== content) setStableContent(content);
@@ -286,17 +280,26 @@ export default function DialoguePage() {
     activeTree?.id
   );
 
-  const imports = useImport<DialogueTree>({
-    importers: DIALOGUE_IMPORTERS,
-    noun: ["dialogue", "dialogues"],
+  // With a dialogue open, a filled-in Localisation CSV adds its translations to it.
+  const importers: Importer<DialogueTree | TranslationSheet>[] = activeTree ? [...DIALOGUE_IMPORTERS, translationsCsvImporter] : DIALOGUE_IMPORTERS;
+  const imports = useImport<DialogueTree | TranslationSheet>({
+    importers,
+    noun: activeTree ? ["file", "files"] : ["dialogue", "dialogues"],
     history,
     openId: activeTree?.id ?? null,
-    apply: ({ items }) =>
-      importAsNewAssets("dialogues", projectId, items, {
+    review: async (result, importer) =>
+      importer === translationsCsvImporter && activeTree ? { ...result, warnings: applyTranslations(activeTree, result.items[0] as TranslationSheet).warnings } : result,
+    apply: ({ items }, importer) => {
+      if (importer === translationsCsvImporter) {
+        if (activeTree) saveTree(applyTranslations(activeTree, items[0] as TranslationSheet).tree);
+        return;
+      }
+      return importAsNewAssets("dialogues", projectId, items as DialogueTree[], {
         previousId: activeTree?.id ?? null,
         open: (tree) => showTree(tree),
         back: (previous) => showTree(previous ?? null),
-      }),
+      });
+    },
   });
 
   function showTree(tree: DialogueTree | null) {
@@ -304,7 +307,7 @@ export default function DialoguePage() {
     setActiveTree(tree);
     setSelectedNode(null);
     setEditingNode(null);
-    setPreview(null);
+    setIsPreviewing(false);
   }
 
   function createTree() {
@@ -328,8 +331,10 @@ export default function DialoguePage() {
     if (activeTree?.id === id) setActiveTree(null);
   }
 
-  function addNode(type: NodeType) {
+  function addNode(kind: AddKind) {
     if (!activeTree) return;
+    const type: NodeType = kind === "set" ? "action" : kind;
+    const variable = activeTree.variables?.[0];
     const node: DialogueNode = {
       id: uuid(),
       type,
@@ -349,11 +354,20 @@ export default function DialoguePage() {
       choices:
         type === "choice"
           ? [
-              { text: "Option 1", targetId: "" },
-              { text: "Option 2", targetId: "" },
+              { id: uuid(), text: "Option 1", targetId: "" },
+              { id: uuid(), text: "Option 2", targetId: "" },
             ]
           : undefined,
     };
+    if (kind === "condition" && variable) {
+      node.check = { variable: variable.name, op: "==", value: variable.type === "bool" ? true : variable.defaultValue };
+      node.condition = node.text = describeCheck(node.check);
+    }
+    if (kind === "set") {
+      node.set = variable ? { variable: variable.name, op: variable.type === "bool" ? "toggle" : "set", value: variable.type === "bool" ? undefined : variable.defaultValue } : undefined;
+      node.text = node.set ? describeSet(node.set) : "do_action";
+      if (!variable) setIsVariablesOpen(true);
+    }
     saveTree({ ...activeTree, nodes: [...activeTree.nodes, node] });
   }
 
@@ -364,6 +378,7 @@ export default function DialoguePage() {
       .map((n) => {
         const updated = { ...n };
         if (updated.nextId === id) updated.nextId = undefined;
+        if (updated.elseId === id) updated.elseId = undefined;
         if (updated.choices) {
           updated.choices = updated.choices.map((c) =>
             c.targetId === id ? { ...c, targetId: "" } : c
@@ -374,6 +389,11 @@ export default function DialoguePage() {
     saveTree({ ...activeTree, nodes });
     if (selectedNode === id) setSelectedNode(null);
     if (editingNode === id) setEditingNode(null);
+  }
+
+  function openEditor(id: string) {
+    setEditingNode(id);
+    setIsVariablesOpen(false);
   }
 
   function updateNode(id: string, patch: Partial<DialogueNode>, persist = true) {
@@ -448,7 +468,7 @@ export default function DialoguePage() {
             };
             updateNode(fromNode.id, { choices });
           } else {
-            updateNode(fromNode.id, { nextId: target.id });
+            updateNode(fromNode.id, connecting.isElse ? { elseId: target.id } : { nextId: target.id });
           }
         }
       }
@@ -473,6 +493,11 @@ export default function DialoguePage() {
   function exportYarn() {
     if (!activeTree) return;
     downloadText(`${activeTree.name.replace(/[^\w\- ]+/g, "")}.yarn`, toYarn(activeTree), "text/plain");
+  }
+
+  function exportLocalisation() {
+    if (!activeTree) return;
+    downloadText(`${activeTree.name.replace(/[^\w\- ]+/g, "")}.localisation.csv`, toLocalisationCsv(activeTree), "text/csv");
   }
 
   // Delete/Backspace removes the selected node; Ctrl/⌘+S saves (edits already save, so this is a no-op safety).
@@ -500,27 +525,6 @@ export default function DialoguePage() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  function startPreview() {
-    if (!activeTree) return;
-    const startNode = activeTree.nodes.find((n) => n.type === "start");
-    if (!startNode) return;
-    const firstId = startNode.nextId;
-    if (firstId) {
-      setPreview({ currentId: firstId, history: [] });
-    }
-  }
-
-  function previewAdvance(nextId?: string) {
-    if (!preview || !nextId) {
-      setPreview(null);
-      return;
-    }
-    setPreview({
-      currentId: nextId,
-      history: [...preview.history, preview.currentId],
-    });
-  }
-
   // Render connections
   function renderEdges() {
     if (!activeTree) return null;
@@ -546,21 +550,24 @@ export default function DialoguePage() {
             />
           );
         }
-      } else if (node.nextId) {
-        const target = activeTree.nodes.find((n) => n.id === node.nextId);
-        if (!target) continue;
-        const from = getOutputPoint(node);
-        const to = getInputPoint(target);
-        edges.push(
-          <path
-            key={`${node.id}-next`}
-            d={bezierPath(from.x, from.y, to.x, to.y)}
-            stroke={NODE_COLORS[node.type]}
-            strokeWidth={2}
-            fill="none"
-            opacity={0.6}
-          />
-        );
+      } else {
+        for (const isElse of node.type === "condition" ? [false, true] : [false]) {
+          const target = activeTree.nodes.find((n) => n.id === (isElse ? node.elseId : node.nextId));
+          if (!target) continue;
+          const from = getOutputPoint(node, undefined, isElse);
+          const to = getInputPoint(target);
+          edges.push(
+            <path
+              key={`${node.id}-${isElse ? "else" : "next"}`}
+              d={bezierPath(from.x, from.y, to.x, to.y)}
+              stroke={NODE_COLORS[node.type]}
+              strokeWidth={2}
+              fill="none"
+              opacity={0.6}
+              strokeDasharray={isElse ? "6 4" : undefined}
+            />
+          );
+        }
       }
     }
 
@@ -569,7 +576,7 @@ export default function DialoguePage() {
         (n) => n.id === connecting.fromId
       );
       if (fromNode) {
-        const from = getOutputPoint(fromNode, connecting.choiceIdx);
+        const from = getOutputPoint(fromNode, connecting.choiceIdx, connecting.isElse);
         const rect = canvasRef.current?.getBoundingClientRect();
         if (rect) {
           const mx = (connecting.mx - rect.left - pan.x) / zoom;
@@ -630,12 +637,12 @@ export default function DialoguePage() {
             background: tint(color, 9),
             border: `2px solid ${borderCol}`,
             borderRadius: 8,
-            transform: "rotate(0deg)",
+            position: "relative",
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
             justifyContent: "center",
-            padding: "8px",
+            padding: "8px 30px 8px 8px",
             gap: 2,
           }}
         >
@@ -651,8 +658,16 @@ export default function DialoguePage() {
               wordBreak: "break-word",
             }}
           >
-            {node.condition || node.text || "if..."}
+            {node.check ? describeCheck(node.check) : node.condition || node.text || "if..."}
           </span>
+          {(["true", "else"] as const).map((label) => (
+            <span
+              key={label}
+              style={{ position: "absolute", right: 10, top: conditionExitTop(node, label === "else") - 7, fontSize: 9, color, fontWeight: 600 }}
+            >
+              {label}
+            </span>
+          ))}
         </div>
       );
     }
@@ -762,16 +777,17 @@ export default function DialoguePage() {
                 letterSpacing: "0.05em",
               }}
             >
-              Action
+              {node.set ? "Set" : "Action"}
             </div>
             <div
               style={{
                 fontSize: 11,
                 color: "var(--text-primary)",
                 wordBreak: "break-word",
+                fontFamily: node.set ? "var(--font-mono, monospace)" : undefined,
               }}
             >
-              {node.text || "action"}
+              {node.set ? describeSet(node.set) : node.text || "action"}
             </div>
           </>
         )}
@@ -908,9 +924,6 @@ export default function DialoguePage() {
   }
 
   // EDITOR VIEW
-  const currentPreviewNode = preview
-    ? activeTree.nodes.find((n) => n.id === preview.currentId)
-    : null;
 
   return (
     <div ref={rootRef} className="flex flex-col h-full">
@@ -929,7 +942,7 @@ export default function DialoguePage() {
               setActiveTree(null);
               setSelectedNode(null);
               setEditingNode(null);
-              setPreview(null);
+              setIsPreviewing(false);
             }}
             className="px-2 py-1 rounded text-xs whitespace-nowrap"
             style={{ color: "var(--text-primary)" }}
@@ -958,20 +971,20 @@ export default function DialoguePage() {
           <span className="text-xs mr-1 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
             Add node:
           </span>
-          {NODE_TYPES.map((type) => (
+          {ADD_KINDS.map((kind) => (
             <button
-              key={type}
-              onClick={() => addNode(type)}
+              key={kind}
+              onClick={() => addNode(kind)}
               className="inline-flex items-center gap-0.5 px-2 py-1 rounded-md text-xs font-medium whitespace-nowrap"
               style={{
-                background: tint(NODE_COLORS[type], 14),
-                color: NODE_COLORS[type],
-                border: `1px solid ${tint(NODE_COLORS[type], 45)}`,
+                background: tint(ADD_COLORS[kind], 14),
+                color: ADD_COLORS[kind],
+                border: `1px solid ${tint(ADD_COLORS[kind], 45)}`,
               }}
-              title={`Add a ${NODE_LABELS[type]} node`}
+              title={kind === "set" ? "Add a node that changes a variable" : `Add a ${ADD_LABELS[kind]} node`}
             >
               <Plus className="w-3 h-3" />
-              {NODE_LABELS[type]}
+              {ADD_LABELS[kind]}
             </button>
           ))}
         </div>
@@ -1012,7 +1025,20 @@ export default function DialoguePage() {
             style={{ background: "var(--border)" }}
           />
           <button
-            onClick={startPreview}
+            onClick={() => {
+              setIsVariablesOpen(!isVariablesOpen);
+              setEditingNode(null);
+            }}
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium"
+            style={{ color: "var(--text-primary)", border: "1px solid var(--border)", background: isVariablesOpen ? "var(--bg-hover)" : undefined }}
+            title="Variables and languages"
+            aria-pressed={isVariablesOpen}
+          >
+            <Variable className="w-3.5 h-3.5" />
+            Variables
+          </button>
+          <button
+            onClick={() => setIsPreviewing(true)}
             className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium"
             style={{
               background: "var(--green)",
@@ -1030,6 +1056,7 @@ export default function DialoguePage() {
             items={[
               { label: "JSON", description: "The whole tree, to re-import or load in code", onClick: exportTree },
               { label: "Yarn Spinner (.yarn)", description: "Script for Unity, Godot and GameMaker via Yarn Spinner", onClick: exportYarn },
+              { label: "Localisation CSV", description: "One row per line and choice, a column per language, to translate and import back", onClick: exportLocalisation },
             ]}
           />
         </div>
@@ -1098,7 +1125,7 @@ export default function DialoguePage() {
                   if (e.pointerType === "touch") {
                     const now = Date.now();
                     if (lastTap.current.id === node.id && now - lastTap.current.at < 320) {
-                      setEditingNode(node.id);
+                      openEditor(node.id);
                       lastTap.current = { id: "", at: 0 };
                       return;
                     }
@@ -1114,7 +1141,7 @@ export default function DialoguePage() {
                 }}
                 onDoubleClick={(e) => {
                   e.stopPropagation();
-                  setEditingNode(node.id);
+                  openEditor(node.id);
                 }}
               >
                 {renderNodeShape(node)}
@@ -1136,30 +1163,36 @@ export default function DialoguePage() {
                   />
                 )}
 
-                {/* Output handle (non-choice) */}
-                {node.type !== "end" && node.type !== "choice" && (
-                  <div
-                    className="output-handle"
-                    style={{
-                      position: "absolute",
-                      right: -6,
-                      top: getNodeHeight(node) / 2 - 6,
-                      width: 12,
-                      height: 12,
-                      borderRadius: "50%",
-                      background: NODE_COLORS[node.type],
-                      cursor: "crosshair",
-                    }}
-                    onPointerDown={(e) => {
-                      e.stopPropagation();
-                      setConnecting({
-                        fromId: node.id,
-                        mx: e.clientX,
-                        my: e.clientY,
-                      });
-                    }}
-                  />
-                )}
+                {/* Output handles (non-choice); a condition has a true and an else exit */}
+                {node.type !== "end" &&
+                  node.type !== "choice" &&
+                  (node.type === "condition" ? [false, true] : [false]).map((isElse) => (
+                    <div
+                      key={isElse ? "else" : "next"}
+                      className="output-handle"
+                      style={{
+                        position: "absolute",
+                        right: -6,
+                        top: (node.type === "condition" ? conditionExitTop(node, isElse) : getNodeHeight(node) / 2) - 6,
+                        width: 12,
+                        height: 12,
+                        borderRadius: "50%",
+                        background: isElse ? "var(--bg-primary)" : NODE_COLORS[node.type],
+                        border: isElse ? `2px solid ${NODE_COLORS[node.type]}` : undefined,
+                        cursor: "crosshair",
+                      }}
+                      title={node.type === "condition" ? (isElse ? "Else: drag to where it goes when false" : "True: drag to where it goes when true") : undefined}
+                      onPointerDown={(e) => {
+                        e.stopPropagation();
+                        setConnecting({
+                          fromId: node.id,
+                          isElse,
+                          mx: e.clientX,
+                          my: e.clientY,
+                        });
+                      }}
+                    />
+                  ))}
 
                 {/* Delete button on hover */}
                 {selectedNode === node.id && node.type !== "start" && (
@@ -1203,123 +1236,45 @@ export default function DialoguePage() {
             onUpdate={(patch) => updateNode(editingNode, patch)}
             onClose={() => setEditingNode(null)}
             characters={characters}
+            variables={activeTree.variables ?? []}
+            languages={activeTree.languages ?? []}
           />
         )}
 
-        {/* Preview overlay */}
-        {preview && currentPreviewNode && (
-          <div
-            className="absolute bottom-6 left-1/2 -translate-x-1/2 w-96 max-w-[90vw] rounded-xl border p-5"
-            style={{
-              background: "var(--bg-card)",
-              borderColor: "var(--accent)",
-              boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
-            }}
-          >
-            <div className="flex items-center justify-between mb-3">
-              <span
-                className="text-xs font-semibold uppercase"
-                style={{ color: "var(--accent)" }}
-              >
-                Preview
-              </span>
-              <button
-                onClick={() => setPreview(null)}
-                style={{ color: "var(--text-secondary)" }}
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
+        {isVariablesOpen && <VariablesPanel tree={activeTree} onChange={saveTree} onClose={() => setIsVariablesOpen(false)} />}
 
-            {currentPreviewNode.type === "end" ? (
-              <div>
-                <p
-                  className="text-sm italic"
-                  style={{ color: "var(--text-secondary)" }}
-                >
-                  — End of dialogue —
-                </p>
-                <button
-                  onClick={() => setPreview(null)}
-                  className="mt-3 px-3 py-1.5 rounded-lg text-xs font-medium"
-                  style={{ background: "var(--accent)", color: "white" }}
-                >
-                  Close
-                </button>
-              </div>
-            ) : currentPreviewNode.type === "dialogue" ? (
-              <div>
-                <div
-                  className="text-xs font-bold mb-1"
-                  style={{ color: "var(--green)" }}
-                >
-                  {currentPreviewNode.speaker}
-                </div>
-                <p
-                  className="text-sm mb-3"
-                  style={{ color: "var(--text-primary)" }}
-                >
-                  {currentPreviewNode.text}
-                </p>
-                <button
-                  onClick={() =>
-                    previewAdvance(currentPreviewNode.nextId)
-                  }
-                  className="px-3 py-1.5 rounded-lg text-xs font-medium"
-                  style={{ background: "var(--accent)", color: "white" }}
-                >
-                  Continue →
-                </button>
-              </div>
-            ) : currentPreviewNode.type === "choice" ? (
-              <div>
-                <p
-                  className="text-sm mb-3"
-                  style={{ color: "var(--text-primary)" }}
-                >
-                  {currentPreviewNode.text}
-                </p>
-                <div className="space-y-1.5">
-                  {currentPreviewNode.choices?.map((c, i) => (
-                    <button
-                      key={i}
-                      onClick={() => previewAdvance(c.targetId)}
-                      className="w-full text-left px-3 py-2 rounded-lg text-sm transition-colors"
-                      style={{
-                        background: "var(--bg-hover)",
-                        color: "var(--text-primary)",
-                        border: "1px solid var(--border)",
-                      }}
-                    >
-                      {c.text}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div>
-                <p
-                  className="text-xs"
-                  style={{ color: "var(--text-secondary)" }}
-                >
-                  [{currentPreviewNode.type}: {currentPreviewNode.text || currentPreviewNode.condition}]
-                </p>
-                <button
-                  onClick={() =>
-                    previewAdvance(currentPreviewNode.nextId)
-                  }
-                  className="mt-2 px-3 py-1.5 rounded-lg text-xs font-medium"
-                  style={{ background: "var(--accent)", color: "white" }}
-                >
-                  Continue →
-                </button>
-              </div>
-            )}
-          </div>
-        )}
+        {isPreviewing && <DialoguePreview tree={activeTree} onClose={() => setIsPreviewing(false)} />}
       </div>
     </div>
   );
+}
+
+function TranslationFields({
+  label,
+  translations,
+  languages,
+  onChange,
+}: {
+  label: string;
+  translations?: DialogueNode["translations"];
+  languages: string[];
+  onChange(translations: DialogueNode["translations"]): void;
+}) {
+  return languages.map((language) => (
+    <input
+      key={language}
+      className="w-full px-2 py-1 rounded text-xs outline-none mt-1"
+      style={FIELD_STYLE}
+      value={translations?.[language] ?? ""}
+      placeholder={`${label} in ${language}`}
+      onChange={(e) => {
+        const next = { ...translations, [language]: e.target.value };
+        if (!e.target.value) delete next[language];
+        onChange(Object.keys(next).length ? next : undefined);
+      }}
+      aria-label={`${label} in ${language}`}
+    />
+  ));
 }
 
 function EditPanel({
@@ -1327,15 +1282,21 @@ function EditPanel({
   onUpdate,
   onClose,
   characters,
+  variables,
+  languages,
 }: {
   node: DialogueNode;
   onUpdate: (patch: Partial<DialogueNode>) => void;
   onClose: () => void;
   characters: string[];
+  variables: DialogueVariable[];
+  languages: string[];
 }) {
+  // options get ids before one is added or removed, so their translations stay with them
+  const choices = withChoiceIds(node).choices ?? [];
   return (
     <div
-      className="absolute top-2 right-2 w-72 rounded-xl border p-4 overflow-y-auto max-h-[80vh] max-md:left-2 max-md:w-auto max-md:max-h-[60vh]"
+      className="absolute top-2 right-2 w-72 rounded-xl border p-4 overflow-y-auto max-h-[80vh] max-md:left-2 max-md:w-auto max-md:max-h-[60vh] z-10"
       style={{
         background: "var(--bg-card)",
         borderColor: "var(--border)",
@@ -1347,7 +1308,7 @@ function EditPanel({
           className="text-xs font-bold uppercase"
           style={{ color: NODE_COLORS[node.type] }}
         >
-          Edit {NODE_LABELS[node.type]}
+          Edit {node.set ? "Set" : NODE_LABELS[node.type]}
         </span>
         <button onClick={onClose} style={{ color: "var(--text-secondary)" }} title="Close" aria-label="Close editor">
           <X className="w-4 h-4" />
@@ -1364,11 +1325,7 @@ function EditPanel({
           </label>
           <input
             className="w-full px-2.5 py-1.5 rounded-lg text-sm mb-3 outline-none"
-            style={{
-              background: "var(--bg-primary)",
-              color: "var(--text-primary)",
-              border: "1px solid var(--border)",
-            }}
+            style={FIELD_STYLE}
             value={node.speaker || ""}
             onChange={(e) => onUpdate({ speaker: e.target.value })}
             list="dialogue-speakers"
@@ -1387,15 +1344,11 @@ function EditPanel({
           </label>
           <textarea
             className="w-full px-2.5 py-1.5 rounded-lg text-sm outline-none resize-none"
-            style={{
-              background: "var(--bg-primary)",
-              color: "var(--text-primary)",
-              border: "1px solid var(--border)",
-              minHeight: 60,
-            }}
+            style={{ ...FIELD_STYLE, minHeight: 60 }}
             value={node.text || ""}
             onChange={(e) => onUpdate({ text: e.target.value })}
           />
+          <TranslationFields label="Text" translations={node.translations} languages={languages} onChange={(translations) => onUpdate({ translations })} />
         </>
       )}
 
@@ -1408,57 +1361,49 @@ function EditPanel({
             Prompt
           </label>
           <input
-            className="w-full px-2.5 py-1.5 rounded-lg text-sm mb-3 outline-none"
-            style={{
-              background: "var(--bg-primary)",
-              color: "var(--text-primary)",
-              border: "1px solid var(--border)",
-            }}
+            className="w-full px-2.5 py-1.5 rounded-lg text-sm outline-none"
+            style={FIELD_STYLE}
             value={node.text || ""}
             onChange={(e) => onUpdate({ text: e.target.value })}
           />
+          <TranslationFields label="Prompt" translations={node.translations} languages={languages} onChange={(translations) => onUpdate({ translations })} />
           <label
-            className="block text-xs mb-2"
+            className="block text-xs mb-2 mt-3"
             style={{ color: "var(--text-secondary)" }}
           >
             Choices
           </label>
-          {node.choices?.map((c, i) => (
-            <div key={i} className="flex gap-1 mb-1.5">
-              <input
-                className="flex-1 px-2 py-1 rounded text-xs outline-none"
-                style={{
-                  background: "var(--bg-primary)",
-                  color: "var(--text-primary)",
-                  border: "1px solid var(--border)",
-                }}
-                value={c.text}
-                onChange={(e) => {
-                  const choices = [...(node.choices || [])];
-                  choices[i] = { ...choices[i], text: e.target.value };
-                  onUpdate({ choices });
-                }}
+          {choices.map((c, i) => (
+            <div key={c.id} className="mb-1.5">
+              <div className="flex gap-1">
+                <input
+                  className="flex-1 px-2 py-1 rounded text-xs outline-none"
+                  style={FIELD_STYLE}
+                  value={c.text}
+                  onChange={(e) => onUpdate({ choices: choices.map((choice, j) => (j === i ? { ...choice, text: e.target.value } : choice)) })}
+                  aria-label={`Choice ${i + 1}`}
+                />
+                <button
+                  onClick={() => onUpdate({ choices: choices.filter((_, j) => j !== i) })}
+                  style={{ color: "var(--red)", fontSize: 12 }}
+                  title="Remove choice"
+                  aria-label={`Remove choice ${i + 1}`}
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+              <TranslationFields
+                label={`Choice ${i + 1}`}
+                translations={c.translations}
+                languages={languages}
+                onChange={(translations) => onUpdate({ choices: choices.map((choice, j) => (j === i ? { ...choice, translations } : choice)) })}
               />
-              <button
-                onClick={() => {
-                  const choices = (node.choices || []).filter(
-                    (_, j) => j !== i
-                  );
-                  onUpdate({ choices });
-                }}
-                style={{ color: "var(--red)", fontSize: 12 }}
-              >
-                <X className="w-3 h-3" />
-              </button>
             </div>
           ))}
           <button
             onClick={() =>
               onUpdate({
-                choices: [
-                  ...(node.choices || []),
-                  { text: "New option", targetId: "" },
-                ],
+                choices: [...choices, { id: uuid(), text: "New option", targetId: "" }],
               })
             }
             className="text-xs mt-1"
@@ -1469,49 +1414,9 @@ function EditPanel({
         </>
       )}
 
-      {node.type === "condition" && (
-        <>
-          <label
-            className="block text-xs mb-1"
-            style={{ color: "var(--text-secondary)" }}
-          >
-            Condition
-          </label>
-          <input
-            className="w-full px-2.5 py-1.5 rounded-lg text-sm outline-none"
-            style={{
-              background: "var(--bg-primary)",
-              color: "var(--text-primary)",
-              border: "1px solid var(--border)",
-            }}
-            value={node.condition || node.text || ""}
-            onChange={(e) =>
-              onUpdate({ condition: e.target.value, text: e.target.value })
-            }
-          />
-        </>
-      )}
+      {node.type === "condition" && <ConditionFields node={node} variables={variables} onUpdate={onUpdate} />}
 
-      {node.type === "action" && (
-        <>
-          <label
-            className="block text-xs mb-1"
-            style={{ color: "var(--text-secondary)" }}
-          >
-            Action
-          </label>
-          <input
-            className="w-full px-2.5 py-1.5 rounded-lg text-sm outline-none"
-            style={{
-              background: "var(--bg-primary)",
-              color: "var(--text-primary)",
-              border: "1px solid var(--border)",
-            }}
-            value={node.text || ""}
-            onChange={(e) => onUpdate({ text: e.target.value })}
-          />
-        </>
-      )}
+      {node.type === "action" && <ActionFields node={node} variables={variables} onUpdate={onUpdate} />}
     </div>
   );
 }

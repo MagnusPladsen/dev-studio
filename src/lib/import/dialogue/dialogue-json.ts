@@ -20,13 +20,15 @@ function readTree(value: unknown): DialogueTree {
   };
 }
 
-/** Unhooks `nextId` and choice targets that point at nodes missing from the file. Returns the node and how many it unhooked. */
+/** Unhooks `nextId`, `elseId` and choice targets that point at nodes missing from the file. Returns the node and how many it unhooked. */
 function unhookMissing(node: DialogueNode, ids: Set<string>): [DialogueNode, number] {
   let count = 0;
   const copy = { ...node };
-  if (copy.nextId && !ids.has(copy.nextId)) {
-    copy.nextId = undefined;
-    count++;
+  for (const key of ["nextId", "elseId"] as const) {
+    if (copy[key] && !ids.has(copy[key])) {
+      copy[key] = undefined;
+      count++;
+    }
   }
   copy.choices = copy.choices?.map((choice) => {
     if (!choice.targetId || ids.has(choice.targetId)) return choice;

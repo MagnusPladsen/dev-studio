@@ -69,11 +69,16 @@ describe("Yarn Spinner import", () => {
     const condition = node(price.nextId);
     expect(condition).toMatchObject({ type: "condition", condition: "$gold >= 5" });
     expect(node(condition.nextId)).toMatchObject({ type: "action", text: "set $gold to $gold - 5" });
-    const elseIf = tree.nodes.find((entry) => entry.condition === "not ($gold >= 5) and has_coupon");
-    const otherwise = tree.nodes.find((entry) => entry.condition === "not ($gold >= 5) and not (has_coupon)");
-    expect(node(elseIf?.nextId).text).toBe("A coupon? Fine.");
-    expect(node(otherwise?.nextId).text).toBe("Come back with coin.");
-    expect(tree.nodes.some((entry) => entry.nextId === elseIf?.id || entry.nextId === otherwise?.id)).toBe(false);
+    expect(condition.check).toEqual({ variable: "gold", op: ">=", value: 5 });
+    const elseIf = node(condition.elseId);
+    expect(elseIf).toMatchObject({ type: "condition", condition: "has_coupon", check: { variable: "has_coupon", op: "==", value: true } });
+    expect(node(elseIf.nextId).text).toBe("A coupon? Fine.");
+    expect(node(elseIf.elseId).text).toBe("Come back with coin.");
+    expect(tree.variables).toEqual([
+      { name: "visits", type: "number", defaultValue: 0 },
+      { name: "gold", type: "number", defaultValue: 0 },
+      { name: "has_coupon", type: "bool", defaultValue: false },
+    ]);
 
     // every branch of the shop meets again at the goodbye line
     const goodbye = tree.nodes.find((entry) => entry.text === "Safe travels.")!;
@@ -86,7 +91,6 @@ describe("Yarn Spinner import", () => {
     expect(node(choice.choices![2].targetId).type).toBe("end");
 
     expect(warnings).toEqual([
-      "Conditions here have one exit, so 2 else branches became separate “not …” conditions with nothing leading in. Connect them where you need them.",
       "Jumps to nodes that aren't in the file were left unconnected: Missing.",
       "1 line or option had its <<if>> condition removed; they always show.",
     ]);

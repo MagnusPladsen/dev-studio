@@ -12,13 +12,13 @@ function nodeHeight(node: DialogueNode): number {
   return 90;
 }
 
-const successors = (node: DialogueNode) => [node.nextId, ...(node.choices ?? []).map((choice) => choice.targetId)].filter((id): id is string => !!id);
+const successors = (node: DialogueNode) => [node.nextId, node.elseId, ...(node.choices ?? []).map((choice) => choice.targetId)].filter((id): id is string => !!id);
 
 /**
  * Lays nodes out left to right: one column per step from the first node, nodes stacked in the order they are reached.
- * Nodes nothing leads to start their own run, in the column of the node named in `near` (or the second column).
+ * Nodes nothing leads to start their own run in the second column.
  */
-export function layOutDialogue(nodes: DialogueNode[], near: Map<string, string> = new Map()): DialogueNode[] {
+export function layOutDialogue(nodes: DialogueNode[]): DialogueNode[] {
   const byId = new Map(nodes.map((node) => [node.id, node]));
   const depth = new Map<string, number>();
   const order: string[] = [];
@@ -37,8 +37,7 @@ export function layOutDialogue(nodes: DialogueNode[], near: Map<string, string> 
   };
   for (const node of nodes) {
     if (depth.has(node.id)) continue;
-    const anchor = near.get(node.id);
-    visit(node.id, node === nodes[0] ? 0 : anchor && depth.has(anchor) ? depth.get(anchor)! : 1);
+    visit(node.id, node === nodes[0] ? 0 : 1);
   }
 
   const columnBottom = new Map<number, number>();

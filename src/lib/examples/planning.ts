@@ -140,13 +140,25 @@ const choose = (id: string, x: number, y: number, text: string, choices: [string
   text,
   choices: choices.map(([t, targetId]) => ({ text: t, targetId })),
 });
-const when = (id: string, x: number, y: number, condition: string, nextId: string): DNode => ({
+/** A true/false variable test: `name` or `not name`, true goes to `nextId`, otherwise `elseId`. */
+const when = (id: string, x: number, y: number, variable: string, nextId: string, elseId: string): DNode => ({
   id,
   type: "condition",
   x,
   y,
-  condition,
-  text: condition,
+  condition: variable,
+  text: variable,
+  check: { variable, op: "==", value: true },
+  nextId,
+  elseId,
+});
+const setFlag = (id: string, x: number, y: number, variable: string, nextId: string): DNode => ({
+  id,
+  type: "action",
+  x,
+  y,
+  text: `${variable} = true`,
+  set: { variable, op: "set", value: true },
   nextId,
 });
 const act = (id: string, x: number, y: number, text: string, nextId: string): DNode => ({ id, type: "action", x, y, text, nextId });
@@ -179,29 +191,39 @@ const dialogues: ExampleModule = {
     {
       id: id("elder-quest"),
       name: "Elder Maren's Quest",
+      variables: [
+        { name: "quest_started", type: "bool", defaultValue: false },
+        { name: "has_sunsteel_sword", type: "bool", defaultValue: false },
+      ],
       nodes: [
-        start("s", 40, 135, "ask"),
-        say("ask", 160, 120, "Elder Maren", "Pip, the Sunsteel Sword was stolen and carried into the Whispering Forest. Without it, the Shadow King will return.", "pick"),
-        choose("pick", 440, 100, "Will you help?", [
+        start("s", 40, 175, "started"),
+        when("started", 150, 160, "quest_started", "has", "ask"),
+        when("has", 360, 40, "has_sunsteel_sword", "back", "not-yet"),
+        say("back", 560, 20, "Elder Maren", "The Sunsteel Sword! Mossbrook owes you everything, Pip.", "reward"),
+        act("reward", 820, 20, "give_coins 50", "end1"),
+        end("end1", 1080, 35),
+        say("not-yet", 560, 140, "Elder Maren", "The sword is still out there, Pip. Follow the river east.", "end3"),
+        end("end3", 820, 155),
+        say("ask", 360, 300, "Elder Maren", "Pip, the Sunsteel Sword was stolen and carried into the Whispering Forest. Without it, the Shadow King will return.", "pick"),
+        choose("pick", 640, 280, "Will you help?", [
           ["I'll bring the sword back.", "accept"],
           ["Not now, I'm not ready.", "decline"],
         ]),
-        say("accept", 740, 20, "Elder Maren", "Brave child. Follow the river east, and trust no shadow that speaks.", "quest"),
-        act("quest", 1000, 20, "start_quest lost_sword", "has"),
-        when("has", 1260, 25, "has_sunsteel_sword", "back"),
-        say("back", 1460, 20, "Elder Maren", "The Sunsteel Sword! Mossbrook owes you everything, Pip.", "reward"),
-        act("reward", 1720, 20, "give_coins 50", "end1"),
-        end("end1", 1980, 35),
-        say("decline", 740, 260, "Elder Maren", "Then rest tonight. But the Shadow King will not wait long.", "end2"),
-        end("end2", 1000, 275),
+        say("accept", 940, 220, "Elder Maren", "Brave child. Follow the river east, and trust no shadow that speaks.", "quest"),
+        act("quest", 1200, 220, "start_quest lost_sword", "remember"),
+        setFlag("remember", 1460, 220, "quest_started", "end4"),
+        end("end4", 1720, 235),
+        say("decline", 940, 400, "Elder Maren", "Then rest tonight. But the Shadow King will not wait long.", "end2"),
+        end("end2", 1200, 415),
       ],
     },
     {
       id: id("gate-guard"),
       name: "Gate Guard",
+      variables: [{ name: "is_night", type: "bool", defaultValue: true }],
       nodes: [
         start("s", 40, 115, "night"),
-        when("night", 150, 100, "is_night", "halt"),
+        when("night", 150, 100, "is_night", "halt", "day"),
         say("halt", 340, 95, "Gate Guard", "Halt! The gate stays shut after dark. Come back at sunrise.", "pick"),
         choose("pick", 600, 70, "Pip says:", [
           ["Please, it's urgent. Elder Maren sent me.", "fine"],
@@ -211,6 +233,8 @@ const dialogues: ExampleModule = {
         act("open", 1140, 20, "open_gate", "end1"),
         end("end1", 1400, 35),
         end("end2", 880, 200),
+        say("day", 340, 240, "Gate Guard", "Morning, Pip. Gate's open. Mind the slimes on the road.", "end3"),
+        end("end3", 600, 255),
       ],
     },
   ],

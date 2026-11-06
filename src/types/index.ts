@@ -316,9 +316,49 @@ export interface DialogueTree {
   projectId: string;
   name: string;
   nodes: DialogueNode[];
+  /** What the conversation remembers while it plays, e.g. `gold` or `met_elder`. */
+  variables?: DialogueVariable[];
+  /** Language codes the localisation CSV has a column for, e.g. ["nb", "de"]. */
+  languages?: string[];
   tags: string[];
   createdAt: string;
   updatedAt: string;
+}
+
+export type DialogueValue = boolean | number | string;
+
+export interface DialogueVariable {
+  /** Letters, digits and _ (it becomes `$name` in Yarn). Conditions and sets refer to it by name. */
+  name: string;
+  type: "bool" | "number" | "string";
+  defaultValue: DialogueValue;
+}
+
+export type DialogueCompare = "==" | "!=" | "<" | "<=" | ">" | ">=";
+
+/** A condition node's test: `variable op value`. */
+export interface DialogueCheck {
+  variable: string;
+  op: DialogueCompare;
+  value: DialogueValue;
+}
+
+/** An action node that changes a variable: set it to `value`, add `value` to it, or flip a true/false one. */
+export interface DialogueSet {
+  variable: string;
+  op: "set" | "add" | "toggle";
+  value?: DialogueValue;
+}
+
+/** Translated text by language code. */
+export type DialogueTranslations = Record<string, string>;
+
+export interface DialogueChoice {
+  /** Row id in the localisation CSV. Older choices have none; `choiceTextId` falls back to their position. */
+  id?: string;
+  text: string;
+  targetId: string;
+  translations?: DialogueTranslations;
 }
 
 export interface DialogueNode {
@@ -328,9 +368,17 @@ export interface DialogueNode {
   y: number;
   speaker?: string;
   text?: string;
-  choices?: { text: string; targetId: string }[];
+  /** Translations of `text` (a line, or a choice's prompt). */
+  translations?: DialogueTranslations;
+  choices?: DialogueChoice[];
+  /** The next node; for a condition, where to go when it is true. */
   nextId?: string;
+  /** Where a condition goes when it is false. Older conditions have none: the conversation ends there. */
+  elseId?: string;
+  /** Free-text condition, for the game's own code. `check` takes over when set. */
   condition?: string;
+  check?: DialogueCheck;
+  set?: DialogueSet;
 }
 
 export interface SpriteSheet {

@@ -55,16 +55,6 @@ export const PRIORITY_META: Record<IssuePriority, { label: string; icon: LucideI
 
 export const CATEGORY_LABEL: Record<ColumnCategory, string> = { todo: "To do", doing: "In progress", done: "Done" };
 
-/** Quotes a CSV cell and defuses leading = + - @ so spreadsheets don't run it as a formula. */
-export function csvCell(value: unknown): string {
-  const text = String(value ?? "");
-  const safe = /^[=+\-@]/.test(text) ? "'" + text : text;
-  return `"${safe.replace(/"/g, '""')}"`;
-}
-
-/** Byte order mark so Excel reads the CSV as UTF-8. */
-export const CSV_BOM = "\uFEFF";
-
 export function formatDate(iso?: string): string {
   if (!iso) return "";
   const d = new Date(iso.length === 10 ? iso + "T12:00:00" : iso);
