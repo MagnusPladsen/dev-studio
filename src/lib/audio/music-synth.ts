@@ -1,3 +1,4 @@
+import { getSections, songSteps } from "@/lib/music-sections";
 import type { MusicNote, MusicTrack, MusicVibrato } from "@/types";
 import { envelopeSteps, releaseSeconds, SILENT } from "./music-envelope";
 import type { MusicVoice } from "./music-instruments";
@@ -87,6 +88,10 @@ export function scheduleNote(
 }
 
 export function trackLengthSeconds(track: MusicTrack): number {
+  if (getSections(track).length > 1) {
+    const beats = songSteps(track, "song", getSections(track)[0].id).steps.reduce((total, step) => total + step.length, 0);
+    return (beats * 60) / track.bpm;
+  }
   let lastBeat = 0;
   for (const channel of track.channels) {
     for (const note of channel.patterns[0]?.notes ?? []) {

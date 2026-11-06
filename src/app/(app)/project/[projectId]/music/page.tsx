@@ -42,8 +42,9 @@ import { getAudioContext } from "@/lib/audio/context";
 import { scheduleNote } from "@/lib/audio/music-synth";
 import { applyPreset } from "@/lib/audio/music-instruments";
 import { InstrumentPanel, PresetSelect } from "@/components/music/InstrumentPanel";
-import { RENDER_SAMPLE_RATE, renderLoop } from "@/lib/audio/music-render";
+import { RENDER_SAMPLE_RATE, renderSong } from "@/lib/audio/music-render";
 import { encodeWav } from "@/lib/audio/wav";
+import { resolveSelectedSection, songSteps } from "@/lib/music-sections";
 import { beatAt, scheduleWindow, type LiveSong, type PlayCursor } from "@/lib/audio/music-scheduler";
 import { isInScale, isScaleLocked, KEY_NAMES, SCALE_IDS, SCALES, songScale, type ScaleId } from "@/lib/music-scale";
 import { fitPatternLength } from "@/lib/music-sections";
@@ -205,7 +206,12 @@ export default function MusicPage() {
 
   // the player reads the latest song on every tick, so edits and undo/redo are heard while it plays
   useEffect(() => {
-    songRef.current = activeTrack ? { track: activeTrack, patternLen, muted, soloed, looping } : null;
+    if (!activeTrack) {
+      songRef.current = null;
+      return;
+    }
+    const { steps, loopIndex } = songSteps(activeTrack, "section", resolveSelectedSection(activeTrack, null).id);
+    songRef.current = { track: activeTrack, steps: steps.map((step) => ({ ...step, length: patternLen })), loopIndex, muted, soloed, looping };
   }, [activeTrack, patternLen, muted, soloed, looping]);
 
   useEffect(() => {
@@ -292,7 +298,7 @@ export default function MusicPage() {
     if (!activeTrack) return;
     stopPlayback();
     const ctx = getAudioCtx();
-    let cursor: PlayCursor = { time: ctx.currentTime, beat: 0 };
+    let cursor: PlayCursor = { time: ctx.currentTime, step: 0, beat: 0 };
 
     function tick() {
       const song = songRef.current;
@@ -306,7 +312,7 @@ export default function MusicPage() {
         stopPlayback();
         return;
       }
-      setPlayhead(beatAt(song, cursor, ctx.currentTime));
+      setPlayhead(beatAt(song, cursor, ctx.currentTime).beat);
     }
 
     tick();
@@ -499,7 +505,11 @@ export default function MusicPage() {
 
   async function exportWav() {
     if (!activeTrack) return;
-    const samples = await renderLoop(activeTrack, { patternLen, muted, soloed });
+    const samples = await renderSong(activeTrack, {
+      steps: songSteps(activeTrack, "section", resolveSelectedSection(activeTrack, null).id).steps.map((step) => ({ ...step, length: patternLen })),
+      muted,
+      soloed,
+    });
     downloadBlob(`${activeTrack.name}.wav`, new Blob([encodeWav(samples, RENDER_SAMPLE_RATE)], { type: "audio/wav" }));
   }
 
