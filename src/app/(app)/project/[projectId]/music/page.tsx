@@ -42,14 +42,15 @@ import { getAudioContext } from "@/lib/audio/context";
 import { scheduleNote } from "@/lib/audio/music-synth";
 import { applyPreset } from "@/lib/audio/music-instruments";
 import { InstrumentPanel, PresetSelect } from "@/components/music/InstrumentPanel";
+import { SongRow } from "@/components/music/SongRow";
+import { useSelectedSection } from "@/hooks/useSelectedSection";
 import { RENDER_SAMPLE_RATE, renderSong } from "@/lib/audio/music-render";
 import { encodeWav } from "@/lib/audio/wav";
-import { resolveSelectedSection, songSteps } from "@/lib/music-sections";
+import { getSections, SECTION_LENGTHS, sectionNotes, setSectionNotes, songSteps, updateSection, type SongStep } from "@/lib/music-sections";
 import { beatAt, scheduleWindow, type LiveSong, type PlayCursor } from "@/lib/audio/music-scheduler";
 import { isInScale, isScaleLocked, KEY_NAMES, SCALE_IDS, SCALES, songScale, type ScaleId } from "@/lib/music-scale";
-import { fitPatternLength } from "@/lib/music-sections";
 import { cellsBetween, coversCell, eraseCells, paintCells, type GridCell, type NoteCell } from "@/lib/music-draw";
-import type { MusicTrack, MusicChannel, MusicNote } from "@/types";
+import type { MusicTrack, MusicChannel, MusicNote, MusicSectionLength } from "@/types";
 import { v4 as uuid } from "uuid";
 
 function midiToName(midi: number): string {
@@ -104,11 +105,42 @@ const NOTE_LENGTHS = [
   { value: 2, label: "2 beats" },
   { value: 4, label: "4 beats" },
 ];
-const PATTERN_LENGTHS = [8, 16, 32];
 /** How far ahead notes are handed to the audio clock; edits land after at most this long. */
 const LOOKAHEAD_SECONDS = 0.2;
 /** Longest a placed note is heard for, in beats, so long notes don't drone while you draw. */
 const PLACE_PREVIEW_BEATS = 0.5;
+
+/** How many earlier passes of the same section come right before `stepIndex` (its repeats so far). */
+function playedRepeats(steps: SongStep[], stepIndex: number): number {
+  let count = 0;
+  while (stepIndex - count > 0 && steps[stepIndex - count - 1].sectionId === steps[stepIndex].sectionId) count++;
+  return count;
+}
+
+const PLAY_MODES = [
+  { mode: "song", label: "Song", title: "Play the whole song: the intro once, then loop" },
+  { mode: "section", label: "Section", title: "Play only the section you are editing" },
+] as const;
+
+function PlayModeToggle({ mode, onChange }: { mode: "song" | "section"; onChange(mode: "song" | "section"): void }) {
+  return (
+    <div className="flex items-center rounded overflow-hidden text-xs" style={{ border: "1px solid var(--border)" }} role="group" aria-label="What to play">
+      {PLAY_MODES.map((option) => (
+        <button
+          key={option.mode}
+          type="button"
+          onClick={() => onChange(option.mode)}
+          className="px-2 py-0.5"
+          style={mode === option.mode ? { background: "var(--accent)", color: "var(--on-accent)" } : { color: "var(--text-primary)" }}
+          title={option.title}
+          aria-pressed={mode === option.mode}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 export default function MusicPage() {
   const params = useParams();
@@ -118,7 +150,12 @@ export default function MusicPage() {
   const [tracks, setTracks] = useState<MusicTrack[]>([]);
   const [activeTrack, setActiveTrack] = useState<MusicTrack | null>(null);
   const [activeChannelIdx, setActiveChannelIdx] = useState(0);
-  const [patternLen, setPatternLen] = useState(8);
+  const selection = useSelectedSection(activeTrack);
+  const selectedSectionId = selection.section?.id ?? "";
+  const patternLen = selection.section?.length ?? 8;
+  const [playMode, setPlayMode] = useState<"song" | "section">("song");
+  const hasSongRow = activeTrack ? getSections(activeTrack).length > 1 : false;
+  const effectivePlayMode = hasSongRow ? playMode : "section";
   const [playing, setPlaying] = useState(false);
   const [looping, setLooping] = useState(true);
   const [zoom, setZoom] = useState({ x: 1, y: 1 });
@@ -188,7 +225,7 @@ export default function MusicPage() {
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
   });
-  const [playhead, setPlayhead] = useState(0);
+  const [playhead, setPlayhead] = useState<{ step: number; beat: number } | null>(null);
   const [muted, setMuted] = useState<boolean[]>([false, false, false, false]);
   const [soloed, setSoloed] = useState<boolean[]>([false, false, false, false]);
   const [editingName, setEditingName] = useState(false);
@@ -210,23 +247,21 @@ export default function MusicPage() {
       songRef.current = null;
       return;
     }
-    const { steps, loopIndex } = songSteps(activeTrack, "section", resolveSelectedSection(activeTrack, null).id);
-    songRef.current = { track: activeTrack, steps: steps.map((step) => ({ ...step, length: patternLen })), loopIndex, muted, soloed, looping };
-  }, [activeTrack, patternLen, muted, soloed, looping]);
+    songRef.current = { track: activeTrack, ...songSteps(activeTrack, effectivePlayMode, selectedSectionId), muted, soloed, looping };
+  }, [activeTrack, effectivePlayMode, selectedSectionId, muted, soloed, looping]);
 
   useEffect(() => {
     const saved = storage.getAll("music", projectId);
     setTracks(saved);
     const first = saved[0] ?? null;
     setActiveTrack(first);
-    if (first) setPatternLen(fitPatternLength(first));
     setLoaded(true);
   }, [projectId]);
 
-  /** Open a track and show the whole song. */
-  function openTrack(t: MusicTrack | null) {
+  /** Open a track on `sectionId`, or on its first section. */
+  function openTrack(t: MusicTrack | null, sectionId: string | null = null) {
     setActiveTrack(t);
-    if (t) setPatternLen(fitPatternLength(t));
+    selection.select(sectionId);
   }
 
   // the list shows the open track's live state (e.g. a new name) before it is saved
@@ -262,7 +297,7 @@ export default function MusicPage() {
       try { o.stop(); } catch {}
     });
     scheduledRef.current = [];
-    setPlayhead(0);
+    setPlayhead(null);
   }, []);
 
   useEffect(() => stopPlayback, [stopPlayback]);
@@ -271,7 +306,7 @@ export default function MusicPage() {
     const t = storage.getById("music", id, projectId);
     if (t) {
       stopPlayback();
-      openTrack(t);
+      openTrack(t, selection.initialId);
     }
   }, loaded);
   useTrackOpenAsset(activeTrack?.id ? { type: "music", id: activeTrack?.id } : null);
@@ -312,7 +347,7 @@ export default function MusicPage() {
         stopPlayback();
         return;
       }
-      setPlayhead(beatAt(song, cursor, ctx.currentTime).beat);
+      setPlayhead(beatAt(song, cursor, ctx.currentTime));
     }
 
     tick();
@@ -326,12 +361,7 @@ export default function MusicPage() {
       if (!t) return t;
       const ch = t.channels[activeChannelIdx];
       if (!ch) return t;
-      const pattern = ch.patterns[0] ?? { id: uuid(), notes: [] };
-      return {
-        ...t,
-        channels: t.channels.map((c, i) => (i === activeChannelIdx ? { ...c, patterns: [{ ...pattern, notes: fn(pattern.notes) }] } : c)),
-        updatedAt: new Date().toISOString(),
-      };
+      return { ...setSectionNotes(t, selectedSectionId, ch.id, fn), updatedAt: new Date().toISOString() };
     });
   }
 
@@ -495,6 +525,20 @@ export default function MusicPage() {
     setTracks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
   }
 
+  /** A song-section edit is its own undo step; `selectId` opens that section afterwards. */
+  function applySectionEdit(next: MusicTrack, selectId?: string) {
+    history.checkpoint();
+    const updated = { ...next, updatedAt: new Date().toISOString() };
+    setActiveTrack(updated);
+    setTracks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+    if (selectId) selection.select(selectId);
+  }
+
+  function updateSectionLength(length: MusicSectionLength) {
+    if (!activeTrack || !selection.section || length === selection.section.length) return;
+    applySectionEdit(updateSection(activeTrack, selection.section.id, { length }));
+  }
+
   function toggleMute(idx: number) {
     setMuted((prev) => prev.map((v, i) => (i === idx ? !v : v)));
   }
@@ -503,14 +547,24 @@ export default function MusicPage() {
     setSoloed((prev) => prev.map((v, i) => (i === idx ? !v : v)));
   }
 
-  async function exportWav() {
+  async function exportWav(mode: "song" | "section", fileName: string) {
     if (!activeTrack) return;
-    const samples = await renderSong(activeTrack, {
-      steps: songSteps(activeTrack, "section", resolveSelectedSection(activeTrack, null).id).steps.map((step) => ({ ...step, length: patternLen })),
-      muted,
-      soloed,
-    });
-    downloadBlob(`${activeTrack.name}.wav`, new Blob([encodeWav(samples, RENDER_SAMPLE_RATE)], { type: "audio/wav" }));
+    const samples = await renderSong(activeTrack, { steps: songSteps(activeTrack, mode, selectedSectionId).steps, muted, soloed });
+    downloadBlob(`${fileName}.wav`, new Blob([encodeWav(samples, RENDER_SAMPLE_RATE)], { type: "audio/wav" }));
+  }
+
+  function wavExportItems() {
+    const name = activeTrack?.name ?? "";
+    const withoutMuted = "with muted channels left out";
+    if (!hasSongRow) return [{ label: "WAV (this pattern)", description: `${patternLen} beats, ${withoutMuted}`, onClick: () => exportWav("section", name) }];
+    return [
+      { label: "WAV (whole song)", description: `Intro + one pass of the loop, ${withoutMuted}`, onClick: () => exportWav("song", name) },
+      {
+        label: "WAV (this section)",
+        description: `${selection.section?.name}, ${patternLen} beats, ${withoutMuted}`,
+        onClick: () => exportWav("section", `${name} - ${selection.section?.name}`),
+      },
+    ];
   }
 
   function exportJson() {
@@ -526,19 +580,22 @@ export default function MusicPage() {
     setEditingName(false);
   }
 
-  const activeNotes =
-    activeTrack?.channels[activeChannelIdx]?.patterns[0]?.notes ?? [];
-  const outOfKeyCount = activeNotes.filter((n) => n.start < patternLen && !isPlayable(n.pitch)).length;
+  const activeChannel = activeTrack?.channels[activeChannelIdx];
+  const activeNotes = activeTrack && activeChannel && selection.section ? sectionNotes(activeTrack, selection.section, activeChannel.id) : [];
+  const outOfKeyCount = activeNotes.filter((n) => !isPlayable(n.pitch)).length;
+
+  const playSteps = activeTrack ? songSteps(activeTrack, effectivePlayMode, selectedSectionId).steps : [];
+  const playingStep = playing && playhead ? playSteps[playhead.step] : undefined;
+  const isPlayheadInRoll = playingStep?.sectionId === selectedSectionId;
+  const playingBlock = playingStep && playhead ? { sectionId: playingStep.sectionId, beat: playhead.beat + playedRepeats(playSteps, playhead.step) * playingStep.length } : null;
 
 
   // Also collect all channel notes for background display
   const allChannelNotes: { pitch: number; start: number; duration: number; chIdx: number }[] = [];
   activeTrack?.channels.forEach((ch, ci) => {
-    if (ci === activeChannelIdx) return;
-    ch.patterns[0]?.notes.forEach((n) => {
-      if (n.start < patternLen) {
-        allChannelNotes.push({ pitch: n.pitch, start: n.start, duration: n.duration, chIdx: ci });
-      }
+    if (ci === activeChannelIdx || !selection.section) return;
+    sectionNotes(activeTrack, selection.section, ch.id).forEach((n) => {
+      allChannelNotes.push({ pitch: n.pitch, start: n.start, duration: n.duration, chIdx: ci });
     });
   });
 
@@ -579,7 +636,7 @@ export default function MusicPage() {
           <ExportMenu
             disabled={!activeTrack}
             items={[
-              { label: "WAV (this pattern)", description: `${patternLen} beats, with muted channels left out`, onClick: exportWav },
+              ...wavExportItems(),
               { label: "Song JSON", description: "Every channel and note, to import again later", onClick: exportJson },
             ]}
           />
@@ -693,6 +750,8 @@ export default function MusicPage() {
                 <Repeat className="w-3.5 h-3.5" />
               </button>
 
+              {hasSongRow && <PlayModeToggle mode={playMode} onChange={setPlayMode} />}
+
               <div className="w-px h-5" style={{ background: "var(--border)" }} />
 
               <VolumeControl />
@@ -741,17 +800,29 @@ export default function MusicPage() {
                 <span className="text-xs" style={{ color: "var(--text-muted)" }}>Loop length</span>
                 <select
                   value={patternLen}
-                  onChange={(e) => setPatternLen(Number(e.target.value))}
+                  onChange={(e) => updateSectionLength(Number(e.target.value) as MusicSectionLength)}
                   className="bg-transparent text-xs rounded px-1 py-0.5 outline-none"
                   style={{ color: "var(--text-primary)", border: "1px solid var(--border)" }}
                 >
-                  {PATTERN_LENGTHS.map((l) => (
+                  {SECTION_LENGTHS.map((l) => (
                     <option key={l} value={l}>
                       {l} beats ({l / 4} bars)
                     </option>
                   ))}
                 </select>
               </label>
+              {!hasSongRow && (
+                <SongRow
+                  track={activeTrack}
+                  selectedId={selectedSectionId}
+                  playing={null}
+                  showChannels={false}
+                  onSelect={selection.select}
+                  onChange={applySectionEdit}
+                  onToggleChannels={() => {}}
+                  onSelectCell={() => {}}
+                />
+              )}
 
               {/* Key and scale */}
               <div className="flex items-center gap-1" title="Lock the grid to a scale so every note you place fits. Chromatic turns the lock off. Drums are never locked.">
@@ -784,6 +855,19 @@ export default function MusicPage() {
               <div className="w-px h-5" style={{ background: "var(--border)" }} />
               <LinkedAssets projectId={projectId} type="music" id={activeTrack.id} layout="row" />
             </div>
+
+            {hasSongRow && (
+              <SongRow
+                track={activeTrack}
+                selectedId={selectedSectionId}
+                playing={playingBlock}
+                showChannels={false}
+                onSelect={selection.select}
+                onChange={applySectionEdit}
+                onToggleChannels={() => {}}
+                onSelectCell={() => {}}
+              />
+            )}
 
             {/* Channel mixer strip */}
             <div
@@ -1031,11 +1115,11 @@ export default function MusicPage() {
                   />
 
                   {/* Playhead */}
-                  {playing && (
+                  {isPlayheadInRoll && playhead && (
                     <div
                       className="absolute top-0 bottom-0 pointer-events-none"
                       style={{
-                        left: playhead * BEAT_W,
+                        left: playhead.beat * BEAT_W,
                         width: 2,
                         background: "var(--accent)",
                         boxShadow: "0 0 8px var(--accent)",
