@@ -1,0 +1,7 @@
+pip_walk/pip_walk.png (binary)
+pip_walk/pip_walk.png.meta
+pip_walk/pip_walk_idle.anim
+pip_walk/pip_walk_walk.anim
+pip_walk/pip_walk_hop.anim
+pip_walk/pip_walk_walk_2.anim
+pip_walk/README.md

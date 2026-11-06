@@ -33,7 +33,7 @@ export const COLLISION_LAYER_NAME = "Collision";
  * Collision as a Tiled object layer of rectangles (in pixels), typed "solid" or "one_way" and with a `one_way`
  * bool property, which Tiled shows and Godot's Tiled importers turn into collision shapes.
  */
-function collisionLayer(tilemap: TilemapData, id: number) {
+export function collisionLayer(tilemap: TilemapData, id: number) {
   const size = tilemap.tileSize;
   return {
     id,

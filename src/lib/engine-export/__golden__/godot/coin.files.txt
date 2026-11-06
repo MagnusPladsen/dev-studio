@@ -1,0 +1,4 @@
+coin/coin.png (binary)
+coin/coin_frames.tres
+coin/coin.tscn
+coin/README.md

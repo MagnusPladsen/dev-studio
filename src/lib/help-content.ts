@@ -127,7 +127,7 @@ export const HELP: Record<HelpTopic, HelpContent> = {
       { icon: Layers, text: "Use layers, and frames for animation with onion skin." },
       { icon: Play, text: "Give each frame its own duration, tag frame ranges (idle, walk) and preview one tag or all frames." },
       { icon: Scaling, text: "Resize the canvas, scale a sprite up (8×8 → 16×16 and more) or swap in a project palette." },
-      { icon: Download, text: "Export a PNG, a sprite sheet with Aseprite JSON, or an animated GIF (one per tag too)." },
+      { icon: Download, text: "Export a PNG, a sprite sheet with Aseprite JSON, an animated GIF (one per tag too), or a zip for Godot 4, Unity, Phaser 3 or Tiled." },
     ],
     steps: [
       "Press New sprite and pick a size.",
@@ -200,7 +200,7 @@ export const HELP: Record<HelpTopic, HelpContent> = {
       { icon: PaintBucket, text: "Paint, fill an area or erase." },
       { icon: Layers, text: "Stack layers, hide them and change their order." },
       { icon: Shapes, text: "Auto-tile with terrains, and mark solid or one-way collision." },
-      { icon: Download, text: "Export a PNG of the map or Tiled-style JSON with collision." },
+      { icon: Download, text: "Export a PNG of the map, Tiled-style JSON, or a zip for Godot 4, Unity, Phaser 3 or Tiled with terrains and collision." },
     ],
     steps: [
       "Press + and set the map's width and height in tiles.",

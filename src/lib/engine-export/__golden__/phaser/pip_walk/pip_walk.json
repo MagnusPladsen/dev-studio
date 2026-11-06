@@ -1,0 +1,179 @@
+{
+  "frames": [
+    {
+      "filename": "0",
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "w": 8,
+        "h": 8
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 8,
+        "h": 8
+      },
+      "sourceSize": {
+        "w": 8,
+        "h": 8
+      },
+      "duration": 1200
+    },
+    {
+      "filename": "1",
+      "frame": {
+        "x": 8,
+        "y": 0,
+        "w": 8,
+        "h": 8
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 8,
+        "h": 8
+      },
+      "sourceSize": {
+        "w": 8,
+        "h": 8
+      },
+      "duration": 150
+    },
+    {
+      "filename": "2",
+      "frame": {
+        "x": 16,
+        "y": 0,
+        "w": 8,
+        "h": 8
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 8,
+        "h": 8
+      },
+      "sourceSize": {
+        "w": 8,
+        "h": 8
+      },
+      "duration": 150
+    },
+    {
+      "filename": "3",
+      "frame": {
+        "x": 0,
+        "y": 8,
+        "w": 8,
+        "h": 8
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 8,
+        "h": 8
+      },
+      "sourceSize": {
+        "w": 8,
+        "h": 8
+      },
+      "duration": 150
+    },
+    {
+      "filename": "4",
+      "frame": {
+        "x": 8,
+        "y": 8,
+        "w": 8,
+        "h": 8
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 8,
+        "h": 8
+      },
+      "sourceSize": {
+        "w": 8,
+        "h": 8
+      },
+      "duration": 150
+    },
+    {
+      "filename": "5",
+      "frame": {
+        "x": 16,
+        "y": 8,
+        "w": 8,
+        "h": 8
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 8,
+        "h": 8
+      },
+      "sourceSize": {
+        "w": 8,
+        "h": 8
+      },
+      "duration": 150
+    }
+  ],
+  "meta": {
+    "app": "https://gamedev-studio.pladsen.dev",
+    "version": "1.0",
+    "image": "pip_walk.png",
+    "format": "RGBA8888",
+    "size": {
+      "w": 24,
+      "h": 16
+    },
+    "scale": "1",
+    "frameTags": [
+      {
+        "name": "idle",
+        "from": 0,
+        "to": 1,
+        "direction": "forward",
+        "color": "#5aa9e6ff"
+      },
+      {
+        "name": "walk",
+        "from": 2,
+        "to": 5,
+        "direction": "forward",
+        "color": "#5aa9e6ff"
+      },
+      {
+        "name": "hop",
+        "from": 3,
+        "to": 5,
+        "direction": "pingpong",
+        "color": "#5aa9e6ff"
+      },
+      {
+        "name": "walk_2",
+        "from": 2,
+        "to": 4,
+        "direction": "reverse",
+        "color": "#5aa9e6ff"
+      }
+    ],
+    "layers": [],
+    "slices": []
+  }
+}

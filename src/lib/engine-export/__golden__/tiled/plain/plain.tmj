@@ -1,0 +1,113 @@
+{
+  "type": "map",
+  "version": "1.10",
+  "orientation": "orthogonal",
+  "renderorder": "right-down",
+  "infinite": false,
+  "compressionlevel": -1,
+  "width": 4,
+  "height": 3,
+  "tilewidth": 8,
+  "tileheight": 8,
+  "nextlayerid": 3,
+  "nextobjectid": 1,
+  "layers": [
+    {
+      "id": 1,
+      "name": "Rock",
+      "type": "tilelayer",
+      "x": 0,
+      "y": 0,
+      "width": 4,
+      "height": 3,
+      "opacity": 1,
+      "visible": true,
+      "data": [
+        1,
+        1,
+        1,
+        1,
+        2,
+        0,
+        0,
+        3,
+        1,
+        1,
+        0,
+        0
+      ]
+    },
+    {
+      "id": 2,
+      "name": "Secrets",
+      "type": "tilelayer",
+      "x": 0,
+      "y": 0,
+      "width": 4,
+      "height": 3,
+      "opacity": 1,
+      "visible": false,
+      "data": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        4,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    }
+  ],
+  "tilesets": [
+    {
+      "firstgid": 1,
+      "name": "plain",
+      "image": "plain_tiles.png",
+      "imagewidth": 24,
+      "imageheight": 16,
+      "tilewidth": 8,
+      "tileheight": 8,
+      "tilecount": 6,
+      "columns": 3,
+      "margin": 0,
+      "spacing": 0,
+      "tiles": [
+        {
+          "id": 4,
+          "properties": [
+            {
+              "name": "collides",
+              "type": "bool",
+              "value": true
+            },
+            {
+              "name": "one_way",
+              "type": "bool",
+              "value": false
+            }
+          ]
+        },
+        {
+          "id": 5,
+          "properties": [
+            {
+              "name": "collides",
+              "type": "bool",
+              "value": true
+            },
+            {
+              "name": "one_way",
+              "type": "bool",
+              "value": true
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

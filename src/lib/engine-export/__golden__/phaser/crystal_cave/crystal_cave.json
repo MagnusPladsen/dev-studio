@@ -1,0 +1,248 @@
+{
+  "type": "map",
+  "version": "1.10",
+  "orientation": "orthogonal",
+  "renderorder": "right-down",
+  "infinite": false,
+  "compressionlevel": -1,
+  "width": 4,
+  "height": 3,
+  "tilewidth": 8,
+  "tileheight": 8,
+  "nextlayerid": 4,
+  "nextobjectid": 1,
+  "layers": [
+    {
+      "id": 1,
+      "name": "Rock",
+      "type": "tilelayer",
+      "x": 0,
+      "y": 0,
+      "width": 4,
+      "height": 3,
+      "opacity": 1,
+      "visible": true,
+      "data": [
+        3,
+        3,
+        3,
+        3,
+        4,
+        0,
+        0,
+        1,
+        3,
+        3,
+        0,
+        0
+      ]
+    },
+    {
+      "id": 2,
+      "name": "Secrets",
+      "type": "tilelayer",
+      "x": 0,
+      "y": 0,
+      "width": 4,
+      "height": 3,
+      "opacity": 1,
+      "visible": false,
+      "data": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        7,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": 3,
+      "name": "Collision",
+      "type": "tilelayer",
+      "x": 0,
+      "y": 0,
+      "width": 4,
+      "height": 3,
+      "opacity": 1,
+      "visible": false,
+      "data": [
+        8,
+        8,
+        8,
+        8,
+        0,
+        9,
+        9,
+        0,
+        8,
+        8,
+        0,
+        0
+      ]
+    }
+  ],
+  "tilesets": [
+    {
+      "firstgid": 1,
+      "name": "crystal_cave",
+      "image": "crystal_cave_tiles.png",
+      "imagewidth": 24,
+      "imageheight": 24,
+      "tilewidth": 8,
+      "tileheight": 8,
+      "tilecount": 9,
+      "columns": 3,
+      "margin": 0,
+      "spacing": 0,
+      "tiles": [
+        {
+          "id": 7,
+          "properties": [
+            {
+              "name": "collides",
+              "type": "bool",
+              "value": true
+            },
+            {
+              "name": "one_way",
+              "type": "bool",
+              "value": false
+            }
+          ]
+        },
+        {
+          "id": 8,
+          "properties": [
+            {
+              "name": "collides",
+              "type": "bool",
+              "value": true
+            },
+            {
+              "name": "one_way",
+              "type": "bool",
+              "value": true
+            }
+          ]
+        }
+      ],
+      "wangsets": [
+        {
+          "name": "Rock",
+          "type": "edge",
+          "tile": -1,
+          "colors": [
+            {
+              "name": "Rock",
+              "color": "#f6c945",
+              "tile": -1,
+              "probability": 1
+            }
+          ],
+          "wangtiles": [
+            {
+              "tileid": 0,
+              "wangid": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ]
+            },
+            {
+              "tileid": 1,
+              "wangid": [
+                0,
+                0,
+                1,
+                0,
+                1,
+                0,
+                0,
+                0
+              ]
+            },
+            {
+              "tileid": 2,
+              "wangid": [
+                1,
+                0,
+                1,
+                0,
+                1,
+                0,
+                1,
+                0
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Moss",
+          "type": "mixed",
+          "tile": -1,
+          "colors": [
+            {
+              "name": "Moss",
+              "color": "#6abe30",
+              "tile": -1,
+              "probability": 1
+            }
+          ],
+          "wangtiles": [
+            {
+              "tileid": 3,
+              "wangid": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ]
+            },
+            {
+              "tileid": 4,
+              "wangid": [
+                0,
+                0,
+                1,
+                1,
+                1,
+                0,
+                0,
+                0
+              ]
+            },
+            {
+              "tileid": 5,
+              "wangid": [
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
