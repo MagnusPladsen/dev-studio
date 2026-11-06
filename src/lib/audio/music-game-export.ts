@@ -185,9 +185,8 @@ function effectiveMode(track: MusicTrack, mode: GameExportMode): GameExportMode 
   return mode === "intro-and-loop" && !hasIntro(track) ? "loop" : mode;
 }
 
-function assertLoopHasSamples(track: MusicTrack, mode: GameExportMode): void {
-  const isLoopNeeded = mode === "loop" || mode === "fade-out";
-  if (isLoopNeeded && toSamples(stepsSeconds(track, songParts(track).loop)) === 0) throw new Error("This song has no notes to loop.");
+function assertLoopHasSamples(track: MusicTrack): void {
+  if (toSamples(stepsSeconds(track, songParts(track).loop)) === 0) throw new Error("This song has no notes to loop.");
 }
 
 function renderParts(track: MusicTrack, options: GameExportOptions, render: Renderer): Promise<RenderedPart[]> {
@@ -234,7 +233,7 @@ async function encodePart(part: NamedPart, options: GameExportOptions, deps: Gam
  */
 export async function buildGameExport(track: MusicTrack, requested: GameExportOptions, deps: GameExportDeps = {}): Promise<ExportFile> {
   const options = { ...requested, mode: effectiveMode(track, requested.mode) };
-  assertLoopHasSamples(track, options.mode);
+  assertLoopHasSamples(track);
   const parts = await renderNamedParts(track, options, deps);
   const gain = options.normalise ? peakGain(parts.map((part) => part.samples)) : 1;
   const extension = options.format;

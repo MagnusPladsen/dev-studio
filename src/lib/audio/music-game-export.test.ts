@@ -306,6 +306,7 @@ describe("buildGameExport", () => {
     const { deps } = fakeOgg();
     await expect(buildGameExport(song, DEFAULT_GAME_EXPORT, deps)).rejects.toThrow("This song has no notes to loop.");
     await expect(buildGameExport(song, { ...DEFAULT_GAME_EXPORT, mode: "fade-out" }, deps)).rejects.toThrow("This song has no notes to loop.");
+    await expect(buildGameExport(song, { ...DEFAULT_GAME_EXPORT, mode: "intro-and-loop" }, deps)).rejects.toThrow("This song has no notes to loop.");
   });
 
   it("names stems of intro-and-loop by channel", async () => {
