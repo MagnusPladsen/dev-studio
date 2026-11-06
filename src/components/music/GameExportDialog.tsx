@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useRef, useState } from "react";
+import { useCallback, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { useDialogKeys, useFocusOnOpen } from "@/hooks/useDialogFocus";
@@ -29,15 +29,19 @@ const MODE_LABELS: Record<GameExportMode, string> = {
 
 const rowLabel = "w-20 shrink-0 text-xs font-medium max-md:w-full";
 
-function readSavedOptions(track: MusicTrack): GameExportOptions {
+function readSavedOptions(): GameExportOptions {
   let raw: string | null = null;
   try {
     raw = localStorage.getItem(OPTIONS_KEY);
   } catch {
     // Storage blocked: start from the defaults.
   }
-  const saved = readGameExportOptions(raw);
-  return saved.mode === "intro-and-loop" && !hasIntro(track) ? { ...saved, mode: "loop" } : saved;
+  return readGameExportOptions(raw);
+}
+
+/** Two files need an intro: without one, the remembered choice is shown and exported as looping music but kept for other songs. */
+function effectiveOptions(requested: GameExportOptions, track: MusicTrack): GameExportOptions {
+  return requested.mode === "intro-and-loop" && !hasIntro(track) ? { ...requested, mode: "loop" } : requested;
 }
 
 function saveOptions(options: GameExportOptions) {
@@ -163,19 +167,23 @@ export function GameExportDialog({ track, onClose }: { track: MusicTrack; onClos
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
   const exportRef = useRef<HTMLButtonElement>(null);
-  const [options, setOptions] = useState(() => readSavedOptions(track));
+  const [requested, setRequested] = useState(readSavedOptions);
+  const options = effectiveOptions(requested, track);
   const { isExporting, error, runExport } = useGameExport(track, options, onClose);
-  useDialogKeys(panelRef, onClose);
+  const dismiss = useCallback(() => {
+    if (!isExporting) onClose();
+  }, [isExporting, onClose]);
+  useDialogKeys(panelRef, dismiss);
   useFocusOnOpen(exportRef);
 
   function update(change: Partial<GameExportOptions>) {
-    const next = { ...options, ...change };
-    setOptions(next);
+    const next = { ...requested, ...change };
+    setRequested(next);
     saveOptions(next);
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 max-md:p-0 max-md:items-end bg-black/60 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 max-md:p-0 max-md:items-end bg-black/60 backdrop-blur-sm" onClick={dismiss}>
       <div
         ref={panelRef}
         role="dialog"
@@ -189,7 +197,7 @@ export function GameExportDialog({ track, onClose }: { track: MusicTrack; onClos
           <h2 id={titleId} className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
             Export for game
           </h2>
-          <button type="button" onClick={onClose} className="shrink-0 p-1 rounded" style={{ color: "var(--text-muted)" }} title="Close" aria-label="Close">
+          <button type="button" onClick={onClose} disabled={isExporting} className="shrink-0 p-1 rounded disabled:opacity-50" style={{ color: "var(--text-muted)" }} title="Close" aria-label="Close">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -211,7 +219,7 @@ export function GameExportDialog({ track, onClose }: { track: MusicTrack; onClos
         <div className="flex items-center justify-between gap-3 p-6 pt-0 max-md:p-4 max-md:pt-0 max-md:flex-col max-md:items-stretch">
           <p className="text-xs" style={{ color: "var(--text-muted)" }}>Free to use in any project, no watermark.</p>
           <div className="flex justify-end gap-2 shrink-0">
-            <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg text-sm max-md:flex-1" style={{ color: "var(--text-primary)", border: "1px solid var(--border)" }}>
+            <button type="button" onClick={onClose} disabled={isExporting} className="px-4 py-2 rounded-lg text-sm disabled:opacity-50 max-md:flex-1" style={{ color: "var(--text-primary)", border: "1px solid var(--border)" }}>
               Cancel
             </button>
             <button
