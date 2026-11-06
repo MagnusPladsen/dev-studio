@@ -31,6 +31,12 @@ describe("writeMidiFile", () => {
     expect(channels).toEqual([0, 1, 2, 9]);
   });
 
+  it("keeps every melodic voice on a valid MIDI channel other than 9", () => {
+    const voices = Array.from({ length: 17 }, (_, index) => channel(`v${index}`, "square", [note(60, 0)]));
+    const channels = roundTrip(song(voices)).tracks.slice(1).map((t) => t.notes[0].channel);
+    expect(channels.every((value) => value >= 0 && value <= 15 && value !== 9)).toBe(true);
+  });
+
   it("keeps note starts, durations and velocity in ticks", () => {
     const [, lead] = roundTrip(song([channel("Lead", "square", [note(60, 1.5, 0.5, 0.5)])])).tracks;
     expect(lead.notes).toEqual([{ channel: 0, pitch: 60, velocity: 64, startTick: 720, durationTicks: 240 }]);

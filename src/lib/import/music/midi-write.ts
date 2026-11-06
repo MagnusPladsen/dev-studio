@@ -107,9 +107,10 @@ function channelTrack(track: MusicTrack, channel: MusicChannel, midiChannel: num
   return encodeTrack(channel.name, isDrumChannel(channel) ? events : [program, ...events]);
 }
 
-/** MIDI channels for the melodic voices in order, skipping the drum channel. */
+/** MIDI channels for the melodic voices in order, skipping the drum channel; past 15 voices they share channels again. */
 function melodicMidiChannel(index: number): number {
-  return index < DRUM_CHANNEL ? index : index + 1;
+  const slot = index % 15;
+  return slot < DRUM_CHANNEL ? slot : slot + 1;
 }
 
 /** A format 1 Standard MIDI File of the song as Song mode plays it once: a tempo track, then one named track per channel. */
