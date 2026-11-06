@@ -18,6 +18,8 @@ export interface PlayCursor {
   time: number;
   step: number;
   beat: number;
+  /** True once playback has jumped back to the loop step, so the playhead knows what lies before it. */
+  wrapped?: boolean;
 }
 
 export interface DueNote {
@@ -53,6 +55,7 @@ export function scheduleWindow(song: LiveSong, cursor: PlayCursor, until: number
   const beatDuration = 60 / song.track.bpm;
   const notes: DueNote[] = [];
   let { time, step, beat } = cursor;
+  let wrapped = cursor.wrapped ?? false;
   while (time < until - EPSILON) {
     while (step < song.steps.length && beat >= song.steps[step].length - EPSILON) {
       step += 1;
@@ -61,6 +64,7 @@ export function scheduleWindow(song: LiveSong, cursor: PlayCursor, until: number
     if (step >= song.steps.length) {
       if (!song.looping) return { notes, cursor: { time, step: song.steps.length - 1, beat: song.steps[song.steps.length - 1].length }, ended: true };
       step = Math.min(song.loopIndex, song.steps.length - 1);
+      wrapped = true;
     }
     const current = song.steps[step];
     const endBeat = Math.min(current.length, beat + (until - time) / beatDuration);
@@ -70,7 +74,7 @@ export function scheduleWindow(song: LiveSong, cursor: PlayCursor, until: number
   }
   const last = song.steps.length - 1;
   const ended = !song.looping && step >= last && beat >= song.steps[last].length - EPSILON;
-  return { notes, cursor: { time, step, beat }, ended };
+  return { notes, cursor: { time, step, beat, ...(wrapped && { wrapped }) }, ended };
 }
 
 /** The step and beat that are sounding at audio time `now`, for the playhead. */
@@ -78,11 +82,9 @@ export function beatAt(song: LiveSong, cursor: PlayCursor, now: number): { step:
   let step = Math.min(cursor.step, song.steps.length - 1);
   let beat = cursor.beat - (cursor.time - now) / (60 / song.track.bpm);
   while (beat < 0) {
-    step -= 1;
-    if (step < 0) {
-      if (!song.looping) return { step: 0, beat: 0 };
-      step = song.steps.length - 1;
-    }
+    if (step === Math.min(song.loopIndex, song.steps.length - 1) && cursor.wrapped) step = song.steps.length - 1;
+    else step -= 1;
+    if (step < 0) return { step: 0, beat: 0 };
     beat += song.steps[step].length;
   }
   return { step, beat: Math.min(beat, song.steps[step].length) };

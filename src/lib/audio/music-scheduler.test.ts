@@ -67,8 +67,8 @@ describe("scheduleWindow", () => {
 
 describe("beatAt", () => {
   it("counts back from the scheduled cursor and wraps", () => {
-    expect(beatAt(song([[]]), { time: 10, step: 0, beat: 1.5 }, 9.8).beat).toBeCloseTo(1.3);
-    expect(beatAt(song([[]]), { time: 10, step: 0, beat: 0.1 }, 9.8).beat).toBeCloseTo(3.9);
+    expect(beatAt(song([[]]), { time: 10, step: 0, beat: 1.5, wrapped: true }, 9.8).beat).toBeCloseTo(1.3);
+    expect(beatAt(song([[]]), { time: 10, step: 0, beat: 0.1, wrapped: true }, 9.8).beat).toBeCloseTo(3.9);
   });
 });
 
@@ -134,6 +134,15 @@ describe("scheduleWindow over sections", () => {
     expect(result.ended).toBe(true);
   });
 
+  it("marks the cursor as wrapped once it jumps back, and keeps it", () => {
+    const live = { ...song([[note(0)]]), steps: [{ sectionId: LEGACY_SECTION_ID, length: 4 }] };
+    const first = scheduleWindow(live, { time: 0, step: 0, beat: 0 }, 3);
+    expect(first.cursor.wrapped).toBeUndefined();
+    const second = scheduleWindow(live, first.cursor, 5);
+    expect(second.cursor.wrapped).toBe(true);
+    expect(scheduleWindow(live, second.cursor, 6).cursor.wrapped).toBe(true);
+  });
+
   it("ends at once without steps", () => {
     const live = { ...song([[note(0)]]), steps: [] };
     expect(scheduleWindow(live, { time: 0, step: 0, beat: 0 }, 5)).toEqual({ notes: [], cursor: { time: 0, step: 0, beat: 0 }, ended: true });
@@ -154,8 +163,18 @@ describe("beatAt over sections", () => {
   });
 
   it("goes to the last step across the loop wrap", () => {
-    const at = beatAt({ ...twoSteps(), loopIndex: 0 }, { time: 10, step: 0, beat: 0.1 }, 9.8);
+    const at = beatAt({ ...twoSteps(), loopIndex: 0 }, { time: 10, step: 0, beat: 0.1, wrapped: true }, 9.8);
     expect(at.step).toBe(1);
     expect(at.beat).toBeCloseTo(3.9);
+  });
+
+  it("reports the intro on the first pass and the last step after a wrap", () => {
+    const withIntro = { ...song([[]]), steps: [{ sectionId: "intro", length: 4 }, { sectionId: "a", length: 4 }, { sectionId: "b", length: 4 }], loopIndex: 1 };
+    const firstPass = beatAt(withIntro, { time: 10, step: 1, beat: 0.1 }, 9.8);
+    expect(firstPass.step).toBe(0);
+    expect(firstPass.beat).toBeCloseTo(3.9);
+    const afterWrap = beatAt(withIntro, { time: 10, step: 1, beat: 0.1, wrapped: true }, 9.8);
+    expect(afterWrap.step).toBe(2);
+    expect(afterWrap.beat).toBeCloseTo(3.9);
   });
 });
