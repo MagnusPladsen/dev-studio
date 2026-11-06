@@ -32,6 +32,16 @@ export function getSections(track: MusicTrack): MusicSection[] {
   ];
 }
 
+/**
+ * The track as the editor shows and plays it: a legacy song keeps the length it opened with
+ * (`pinnedLength`), growing only when its notes reach further, so erasing notes never shrinks the grid.
+ */
+export function withLegacyLength(track: MusicTrack, pinnedLength: MusicSectionLength): MusicTrack {
+  if (!isLegacy(track)) return track;
+  const [section] = getSections(track);
+  return { ...track, sections: [{ ...section, length: Math.max(section.length, pinnedLength) as MusicSectionLength }] };
+}
+
 export function findPattern(track: MusicTrack, section: MusicSection, channelId: string): MusicPattern | undefined {
   const entry = section.patterns.find((pattern) => pattern.channelId === channelId);
   if (!entry) return undefined;

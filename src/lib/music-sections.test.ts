@@ -17,6 +17,7 @@ import {
   songSteps,
   unlinkPattern,
   updateSection,
+  withLegacyLength,
 } from "./music-sections";
 
 function channel(id: string, patterns: MusicChannel["patterns"]): MusicChannel {
@@ -57,6 +58,29 @@ describe("getSections", () => {
   it("returns stored sections unchanged", () => {
     const sections = [section("a", 8)];
     expect(getSections(track([], { sections }))).toBe(sections);
+  });
+});
+
+describe("withLegacyLength", () => {
+  const legacy = track([channel("c1", [{ id: "p1", notes: [note(2), note(12)] }])]);
+
+  it("should keep a legacy track's length when notes past beat 8 are erased", () => {
+    const erased = setSectionNotes(legacy, "section-a", "c1", (notes) => notes.filter((candidate) => candidate.start < 8));
+    expect(getSections(withLegacyLength(erased, 16))[0].length).toBe(16);
+  });
+
+  it("should leave the stored track legacy", () => {
+    withLegacyLength(legacy, 16);
+    expect(legacy.sections).toBeUndefined();
+  });
+
+  it("should grow past the pinned length when notes reach further", () => {
+    expect(getSections(withLegacyLength(legacy, 8))[0].length).toBe(16);
+  });
+
+  it("should leave a sectioned track as it is", () => {
+    const sectioned = track([], { sections: [section("a", 8)] });
+    expect(withLegacyLength(sectioned, 32)).toBe(sectioned);
   });
 });
 
