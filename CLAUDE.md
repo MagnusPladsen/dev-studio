@@ -95,6 +95,9 @@ tools comes from `COPY.help`. `npm test` checks both objects have the same keys 
   and an `ExamplesBar`. Secondary buttons use `var(--text-primary)` text so they never look disabled. Icon-only
   buttons need `title` + `aria-label`. Pointer cursor and hover come from `globals.css`.
 - The app is marked **beta** in the UI and README.
+- **Versioning**: `src/lib/changelog.ts` lists releases newest first; its first entry is the app version and must match
+  `package.json` (a test checks). A user-facing feature adds a bullet there (`tool:` limits it to apps with that tool) and
+  bumps the version, so returning visitors see the "What's new" popup on studio pages (never on `/`).
 - Commit messages: short imperative summary + a body explaining why. Don't commit secrets; `.env*` is ignored
   except `.env.example`.
 
