@@ -42,6 +42,15 @@ export const CHANGELOG: ChangelogEntry[] = [
         text: "Export WAV at 22/44.1/48 kHz in 8 or 16-bit, zip 5 variations or all your sounds, lock settings while you Random or Mutate, and get back any of your last 10 drafts.",
         tool: "sound",
       },
+      { text: "Undo right after an undo or redo now steps back one change at a time." },
+      {
+        text: "Music instrument presets (Lead, Soft Pad, Bass, Pluck, Bell, Chip Square, drum kits) with attack, decay, sustain, release and vibrato for each channel.",
+        tool: "music",
+      },
+      {
+        text: "Build a song from sections: an intro that plays once, then parts that loop. Export the whole song or one section, and use Show channels to share patterns between sections.",
+        tool: "music",
+      },
     ],
   },
   {
