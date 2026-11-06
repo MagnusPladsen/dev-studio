@@ -175,12 +175,12 @@ describe("tailSeconds", () => {
 
 describe("introSeconds and hasIntro", () => {
   it("is the time before the loop step", () => {
-    expect(introSeconds(sectioned(70))).toBeCloseTo((8 * 60) / 70);
-    expect(hasIntro(sectioned(70))).toBe(true);
+    expect(introSeconds(sectioned(73))).toBeCloseTo((8 * 60) / 73);
+    expect(hasIntro(sectioned(73))).toBe(true);
   });
 
   it("is zero when the song loops from the start", () => {
-    const song = { ...sectioned(70), loopStartId: "intro" };
+    const song = { ...sectioned(73), loopStartId: "intro" };
     expect(introSeconds(song)).toBe(0);
     expect(hasIntro(song)).toBe(false);
   });
@@ -188,11 +188,11 @@ describe("introSeconds and hasIntro", () => {
 
 describe("buildGameExport", () => {
   const rate = RENDER_SAMPLE_RATE;
-  const introSamples = Math.round(((8 * 60) / 70) * rate);
-  const loopSamples = Math.round(((16 * 60) / 70) * rate);
+  const introSamples = Math.round(((8 * 60) / 73) * rate);
+  const loopSamples = Math.round(((16 * 60) / 73) * rate);
 
   it("writes intro + one loop pass with a smpl loop from the loop start to the last sample", async () => {
-    const file = await buildGameExport(sectioned(70), { ...DEFAULT_GAME_EXPORT, format: "wav", normalise: false }, { createContext: boxContext });
+    const file = await buildGameExport(sectioned(73), { ...DEFAULT_GAME_EXPORT, format: "wav", normalise: false }, { createContext: boxContext });
     expect(file.name).toBe("Theme.wav");
     const wav = readWav(file.bytes);
     expect(wav.samples).toBe(introSamples + loopSamples);
@@ -238,7 +238,7 @@ describe("buildGameExport", () => {
 
   it("zips an intro file and a loop file for intro-and-loop", async () => {
     const { deps, decode } = fakeOgg();
-    const file = await buildGameExport(sectioned(70), { ...DEFAULT_GAME_EXPORT, mode: "intro-and-loop" }, deps);
+    const file = await buildGameExport(sectioned(73), { ...DEFAULT_GAME_EXPORT, mode: "intro-and-loop" }, deps);
     expect(file.name).toBe("Theme.zip");
     const entries = unzipSync(file.bytes);
     expect(Object.keys(entries)).toEqual(["Theme - intro.ogg", "Theme - loop.ogg"]);
@@ -259,7 +259,7 @@ describe("buildGameExport", () => {
   });
 
   it("writes one stem per channel, all the same length, that add up to the mix with one shared gain (Review Focus 3)", async () => {
-    const song = sectioned(70);
+    const song = sectioned(73);
     const stems = fakeOgg();
     const zip = await buildGameExport(song, { ...DEFAULT_GAME_EXPORT, stems: true }, stems.deps);
     expect(zip.name).toBe("Theme.zip");
@@ -282,22 +282,48 @@ describe("buildGameExport", () => {
     }
   });
 
+  it("writes the same files as loop mode for two files when the song has no intro", async () => {
+    const song = { ...sectioned(73), loopStartId: "intro" };
+    const looping = fakeOgg();
+    const twoFiles = fakeOgg();
+    const expected = await buildGameExport(song, { ...DEFAULT_GAME_EXPORT, stems: true }, looping.deps);
+    const file = await buildGameExport(song, { ...DEFAULT_GAME_EXPORT, mode: "intro-and-loop", stems: true }, twoFiles.deps);
+    expect(file.name).toBe("Theme.zip");
+    const entries = unzipSync(file.bytes);
+    expect(Object.keys(entries)).toEqual(Object.keys(unzipSync(expected.bytes)));
+    expect(Object.values(entries).map(twoFiles.decode)).toEqual(Object.values(unzipSync(expected.bytes)).map(looping.decode));
+  });
+
+  it("writes one file for two files without stems when the song has no intro", async () => {
+    const { deps } = fakeOgg();
+    const file = await buildGameExport({ ...sectioned(73), loopStartId: "intro" }, { ...DEFAULT_GAME_EXPORT, mode: "intro-and-loop" }, deps);
+    expect(file.name).toBe("Theme.ogg");
+  });
+
+  it("refuses a song whose loop part has no length, for loop and fade-out", async () => {
+    const song = sectioned(73);
+    song.sections = song.sections?.map((section) => (section.id === "loop" ? { ...section, repeat: 0 } : section));
+    const { deps } = fakeOgg();
+    await expect(buildGameExport(song, DEFAULT_GAME_EXPORT, deps)).rejects.toThrow("This song has no notes to loop.");
+    await expect(buildGameExport(song, { ...DEFAULT_GAME_EXPORT, mode: "fade-out" }, deps)).rejects.toThrow("This song has no notes to loop.");
+  });
+
   it("names stems of intro-and-loop by channel", async () => {
     const { deps } = fakeOgg();
-    const zip = await buildGameExport(sectioned(70), { ...DEFAULT_GAME_EXPORT, mode: "intro-and-loop", stems: true }, deps);
+    const zip = await buildGameExport(sectioned(73), { ...DEFAULT_GAME_EXPORT, mode: "intro-and-loop", stems: true }, deps);
     expect(Object.keys(unzipSync(zip.bytes))).toEqual(["Theme - Lead - intro.ogg", "Theme - Lead - loop.ogg", "Theme - Drums - intro.ogg", "Theme - Drums - loop.ogg"]);
   });
 
   it("includes every channel: mute and solo are not part of a game export", async () => {
     const { deps, decode } = fakeOgg();
-    const samples = decode((await buildGameExport(sectioned(70), { ...DEFAULT_GAME_EXPORT, normalise: false }, deps)).bytes);
+    const samples = decode((await buildGameExport(sectioned(73), { ...DEFAULT_GAME_EXPORT, normalise: false }, deps)).bytes);
     // lead and drums both sound in the first beat of the intro
     expect(samples[100]).toBeCloseTo(2 * BOX_LEVEL);
   });
 
   it("normalises the peak to -1 dBFS", async () => {
     const { deps, decode } = fakeOgg();
-    const samples = decode((await buildGameExport(sectioned(70), DEFAULT_GAME_EXPORT, deps)).bytes);
+    const samples = decode((await buildGameExport(sectioned(73), DEFAULT_GAME_EXPORT, deps)).bytes);
     expect(peak(samples)).toBeCloseTo(NORMALISE_PEAK);
   });
 });

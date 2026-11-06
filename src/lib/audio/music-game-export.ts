@@ -180,6 +180,16 @@ async function renderFadeOut(track: MusicTrack, options: GameExportOptions, rend
   return [{ part: null, samples: fadeOut(rendered, fadeStart, fadeLength) }];
 }
 
+/** Two files need an intro; without one the song is exported as one looping file. */
+function effectiveMode(track: MusicTrack, mode: GameExportMode): GameExportMode {
+  return mode === "intro-and-loop" && !hasIntro(track) ? "loop" : mode;
+}
+
+function assertLoopHasSamples(track: MusicTrack, mode: GameExportMode): void {
+  const isLoopNeeded = mode === "loop" || mode === "fade-out";
+  if (isLoopNeeded && toSamples(stepsSeconds(track, songParts(track).loop)) === 0) throw new Error("This song has no notes to loop.");
+}
+
 function renderParts(track: MusicTrack, options: GameExportOptions, render: Renderer): Promise<RenderedPart[]> {
   if (options.mode === "intro-and-loop") return renderIntroAndLoop(track, render);
   if (options.mode === "fade-out") return renderFadeOut(track, options, render);
@@ -222,7 +232,9 @@ async function encodePart(part: NamedPart, options: GameExportOptions, deps: Gam
  * one file, or a ZIP when there are stems or an intro and a loop file. Normalising uses one gain for every file,
  * so stems still add up to the mix.
  */
-export async function buildGameExport(track: MusicTrack, options: GameExportOptions, deps: GameExportDeps = {}): Promise<ExportFile> {
+export async function buildGameExport(track: MusicTrack, requested: GameExportOptions, deps: GameExportDeps = {}): Promise<ExportFile> {
+  const options = { ...requested, mode: effectiveMode(track, requested.mode) };
+  assertLoopHasSamples(track, options.mode);
   const parts = await renderNamedParts(track, options, deps);
   const gain = options.normalise ? peakGain(parts.map((part) => part.samples)) : 1;
   const extension = options.format;
