@@ -1,4 +1,4 @@
-import { ArrowLeftRight, Film, SquareDashed, ArrowRight, Box, CalendarRange, CirclePlay, Columns3, Copy, Download, GitPullRequestArrow, Hash, FileCode, FileText, FlipHorizontal2, FolderOpen, Gauge, Grid3X3, Image, Layers, LayoutGrid, LayoutTemplate, Link2, List, ListChecks, ListTodo, Maximize2, MessageSquare, MousePointer2, Music, Network, NotebookPen, PaintBucket, Paintbrush, Palette, Pencil, Piano, Pipette, Play, Rows3, Ruler, Scaling, Search, Shapes, Shuffle, SlidersHorizontal, Sparkles, SquareCheck, StickyNote, VolumeX, WandSparkles, Waypoints, type LucideIcon } from "lucide-react";
+import { ArrowLeftRight, Film, SquareDashed, ArrowRight, Box, CalendarRange, CirclePlay, Columns3, Copy, Download, GitPullRequestArrow, Hash, FileCode, FileText, FlipHorizontal2, FolderOpen, Gauge, Grid3X3, Image, Layers, LayoutGrid, LayoutTemplate, Link2, List, ListChecks, ListTodo, Maximize2, MessageSquare, MousePointer2, Music, Network, NotebookPen, PaintBucket, Paintbrush, Palette, Pencil, Piano, Pipette, Play, Rows3, Ruler, Scaling, Scissors, Search, Shapes, Shuffle, SlidersHorizontal, Sparkles, SquareCheck, StickyNote, WandSparkles, Waypoints, type LucideIcon } from "lucide-react";
 import { COPY, type HelpText } from "@/copy";
 import { MENU_TIP, UNDO_TIP } from "@/copy/shared";
 
@@ -74,20 +74,26 @@ export const HELP: Record<HelpTopic, HelpContent> = {
     summary: "Compose chiptune loops on a four-channel piano roll.",
     canDo: [
       { icon: Music, text: "Write notes for melody, harmony, bass and drums channels." },
-      { icon: Piano, text: "Pick an instrument per channel: square, triangle, noise and more." },
-      { icon: Gauge, text: "Set tempo (BPM), loop length and note length." },
-      { icon: VolumeX, text: "Mute or solo channels while you listen." },
-      { icon: Download, text: "Export the pattern as a WAV file." },
+      { icon: Rows3, text: "Build a song from sections: an intro that plays once, then parts that loop." },
+      { icon: Piano, text: "Pick an instrument per channel (Lead, Soft Pad, Bass, Pluck, Bell, Chip Square, drum kits) and shape its envelope and vibrato." },
+      { icon: Gauge, text: "Set tempo (BPM), loop length, note length, and a key and scale so every note fits." },
+      { icon: Download, text: "Export the whole song or one section as a WAV file." },
     ],
     steps: [
       "Press + to make a new track, or add the examples.",
       "Pick a channel, then click the grid to place a note.",
       "Drag in any direction to draw a run of notes; Note length sets how long each one is.",
       "Press Play, turn on Loop, and keep tweaking.",
+      "Press Add section to start a second part; click a block to edit it.",
     ],
     tips: [
       "Click a note again to remove it, or start a drag on a note to erase along the way.",
+      "Mute or solo channels while you listen.",
       "Ctrl/⌘ + scroll zooms time; add Shift to zoom pitch.",
+      "Scale greys out the rows outside the key. Chromatic turns the lock off; drums are never locked.",
+      "The sliders button on a channel opens its instrument: Attack fades a note in, Decay and Sustain set how it settles, Release how long it rings after. Classic is the original sound.",
+      "Right-click or long-press a section to rename, repeat, move or loop from it.",
+      "Show channels lets each channel play a different pattern per section. Linked patterns (chain icon) change everywhere they play.",
       UNDO_TIP,
     ],
   },
@@ -123,7 +129,7 @@ export const HELP: Record<HelpTopic, HelpContent> = {
       { icon: Layers, text: "Use layers, and frames for animation with onion skin." },
       { icon: Play, text: "Give each frame its own duration, tag frame ranges (idle, walk) and preview one tag or all frames." },
       { icon: Scaling, text: "Resize the canvas, scale a sprite up (8×8 → 16×16 and more) or swap in a project palette." },
-      { icon: Download, text: "Export a PNG, a sprite sheet with Aseprite JSON, or an animated GIF (one per tag too)." },
+      { icon: Download, text: "Export a PNG, a sprite sheet with Aseprite JSON, an animated GIF (one per tag too), or a zip for Godot 4, Unity, Phaser 3 or Tiled." },
     ],
     steps: [
       "Press New sprite and pick a size.",
@@ -147,7 +153,8 @@ export const HELP: Record<HelpTopic, HelpContent> = {
       { icon: WandSparkles, text: "Generate sounds like Jump, Coin, Laser, Explosion and Hit." },
       { icon: Shuffle, text: "Randomise a sound, or Mutate it a little." },
       { icon: SlidersHorizontal, text: "Fine-tune wave type, pitch, length and more with sliders." },
-      { icon: Download, text: "Keep sounds in your project and export them as WAV." },
+      { icon: Scissors, text: "Finish it here: trim, fade, normalize, change pitch or reverse." },
+      { icon: Download, text: "Export WAV at 22, 44.1 or 48 kHz, 8 or 16-bit, or zip 5 variations or all your sounds." },
     ],
     steps: [
       "Click a generator, for example Jump. Each click makes a new variant.",
@@ -156,6 +163,9 @@ export const HELP: Record<HelpTopic, HelpContent> = {
       "Export it as WAV for your game.",
     ],
     tips: [
+      "Drag the handles at the ends of the waveform to trim the sound.",
+      "Space plays the sound. Lock a group of settings to keep it while you press Random or Mutate.",
+      "Recent keeps your last 10 drafts: click one to hear it and get it back.",
       "Once kept, every change saves by itself.",
       "Ctrl/⌘+Z undoes, Ctrl/⌘+Shift+Z redoes.",
       MENU_TIP,
@@ -192,7 +202,7 @@ export const HELP: Record<HelpTopic, HelpContent> = {
       { icon: PaintBucket, text: "Paint, fill an area or erase." },
       { icon: Layers, text: "Stack layers, hide them and change their order." },
       { icon: Shapes, text: "Auto-tile with terrains, and mark solid or one-way collision." },
-      { icon: Download, text: "Export a PNG of the map or Tiled-style JSON with collision." },
+      { icon: Download, text: "Export a PNG of the map, Tiled-style JSON, or a zip for Godot 4, Unity, Phaser 3 or Tiled with terrains and collision." },
     ],
     steps: [
       "Press + and set the map's width and height in tiles.",

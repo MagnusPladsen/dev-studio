@@ -1,0 +1,4 @@
+coin/coin.png (binary)
+coin/coin.png.meta
+coin/coin_default.anim
+coin/README.md

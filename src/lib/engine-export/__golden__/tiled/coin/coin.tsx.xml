@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<tileset version="1.10" name="coin" tilewidth="8" tileheight="8" tilecount="4" columns="2">
+ <image source="coin.png" width="16" height="16"/>
+ <tile id="0">
+  <properties>
+   <property name="animation" value="default"/>
+  </properties>
+  <animation>
+   <frame tileid="0" duration="125"/>
+   <frame tileid="1" duration="125"/>
+   <frame tileid="2" duration="125"/>
+   <frame tileid="3" duration="125"/>
+  </animation>
+ </tile>
+</tileset>

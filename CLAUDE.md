@@ -56,7 +56,9 @@ tools comes from `COPY.help`. `npm test` checks both objects have the same keys 
   again. Issue keys and ADR numbers are unique per project (DB index); a clash moves ours to the next free one.
   `search_assets` RPC searches the `asset_search` table (kept by trigger). OAuth clients (the MCP) cannot delete.
 - **Supabase**: tables `projects` and `assets` (JSON bodies, row level security per user). Schema lives in
-  `supabase/migrations/` and is applied by Supabase's GitHub integration. Adding a collection means a new migration
+  `supabase/migrations/` and is applied by Supabase's GitHub integration on merge to `main` (connected 2026-11-04;
+  the migrations before that were run by hand and recorded in `supabase_migrations.schema_migrations`). After merging
+  one, check the live API has it before relying on it. Adding a collection means a new migration
   that widens `assets_collection_check` (and, if its text should be searchable, a case in `asset_search_text`).
   `supabase/db-tests/run.sh` applies every migration to Postgres 17 in Docker and runs SQL checks with two users. Env: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
 - **Assets & links**: `src/lib/assets.ts` (`ASSET_KINDS` registry: collection, label, tool path, colour) and
@@ -79,6 +81,10 @@ tools comes from `COPY.help`. `npm test` checks both objects have the same keys 
 - **Import**: `src/lib/import/` (contract + how to add one in its `README.md`). One file per `Importer` (`parse` →
   items with fresh ids + warnings) listed in the tool's array (`CANVAS_IMPORTERS`…); `useImport` + `<ImportMenu>`
   (right before `ExportMenu`) + `<ImportDropZone>`; `jsonReimporter` re-imports a tool's own JSON export.
+- **Engine exports**: `src/lib/engine-export/` (`ENGINES`: Godot 4, Unity, Phaser 3, Tiled) turns a Pixel Art sprite or
+  a Tilemap into one zip (fflate) per engine; pure file builders, browser drawing in `render.ts`. Golden files in
+  `__golden__/` (`npm test -- -u` rewrites them); `GODOT_EXPORT_DIR=<godot project> npm test -- godot` writes the
+  Godot exports there for a `godot --headless --import` check.
 
 ## Conventions (agreed with the owner)
 
@@ -93,6 +99,9 @@ tools comes from `COPY.help`. `npm test` checks both objects have the same keys 
   and an `ExamplesBar`. Secondary buttons use `var(--text-primary)` text so they never look disabled. Icon-only
   buttons need `title` + `aria-label`. Pointer cursor and hover come from `globals.css`.
 - The app is marked **beta** in the UI and README.
+- **Versioning**: `src/lib/changelog.ts` lists releases newest first; its first entry is the app version and must match
+  `package.json` (a test checks). A user-facing feature adds a bullet there (`tool:` limits it to apps with that tool) and
+  bumps the version, so returning visitors see the "What's new" popup on studio pages (never on `/`).
 - Commit messages: short imperative summary + a body explaining why. Don't commit secrets; `.env*` is ignored
   except `.env.example`.
 
@@ -101,6 +110,11 @@ tools comes from `COPY.help`. `npm test` checks both objects have the same keys 
 vitest unit tests cover the voxel lib and the examples (`npm test`). UI changes are still verified by building, running `next start`, and driving the app with
 Playwright (desktop 1440×900 and phone 390×844): create a project with examples, open every tool, check for page
 errors and horizontal overflow on phones, and exercise the feature changed. Do the same before pushing UI work.
+
+`scripts/mcp-e2e.sh` runs the MCP server end to end against a local Supabase in Docker (real OAuth sign-in, every
+tool and prompt, the app opening what it made, two-user RLS); it needs Docker and the Supabase CLI. The npm package
+publishes from `.github/workflows/mcp-release.yml` when `packages/mcp/package.json`'s version changes (see
+`packages/mcp/PUBLISHING.md`).
 
 ## Known gaps
 
@@ -112,7 +126,7 @@ errors and horizontal overflow on phones, and exercise the feature changed. Do t
 
 ## Next up (from competitor research, highest value first)
 
-Pixel Art animation tags + per-frame durations · Tilemap auto-tiling and collision layer · one-click engine exports
+One-click engine exports
 (Godot, Unity, Phaser, Tiled) · mirror / pixel-perfect / dither tools and Lospec palette import · Tilemap object layer
-· story timeline and world map · multi-pattern songs, envelopes, MIDI ·
+· story timeline and world map · MIDI ·
 pixel font maker · read-only share links and a "play this level" preview.

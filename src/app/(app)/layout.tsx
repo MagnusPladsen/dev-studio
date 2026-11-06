@@ -29,6 +29,7 @@ import { SyncProvider, useSync } from "@/components/SyncProvider";
 import { ToastProvider } from "@/components/Toast";
 import { AssetContextMenuProvider, useAssetMenu } from "@/components/AssetContextMenu";
 import { LiveRefresh } from "@/components/LiveRefresh";
+import { WhatsNewButton, WhatsNewOnUpdate } from "@/components/WhatsNew";
 import type { ContextMenuEntry } from "@/components/ContextMenu";
 import { anchorPoint, type Point } from "@/lib/menu-position";
 import { SidebarPins } from "@/components/SidebarPins";
@@ -234,6 +235,7 @@ function AppSidebar({ children }: { children: React.ReactNode }) {
         </div>
 
         <div className="p-3 border-t" style={{ borderColor: "var(--border)" }}>
+          <WhatsNewButton />
           <AccountPanel />
         </div>
       </aside>
@@ -310,6 +312,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <ToastProvider>
           <AssetContextMenuProvider>
             <LiveRefresh />
+            <WhatsNewOnUpdate />
             <AppSidebar>{children}</AppSidebar>
           </AssetContextMenuProvider>
         </ToastProvider>

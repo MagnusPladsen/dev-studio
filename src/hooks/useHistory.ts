@@ -1,9 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createHistoryStacks, recordChange, stepHistory } from "@/lib/history";
 
 const BURST_MS = 500;
-const LIMIT = 200;
 
 export interface History {
   undo(): void;
@@ -58,18 +58,13 @@ export function useHistory<T>(
   resetKey?: unknown,
   { burstMs = BURST_MS }: { burstMs?: number } = {}
 ): History {
-  const past = useRef<T[]>([]);
-  const future = useRef<T[]>([]);
-  const last = useRef(value);
-  const applying = useRef(false);
+  const stacks = useRef(createHistoryStacks(value));
   const burst = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [, bump] = useState(0);
   const rerender = () => bump((n) => n + 1);
 
   useEffect(() => {
-    past.current = [];
-    future.current = [];
-    last.current = value;
+    stacks.current = createHistoryStacks(value);
     if (burst.current) clearTimeout(burst.current);
     burst.current = null;
     rerender();
@@ -77,46 +72,32 @@ export function useHistory<T>(
   }, [resetKey]);
 
   useEffect(() => {
-    if (Object.is(value, last.current)) return;
-    if (applying.current) {
-      applying.current = false;
-      last.current = value;
-      return;
-    }
-    if (!burst.current) {
-      past.current.push(last.current);
-      if (past.current.length > LIMIT) past.current.shift();
-      future.current = [];
-      rerender();
-    } else {
-      clearTimeout(burst.current);
-    }
+    const result = recordChange(stacks.current, value, burst.current !== null);
+    if (result === "unchanged" || result === "applied") return;
+    if (result === "newStep") rerender();
+    if (burst.current) clearTimeout(burst.current);
     burst.current = setTimeout(() => (burst.current = null), burstMs);
-    last.current = value;
   }, [value, burstMs]);
 
   const applyRef = useRef(apply);
   applyRef.current = apply;
 
-  const step = useCallback((from: React.RefObject<T[]>, to: React.RefObject<T[]>) => {
-    const target = from.current.pop();
+  const step = useCallback((direction: "undo" | "redo") => {
+    const target = stepHistory(stacks.current, direction);
     if (target === undefined) return;
     if (burst.current) clearTimeout(burst.current);
     burst.current = null;
-    to.current.push(last.current);
-    last.current = target;
-    applying.current = true;
     applyRef.current(target);
     rerender();
   }, []);
 
-  const undo = useCallback(() => step(past, future), [step]);
-  const redo = useCallback(() => step(future, past), [step]);
+  const undo = useCallback(() => step("undo"), [step]);
+  const redo = useCallback(() => step("redo"), [step]);
   const checkpoint = useCallback(() => {
     if (burst.current) clearTimeout(burst.current);
     burst.current = null;
   }, []);
   useUndoShortcuts(undo, redo);
 
-  return { undo, redo, canUndo: past.current.length > 0, canRedo: future.current.length > 0, checkpoint };
+  return { undo, redo, canUndo: stacks.current.past.length > 0, canRedo: stacks.current.future.length > 0, checkpoint };
 }
