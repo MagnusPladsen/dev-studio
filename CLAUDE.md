@@ -127,5 +127,5 @@ publishes from `.github/workflows/mcp-release.yml` when `packages/mcp/package.js
 ## Next up (from competitor research, highest value first)
 
 Mirror / pixel-perfect / dither tools and Lospec palette import · Tilemap object layer
-· story timeline and world map · MIDI ·
+· story timeline and world map ·
 pixel font maker · read-only share links and a "play this level" preview.
