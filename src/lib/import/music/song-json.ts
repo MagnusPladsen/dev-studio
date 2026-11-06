@@ -54,7 +54,7 @@ function withValidSections(song: MusicTrack, rawSections: unknown): MusicTrack {
 }
 
 function readSong(value: unknown): MusicTrack {
-  if (!isRecord(value) || typeof value.bpm !== "number" || !Array.isArray(value.channels)) {
+  if (!isRecord(value) || typeof value.bpm !== "number" || !(value.bpm > 0) || !Array.isArray(value.channels)) {
     throw new ImportError("This isn't a song file. Export one from the Music composer with Export → Song JSON.");
   }
   if (!value.channels.every(isChannel)) throw new ImportError("This song file is damaged: some channels or notes are incomplete.");

@@ -14,12 +14,12 @@ export function useDialogKeys(panelRef: React.RefObject<HTMLDivElement | null>, 
 }
 
 function trapTab(event: KeyboardEvent, panel: HTMLElement | null) {
-  const buttons = Array.from(panel?.querySelectorAll<HTMLButtonElement>("button") ?? []);
-  if (buttons.length === 0) return;
+  const controls = Array.from(panel?.querySelectorAll<HTMLElement>("button:not(:disabled), select:not(:disabled), input:not(:disabled):not([type=radio]), input[type=radio]:checked:not(:disabled)") ?? []);
+  if (controls.length === 0) return;
   event.preventDefault();
-  const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
+  const index = controls.indexOf(document.activeElement as HTMLElement);
   const step = event.shiftKey ? -1 : 1;
-  buttons[(index + step + buttons.length) % buttons.length].focus();
+  controls[(index + step + controls.length) % controls.length].focus();
 }
 
 /** Puts focus on the main button while open and hands it back to where it was on close. */

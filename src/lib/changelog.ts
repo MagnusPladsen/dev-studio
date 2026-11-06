@@ -20,6 +20,16 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.3.0-beta",
+    date: "2026-11-06",
+    items: [
+      {
+        text: "Export for game: OGG or WAV that loops cleanly in your engine, an intro + loop pair, a fade-out version, stems, and MIDI.",
+        tool: "music",
+      },
+    ],
+  },
+  {
     version: "0.2.0-beta",
     date: "2026-11-04",
     items: [

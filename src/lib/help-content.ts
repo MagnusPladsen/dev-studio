@@ -77,7 +77,7 @@ export const HELP: Record<HelpTopic, HelpContent> = {
       { icon: Rows3, text: "Build a song from sections: an intro that plays once, then parts that loop." },
       { icon: Piano, text: "Pick an instrument per channel (Lead, Soft Pad, Bass, Pluck, Bell, Chip Square, drum kits) and shape its envelope and vibrato." },
       { icon: Gauge, text: "Set tempo (BPM), loop length, note length, and a key and scale so every note fits." },
-      { icon: Download, text: "Export the whole song or one section as a WAV file." },
+      { icon: Download, text: "Export the whole song, one section, game-ready OGG/WAV loops, stems or MIDI." },
     ],
     steps: [
       "Press + to make a new track, or add the examples.",
@@ -93,6 +93,7 @@ export const HELP: Record<HelpTopic, HelpContent> = {
       "Scale greys out the rows outside the key. Chromatic turns the lock off; drums are never locked.",
       "The sliders button on a channel opens its instrument: Attack fades a note in, Decay and Sustain set how it settles, Release how long it rings after. Classic is the original sound.",
       "Right-click or long-press a section to rename, repeat, move or loop from it.",
+      "Export for game makes a file that loops cleanly; the dialog says which engine setting to use.",
       "Show channels lets each channel play a different pattern per section. Linked patterns (chain icon) change everywhere they play.",
       UNDO_TIP,
     ],

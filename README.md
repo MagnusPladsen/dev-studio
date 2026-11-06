@@ -39,7 +39,7 @@ fix lands in both. Signed in with the same account, each app can list your proje
 | --- | --- |
 | **Task Board** | Jira-style sprints: To Do, In Progress, Testing, Done (columns are yours to change), backlog, issue notes, links to assets |
 | **Pixel Art** | Sprites with layers, animation frames, onion skinning, project palettes, PNG, sprite sheet and animated GIF export |
-| **Music** | Piano-roll composer with melody, harmony, bass and drum channels, zoomable. WAV export |
+| **Music** | Piano-roll composer with melody, harmony, bass and drum channels, zoomable, with song sections. WAV export, game-ready OGG/WAV loops (intro + loop, fade-out, stems) and MIDI |
 | **SFX** | Retro sound effect generator (jump, laser, coin, explosion…) with sliders and WAV export |
 | **Tilemap** | Paint levels with the sprites you drew, on multiple layers. PNG export |
 | **Canvas** | Milanote-style boards for moodboards, story flow, level planning and reference collections: notes, to-do lists, images, YouTube/Spotify/Vimeo/SoundCloud players, link previews, asset cards, groups and colours. Also flow charts and state machines |

@@ -62,3 +62,29 @@ describe("resample", () => {
     expect(Array.from(resample(new Float32Array([0, 1, 0, -1]), 2, 4))).toEqual([0, 0.5, 1, 0.5, 0, -0.5, -1, -1]);
   });
 });
+
+describe("encodeWav loop points", () => {
+  const samples = new Float32Array(10);
+
+  it("writes a smpl chunk with one forward loop after the data", () => {
+    const view = new DataView(encodeWav(samples, 44100, 16, { start: 3, end: 9 }));
+    const smpl = 44 + 20;
+    expect(view.byteLength).toBe(smpl + 8 + 60);
+    expect(view.getUint32(4, true)).toBe(view.byteLength - 8);
+    expect(text(view, smpl, 4)).toBe("smpl");
+    expect(view.getUint32(smpl + 4, true)).toBe(60);
+    expect(view.getUint32(smpl + 8 + 8, true)).toBe(Math.round(1e9 / 44100));
+    expect(view.getUint32(smpl + 8 + 12, true)).toBe(60);
+    expect(view.getUint32(smpl + 8 + 28, true)).toBe(1);
+    expect(view.getUint32(smpl + 8 + 36, true)).toBe(0);
+    expect(view.getUint32(smpl + 8 + 40, true)).toBe(0);
+    expect(view.getUint32(smpl + 8 + 44, true)).toBe(3);
+    expect(view.getUint32(smpl + 8 + 48, true)).toBe(9);
+    expect(view.getUint32(smpl + 8 + 56, true)).toBe(0);
+  });
+
+  it("is byte-identical without a loop", () => {
+    expect(new Uint8Array(encodeWav(samples, 44100, 16, undefined))).toEqual(new Uint8Array(encodeWav(samples, 44100)));
+    expect(encodeWav(samples, 44100).byteLength).toBe(64);
+  });
+});

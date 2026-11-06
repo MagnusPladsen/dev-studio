@@ -26,6 +26,11 @@ describe("Song JSON import", () => {
     expect(await runImporter(songJsonImporter, textFile(JSON.stringify(damaged)))).toEqual({ ok: false, message: expect.stringContaining("damaged") });
   });
 
+  it("rejects a song with a tempo of 0", async () => {
+    const song = { name: "x", bpm: 0, channels: [] };
+    expect(await runImporter(songJsonImporter, textFile(JSON.stringify(song)))).toEqual({ ok: false, message: expect.stringContaining("isn't a song file") });
+  });
+
   describe("sections", () => {
     const note = { pitch: 60, start: 0, duration: 1, velocity: 0.8 };
     const baseSong = {
