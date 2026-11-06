@@ -268,16 +268,17 @@ function ShowChannelsButton({ isOn, onToggle }: { isOn: boolean; onToggle(): voi
     <button
       type="button"
       onClick={onToggle}
-      className="flex items-center gap-1 px-2 py-0.5 my-2.5 mr-4 max-md:mr-2 rounded text-xs shrink-0"
+      className="flex items-center gap-1 px-2 py-0.5 my-2.5 mr-4 max-md:mr-2 max-md:ml-1 max-md:py-1.5 rounded text-xs shrink-0"
       style={{
         color: "var(--text-primary)",
         border: `1px solid ${isOn ? "var(--accent)" : "var(--border)"}`,
         background: isOn ? "var(--bg-hover)" : undefined,
       }}
       aria-pressed={isOn}
+      aria-label="Show channels"
       title={isOn ? "Hide the channel lanes" : "See and change which pattern each channel plays in each section"}
     >
-      <Rows3 className="w-3 h-3" /> Show channels
+      <Rows3 className="w-3 h-3" /> <span className="max-md:hidden">Show channels</span>
     </button>
   );
 }
