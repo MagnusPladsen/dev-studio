@@ -44,10 +44,13 @@ import { applyPreset } from "@/lib/audio/music-instruments";
 import { InstrumentPanel, PresetSelect } from "@/components/music/InstrumentPanel";
 import { LinkedPatternNotice } from "@/components/music/LinkedPatternNotice";
 import { SongRow } from "@/components/music/SongRow";
+import { GameExportDialog } from "@/components/music/GameExportDialog";
 import { useSelectedSection } from "@/hooks/useSelectedSection";
 import { useShowChannels } from "@/hooks/useShowChannels";
 import { RENDER_SAMPLE_RATE, renderSong } from "@/lib/audio/music-render";
 import { encodeWav } from "@/lib/audio/wav";
+import { safeFileName } from "@/lib/audio/sfx-export";
+import { writeMidiFile } from "@/lib/import/music/midi-write";
 import { fitPatternLength, getSections, SECTION_LENGTHS, sectionNotes, setSectionNotes, songSteps, updateSection, withLegacyLength, type SongStep } from "@/lib/music-sections";
 import { beatAt, scheduleWindow, type LiveSong, type PlayCursor } from "@/lib/audio/music-scheduler";
 import { isInScale, isScaleLocked, KEY_NAMES, SCALE_IDS, SCALES, songScale, type ScaleId } from "@/lib/music-scale";
@@ -159,6 +162,7 @@ export default function MusicPage() {
 
   const [tracks, setTracks] = useState<MusicTrack[]>([]);
   const [activeTrack, setActiveTrack] = useState<MusicTrack | null>(null);
+  const [isGameExportOpen, setIsGameExportOpen] = useState(false);
   const [activeChannelIdx, setActiveChannelIdx] = useState(0);
   const [legacyLength, setLegacyLength] = useState<MusicSectionLength>(8);
   const shownTrack = useMemo(() => (activeTrack ? withLegacyLength(activeTrack, legacyLength) : null), [activeTrack, legacyLength]);
@@ -582,6 +586,11 @@ export default function MusicPage() {
     ];
   }
 
+  function exportMidi() {
+    if (!shownTrack) return;
+    downloadBlob(`${safeFileName(shownTrack.name)}.mid`, new Blob([writeMidiFile(shownTrack).slice()], { type: "audio/midi" }));
+  }
+
   function exportJson() {
     if (!activeTrack) return;
     downloadBlob(`${activeTrack.name}.json`, new Blob([JSON.stringify(activeTrack, null, 2)], { type: "application/json" }));
@@ -620,6 +629,7 @@ export default function MusicPage() {
   return (
     <div ref={rootRef} className="flex flex-col h-full" style={{ background: "var(--bg-primary)" }}>
       <ImportDropZone imports={imports} target={rootRef} />
+      {isGameExportOpen && shownTrack && <GameExportDialog track={shownTrack} onClose={() => setIsGameExportOpen(false)} />}
       {/* Top bar */}
       <div
         className="flex items-center justify-between gap-2 px-4 max-md:px-2 h-12 border-b shrink-0"
@@ -652,6 +662,8 @@ export default function MusicPage() {
             disabled={!activeTrack}
             items={[
               ...wavExportItems(),
+              { label: "Export for game…", description: "OGG or WAV that loops cleanly, stems, fade-out", onClick: () => setIsGameExportOpen(true) },
+              { label: "MIDI (.mid)", description: "Notes and tempo for a music app like LMMS (free)", onClick: exportMidi },
               { label: "Song JSON", description: "Every channel and note, to import again later", onClick: exportJson },
             ]}
           />
