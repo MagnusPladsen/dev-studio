@@ -44,6 +44,14 @@ export const CHANGELOG: ChangelogEntry[] = [
       },
       { text: "Undo right after an undo or redo now steps back one change at a time." },
       {
+        text: "Export for engine: Pixel Art and Tilemap download a ready-to-load zip for Godot 4, Unity, Phaser 3 or Tiled.",
+        tool: "sprite",
+      },
+      {
+        text: "Dialogue variables, condition else-branches and set nodes, a live preview, plus Yarn Spinner export and a localisation CSV you can translate and import back.",
+        tool: "dialogue",
+      },
+      {
         text: "Music instrument presets (Lead, Soft Pad, Bass, Pluck, Bell, Chip Square, drum kits) with attack, decay, sustain, release and vibrato for each channel.",
         tool: "music",
       },
