@@ -125,5 +125,5 @@ publishes from `.github/workflows/mcp-release.yml` when `packages/mcp/package.js
 
 One-click engine exports
 (Godot, Unity, Phaser, Tiled) · mirror / pixel-perfect / dither tools and Lospec palette import · Tilemap object layer
-· dialogue variables and localisation CSV · story timeline and world map · multi-pattern songs, MIDI ·
+· dialogue variables and localisation CSV · story timeline and world map · MIDI ·
 pixel font maker · read-only share links and a "play this level" preview.

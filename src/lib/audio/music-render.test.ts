@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { MusicChannel, MusicNote, MusicTrack } from "@/types";
-import { loopSampleCount, renderLoop } from "./music-render";
+import { songSampleCount, renderSong } from "./music-render";
 import { scheduleWindow } from "./music-scheduler";
 import { applyPreset } from "./music-instruments";
+import { LEGACY_SECTION_ID } from "@/lib/music-sections";
 import { midiToFreq, scheduleNote } from "./music-synth";
 
 type Call = [string, ...unknown[]];
@@ -65,19 +66,21 @@ const withInstruments = {
   channels: [applyPreset(track.channels[0], "lead"), applyPreset(track.channels[1], "drum-kit")],
 } as MusicTrack;
 
-const options = { patternLen: 8, muted: [false, false], soloed: [false, false] };
+const steps = [{ sectionId: LEGACY_SECTION_ID, length: 8 }];
+const options = { steps, muted: [false, false], soloed: [false, false] };
 
-describe("loopSampleCount", () => {
+describe("songSampleCount", () => {
   it("is one pass of the loop at the track's tempo", () => {
-    expect(loopSampleCount(track, 8, 44100)).toBe(4 * 44100);
-    expect(loopSampleCount({ ...track, bpm: 90 }, 16, 48000)).toBe(Math.ceil((16 * 60 * 48000) / 90));
+    expect(songSampleCount(track, steps, 44100)).toBe(4 * 44100);
+    expect(songSampleCount({ ...track, bpm: 60 }, [{ sectionId: "a", length: 8 }, { sectionId: "b", length: 8 }], 100)).toBe(1600);
+    expect(songSampleCount({ ...track, bpm: 90 }, [{ sectionId: LEGACY_SECTION_ID, length: 16 }], 48000)).toBe(Math.ceil((16 * 60 * 48000) / 90));
   });
 });
 
-describe("renderLoop", () => {
+describe("renderSong", () => {
   it("renders exactly one pass of the loop", async () => {
     let requested = 0;
-    const samples = await renderLoop(track, {
+    const samples = await renderSong(track, {
       ...options,
       createContext: (length, sampleRate) => {
         requested = length;
@@ -90,11 +93,11 @@ describe("renderLoop", () => {
 
   it("drives the synth exactly as Play does for one pass", async () => {
     const rendered = recordingContext(4 * 44100);
-    await renderLoop(track, { ...options, createContext: () => rendered.ctx });
+    await renderSong(track, { ...options, createContext: () => rendered.ctx });
 
     const played = recordingContext();
-    const song = { track, ...options, looping: false };
-    for (const due of scheduleWindow(song, { time: 0, beat: 0 }, 4).notes) {
+    const song = { track, ...options, loopIndex: 0, looping: false };
+    for (const due of scheduleWindow(song, { time: 0, step: 0, beat: 0 }, 4).notes) {
       scheduleNote(played.ctx, played.ctx.destination, due.note, due.voice, due.volume, due.passStart, due.beatDuration);
     }
 
@@ -107,11 +110,11 @@ describe("renderLoop", () => {
 
   it("drives the synth exactly as Play does with instruments: envelopes, release tails and vibrato", async () => {
     const rendered = recordingContext(4 * 44100);
-    await renderLoop(withInstruments, { ...options, createContext: () => rendered.ctx });
+    await renderSong(withInstruments, { ...options, createContext: () => rendered.ctx });
 
     const played = recordingContext();
-    const song = { track: withInstruments, ...options, looping: false };
-    for (const due of scheduleWindow(song, { time: 0, beat: 0 }, 4).notes) {
+    const song = { track: withInstruments, ...options, loopIndex: 0, looping: false };
+    for (const due of scheduleWindow(song, { time: 0, step: 0, beat: 0 }, 4).notes) {
       scheduleNote(played.ctx, played.ctx.destination, due.note, due.voice, due.volume, due.passStart, due.beatDuration);
     }
 
@@ -124,16 +127,16 @@ describe("renderLoop", () => {
 
   it("leaves out notes past the loop and muted or unsoloed channels", async () => {
     const all = recordingContext(4 * 44100);
-    await renderLoop(track, { ...options, createContext: () => all.ctx });
+    await renderSong(track, { ...options, createContext: () => all.ctx });
     expect(all.calls.filter(([name]) => name === "osc.start")).toHaveLength(2);
     expect(all.calls.filter(([name]) => name === "noise.start")).toHaveLength(1);
 
     const muted = recordingContext(4 * 44100);
-    await renderLoop(track, { ...options, muted: [false, true], createContext: () => muted.ctx });
+    await renderSong(track, { ...options, muted: [false, true], createContext: () => muted.ctx });
     expect(muted.calls.some(([name]) => name === "noise.start")).toBe(false);
 
     const soloed = recordingContext(4 * 44100);
-    await renderLoop(track, { ...options, soloed: [false, true], createContext: () => soloed.ctx });
+    await renderSong(track, { ...options, soloed: [false, true], createContext: () => soloed.ctx });
     expect(soloed.calls.some(([name]) => name === "osc.start")).toBe(false);
   });
 });
