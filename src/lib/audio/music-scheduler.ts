@@ -1,4 +1,5 @@
 import type { MusicNote, MusicTrack } from "@/types";
+import type { MusicVoice } from "./music-instruments";
 
 /** What the player reads on every tick, so edits made while playing are heard on the next pass. */
 export interface LiveSong {
@@ -17,7 +18,7 @@ export interface PlayCursor {
 
 export interface DueNote {
   note: MusicNote;
-  instrument: string;
+  voice: MusicVoice;
   volume: number;
   /** Audio time of beat 0 of the pass this note belongs to. */
   passStart: number;
@@ -33,7 +34,7 @@ function notesBetween(song: LiveSong, fromBeat: number, toBeat: number, passStar
     if (isMuted) return [];
     return (channel.patterns[0]?.notes ?? [])
       .filter((note) => note.start >= fromBeat - EPSILON && note.start < toBeat - EPSILON)
-      .map((note) => ({ note, instrument: channel.instrument, volume: channel.volume, passStart, beatDuration }));
+      .map((note) => ({ note, voice: channel, volume: channel.volume, passStart, beatDuration }));
   });
 }
 

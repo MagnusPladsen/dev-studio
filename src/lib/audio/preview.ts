@@ -66,7 +66,7 @@ function startMusic(ref: AssetRef, track: MusicTrack): void {
   const beatDuration = 60 / track.bpm;
   const sources = track.channels.flatMap((channel) =>
     (channel.patterns[0]?.notes ?? []).map((note) =>
-      scheduleNote(audio, output, note, channel.instrument, channel.volume, audio.currentTime, beatDuration)
+      scheduleNote(audio, output, note, channel, channel.volume, audio.currentTime, beatDuration)
     )
   );
   trackEnding(ref, sources, trackLengthSeconds(track));

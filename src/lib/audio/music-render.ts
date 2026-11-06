@@ -30,7 +30,7 @@ export async function renderLoop(track: MusicTrack, options: RenderOptions): Pro
   const song: LiveSong = { track, patternLen: options.patternLen, muted: options.muted, soloed: options.soloed, looping: false };
   const { notes } = scheduleWindow(song, { time: 0, beat: 0 }, length / sampleRate);
   for (const due of notes) {
-    scheduleNote(ctx, ctx.destination, due.note, due.instrument, due.volume, due.passStart, due.beatDuration);
+    scheduleNote(ctx, ctx.destination, due.note, due.voice, due.volume, due.passStart, due.beatDuration);
   }
   const rendered = await ctx.startRendering();
   return rendered.getChannelData(0);

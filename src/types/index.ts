@@ -138,9 +138,32 @@ export interface MusicTrack {
 export interface MusicChannel {
   id: string;
   name: string;
+  /** The wave: square, sawtooth, sine, triangle or noise. */
   instrument: string;
+  /** Hand-made preset the sound started from, or "custom" once edited. Missing means Classic. */
+  preset?: string;
+  /** Missing means Classic: full volume at the start, fading out over the note. */
+  envelope?: MusicEnvelope;
+  vibrato?: MusicVibrato;
   volume: number;
   patterns: MusicPattern[];
+}
+
+/** ADSR: times in seconds, sustain as a level from 0 to 1. */
+export interface MusicEnvelope {
+  attack: number;
+  decay: number;
+  sustain: number;
+  release: number;
+}
+
+export interface MusicVibrato {
+  /** Wobbles per second. */
+  rate: number;
+  /** How far the pitch wobbles, in cents (100 = one semitone). */
+  depth: number;
+  /** Seconds into the note before the wobble starts. */
+  delay: number;
 }
 
 export interface MusicPattern {

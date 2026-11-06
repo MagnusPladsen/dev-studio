@@ -72,7 +72,7 @@ export const HELP: Record<HelpTopic, HelpContent> = {
     summary: "Compose chiptune loops on a four-channel piano roll.",
     canDo: [
       { icon: Music, text: "Write notes for melody, harmony, bass and drums channels." },
-      { icon: Piano, text: "Pick an instrument per channel: square, triangle, noise and more." },
+      { icon: Piano, text: "Pick an instrument per channel (Lead, Soft Pad, Bass, Pluck, Bell, Chip Square, drum kits) and shape its envelope and vibrato." },
       { icon: Gauge, text: "Set tempo (BPM), loop length, note length, and a key and scale so every note fits." },
       { icon: VolumeX, text: "Mute or solo channels while you listen." },
       { icon: Download, text: "Export the pattern as a WAV file." },
@@ -87,6 +87,7 @@ export const HELP: Record<HelpTopic, HelpContent> = {
       "Click a note again to remove it, or start a drag on a note to erase along the way.",
       "Ctrl/⌘ + scroll zooms time; add Shift to zoom pitch.",
       "Scale greys out the rows outside the key. Chromatic turns the lock off; drums are never locked.",
+      "The sliders button on a channel opens its instrument: Attack fades a note in, Decay and Sustain set how it settles, Release how long it rings after. Classic is the original sound.",
       UNDO_TIP,
     ],
   },
