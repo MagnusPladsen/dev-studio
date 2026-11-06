@@ -90,7 +90,7 @@ function isLinked(track: MusicTrack, section: MusicSection): boolean {
   return section.patterns.some((entry) => patternUses(track, entry.patternId).length > 1);
 }
 
-function useSectionActions(props: SongRowProps, startRename: (id: string) => void): (section: MusicSection) => SectionMenuActions {
+function buildSectionActions(props: SongRowProps, startRename: (id: string) => void): (section: MusicSection) => SectionMenuActions {
   const { track, selectedId, onChange } = props;
   return (section) => ({
     rename: () => startRename(section.id),
@@ -174,7 +174,7 @@ function SectionBlocks(props: SongRowProps): React.JSX.Element {
   const sections = getSections(track);
   const { menu, open, close } = useMenu();
   const [renamingId, setRenamingId] = useState<string | null>(null);
-  const actionsFor = useSectionActions(props, setRenamingId);
+  const actionsFor = buildSectionActions(props, setRenamingId);
   const drag = useBlockDrag(track, props.onChange);
   const isClickSuppressed = useRef(false);
   const [{ pressed, longPress }] = useState(createPressTracker);

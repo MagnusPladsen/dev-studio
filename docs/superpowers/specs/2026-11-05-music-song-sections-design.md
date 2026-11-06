@@ -1,6 +1,6 @@
 # Music: song sections (Easy + Advanced)
 
-Status: draft for the owner's review.
+Status: approved by the owner (2026-11-06).
 
 ## Why
 
@@ -124,7 +124,7 @@ Noise       │ …
   (make a separate copy).
 - **Links:** a pattern used in 2+ cells is *linked*; every such cell shows a chain icon. Editing its notes changes
   every use (FamiStudio-style). While editing a linked pattern, a small notice above the roll says
-  "Also plays in B, Chorus" with an "Unlink" button.
+  "Also plays in B, Chorus" with an "Unlink" button (in Easy mode the button reads "Make separate").
 - Pattern labels are generated (`1`, `2`, … per channel, in order of first use) — not stored, not renamable.
 - **Back to Easy:** links stay. Blocks with linked patterns show the chain icon; the linked notice still shows in the
   roll. Easy's Duplicate copies patterns (never links), so links only ever come from Advanced.

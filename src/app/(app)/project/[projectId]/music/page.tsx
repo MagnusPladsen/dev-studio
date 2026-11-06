@@ -1013,7 +1013,7 @@ export default function MusicPage() {
             </div>
 
             {activeChannel && selection.section && (
-              <LinkedPatternNotice track={shownTrack} section={selection.section} channelId={activeChannel.id} onChange={applySectionEdit} />
+              <LinkedPatternNotice track={shownTrack} section={selection.section} channelId={activeChannel.id} showChannels={showChannels} onChange={applySectionEdit} />
             )}
 
             {/* Piano roll */}

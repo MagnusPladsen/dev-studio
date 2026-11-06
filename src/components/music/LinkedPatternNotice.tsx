@@ -8,11 +8,13 @@ interface LinkedPatternNoticeProps {
   track: MusicTrack;
   section: MusicSection;
   channelId: string;
+  /** Show channels is on: the button may say "Unlink"; Easy mode says "Make separate". */
+  showChannels: boolean;
   onChange(track: MusicTrack): void;
 }
 
 /** Above the roll: the notes being edited also play in other sections, with a way to give this one its own copy. */
-export function LinkedPatternNotice({ track, section, channelId, onChange }: LinkedPatternNoticeProps): React.JSX.Element | null {
+export function LinkedPatternNotice({ track, section, channelId, showChannels, onChange }: LinkedPatternNoticeProps): React.JSX.Element | null {
   const pattern = findPattern(track, section, channelId);
   const otherUses = pattern ? patternUses(track, pattern.id).filter((use) => use.id !== section.id) : [];
   if (otherUses.length === 0) return null;
@@ -32,7 +34,7 @@ export function LinkedPatternNotice({ track, section, channelId, onChange }: Lin
         style={{ color: "var(--text-primary)", border: "1px solid var(--border)" }}
         title="Give this section its own copy, so edits here no longer change the others"
       >
-        Unlink
+        {showChannels ? "Unlink" : "Make separate"}
       </button>
     </div>
   );
