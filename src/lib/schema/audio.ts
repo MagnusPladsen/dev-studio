@@ -46,6 +46,18 @@ export const musicSchema = z.looseObject({
       patterns: z.array(z.looseObject({ id, notes: z.array(musicNoteSchema) })),
     })
   ),
+  sections: z
+    .array(
+      z.looseObject({
+        id,
+        name: z.string(),
+        length: z.union([z.literal(8), z.literal(16), z.literal(32)]),
+        repeat: z.number().int().min(1).max(8).optional(),
+        patterns: z.array(z.looseObject({ channelId: z.string(), patternId: z.string() })),
+      })
+    )
+    .optional(),
+  loopStartId: z.string().optional(),
   tags,
 });
 

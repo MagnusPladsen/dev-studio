@@ -130,9 +130,31 @@ export interface MusicTrack {
   /** Notes outside the scale can't be placed. Missing means chromatic: no lock. */
   scale?: "chromatic" | "major" | "minor" | "majorPentatonic" | "minorPentatonic" | "blues";
   channels: MusicChannel[];
+  /** Song parts played in order. Missing or empty means one section made of each channel's first pattern. */
+  sections?: MusicSection[];
+  /** Section the song returns to when it loops. Missing means the first. */
+  loopStartId?: string;
   tags: string[];
   createdAt: string;
   updatedAt: string;
+}
+
+export type MusicSectionLength = 8 | 16 | 32;
+
+export interface MusicSectionPattern {
+  channelId: string;
+  patternId: string;
+}
+
+export interface MusicSection {
+  id: string;
+  name: string;
+  /** Beats. */
+  length: MusicSectionLength;
+  /** Times played in a row, 1 to 8. Missing means once. */
+  repeat?: number;
+  /** Which pattern each channel plays here; a channel without an entry is silent. */
+  patterns: MusicSectionPattern[];
 }
 
 export interface MusicChannel {

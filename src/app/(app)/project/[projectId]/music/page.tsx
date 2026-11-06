@@ -46,6 +46,7 @@ import { RENDER_SAMPLE_RATE, renderLoop } from "@/lib/audio/music-render";
 import { encodeWav } from "@/lib/audio/wav";
 import { beatAt, scheduleWindow, type LiveSong, type PlayCursor } from "@/lib/audio/music-scheduler";
 import { isInScale, isScaleLocked, KEY_NAMES, SCALE_IDS, SCALES, songScale, type ScaleId } from "@/lib/music-scale";
+import { fitPatternLength } from "@/lib/music-sections";
 import { cellsBetween, coversCell, eraseCells, paintCells, type GridCell, type NoteCell } from "@/lib/music-draw";
 import type { MusicTrack, MusicChannel, MusicNote } from "@/types";
 import { v4 as uuid } from "uuid";
@@ -107,12 +108,6 @@ const PATTERN_LENGTHS = [8, 16, 32];
 const LOOKAHEAD_SECONDS = 0.2;
 /** Longest a placed note is heard for, in beats, so long notes don't drone while you draw. */
 const PLACE_PREVIEW_BEATS = 0.5;
-
-/** Shortest loop length that shows every note in the track. */
-function fitPatternLength(track: MusicTrack): number {
-  const end = Math.max(0, ...track.channels.flatMap((c) => c.patterns[0]?.notes.map((n) => n.start + n.duration) ?? []));
-  return PATTERN_LENGTHS.find((l) => l >= end - 1e-6) ?? 32;
-}
 
 export default function MusicPage() {
   const params = useParams();
