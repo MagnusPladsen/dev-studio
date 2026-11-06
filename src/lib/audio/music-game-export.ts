@@ -186,6 +186,7 @@ function effectiveMode(track: MusicTrack, mode: GameExportMode): GameExportMode 
 }
 
 function assertLoopHasSamples(track: MusicTrack): void {
+  if (!Number.isFinite(track.bpm) || track.bpm <= 0) throw new Error("This song's tempo isn't valid. Set the BPM and try again.");
   if (toSamples(stepsSeconds(track, songParts(track).loop)) === 0) throw new Error("This song has no notes to loop.");
 }
 

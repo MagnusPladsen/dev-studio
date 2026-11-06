@@ -309,6 +309,11 @@ describe("buildGameExport", () => {
     await expect(buildGameExport(song, { ...DEFAULT_GAME_EXPORT, mode: "intro-and-loop" }, deps)).rejects.toThrow("This song has no notes to loop.");
   });
 
+  it("refuses a song with a tempo of 0", async () => {
+    const { deps } = fakeOgg();
+    await expect(buildGameExport({ ...sectioned(73), bpm: 0 }, DEFAULT_GAME_EXPORT, deps)).rejects.toThrow("This song's tempo isn't valid.");
+  });
+
   it("names stems of intro-and-loop by channel", async () => {
     const { deps } = fakeOgg();
     const zip = await buildGameExport(sectioned(73), { ...DEFAULT_GAME_EXPORT, mode: "intro-and-loop", stems: true }, deps);

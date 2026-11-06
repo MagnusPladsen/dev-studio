@@ -91,6 +91,7 @@ function songNoteEvents(track: MusicTrack, channel: MusicChannel, midiChannel: n
 function sectionNoteEvents(track: MusicTrack, channel: MusicChannel, midiChannel: number, section: MusicSection, startBeat: number): TimedEvent[] {
   return sectionNotes(track, section, channel.id).flatMap((note) => {
     const key = isDrumChannel(channel) ? drumKey(note.pitch) : note.pitch;
+    if (!Number.isInteger(key) || key < 0 || key > 127) return [];
     const startTick = Math.round((startBeat + note.start) * TICKS_PER_BEAT);
     const endTick = startTick + Math.max(1, Math.round(note.duration * TICKS_PER_BEAT));
     const velocity = Math.min(127, Math.max(1, Math.round(note.velocity * 127)));

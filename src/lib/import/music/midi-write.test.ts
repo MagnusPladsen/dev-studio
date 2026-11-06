@@ -58,6 +58,11 @@ describe("writeMidiFile", () => {
     expect(midiLead.notes.map((n) => [n.pitch, n.startTick / 480])).toEqual([[60, 0], [62, 8], [62, 16]]);
   });
 
+  it("leaves out melodic notes outside the MIDI range", () => {
+    const [, lead] = roundTrip(song([channel("Lead", "square", [note(200, 0), note(-1, 1), note(60, 2)])])).tracks;
+    expect(lead.notes.map((n) => n.pitch)).toEqual([60]);
+  });
+
   it("writes drum pitches that the Music importer maps back to the same band", () => {
     const pitches = [48, 56, 64, 72, 80, 84];
     const track = song([channel("Drums", "noise", pitches.map((pitch, index) => note(pitch, index)))]);
