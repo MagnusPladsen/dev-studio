@@ -143,6 +143,12 @@ describe("scheduleWindow over sections", () => {
     expect(scheduleWindow(live, second.cursor, 6).cursor.wrapped).toBe(true);
   });
 
+  it("should keep playing the selected section when the steps shrink under a cursor with looping off", () => {
+    const live = song([[note(2), note(3)]], { looping: false });
+    const result = scheduleWindow(live, { time: 6, step: 1, beat: 2 }, 7.5);
+    expect({ starts: starts(result), ended: result.ended }).toEqual({ starts: [6, 7], ended: false });
+  });
+
   it("ends at once without steps", () => {
     const live = { ...song([[note(0)]]), steps: [] };
     expect(scheduleWindow(live, { time: 0, step: 0, beat: 0 }, 5)).toEqual({ notes: [], cursor: { time: 0, step: 0, beat: 0 }, ended: true });

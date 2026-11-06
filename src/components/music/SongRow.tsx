@@ -13,8 +13,8 @@ import type { MusicSection, MusicTrack } from "@/types";
 export interface SongRowProps {
   track: MusicTrack;
   selectedId: string;
-  /** The block that is sounding and the beat inside it (repeats count on), or null when stopped. */
-  playing: { sectionId: string; beat: number } | null;
+  /** The block that is sounding and how far through it playback is (0–1), or null when stopped. */
+  playing: { sectionId: string; progress: number } | null;
   showChannels: boolean;
   /** The channel open in the piano roll; its cell in the open section is highlighted in the lanes. */
   activeChannelIndex: number;
@@ -232,7 +232,7 @@ function SectionBlocks(props: SongRowProps): React.JSX.Element {
               isSelected={section.id === selectedId}
               isLoopStart={section.id === loopStartId}
               isLinked={isLinked(track, section)}
-              playingBeat={playing?.sectionId === section.id ? playing.beat : null}
+              progress={playing?.sectionId === section.id ? playing.progress : null}
               dropEdge={drag.dropIndex === index ? "left" : drag.dropIndex === sections.length && index === sections.length - 1 ? "right" : null}
               isRenaming={renamingId === section.id}
               onRename={(name) => {
@@ -287,7 +287,8 @@ interface SectionBlockProps {
   isSelected: boolean;
   isLoopStart: boolean;
   isLinked: boolean;
-  playingBeat: number | null;
+  /** How far through this block playback is (0–1), or null when it is not sounding. */
+  progress: number | null;
   dropEdge: "left" | "right" | null;
   isRenaming: boolean;
   onRename(name: string): void;
@@ -302,10 +303,8 @@ function dropShadow(edge: SectionBlockProps["dropEdge"]): string | undefined {
 }
 
 function SectionBlock(props: SectionBlockProps): React.JSX.Element {
-  const { section, isSelected, playingBeat } = props;
-  const repeat = section.repeat ?? 1;
-  const beats = section.length * repeat;
-  const progress = playingBeat === null ? null : Math.min(1, playingBeat / beats);
+  const { section, isSelected, progress } = props;
+  const beats = section.length * (section.repeat ?? 1);
   return (
     <div
       data-section-block
@@ -327,6 +326,15 @@ function SectionBlock(props: SectionBlockProps): React.JSX.Element {
   );
 }
 
+function blockLabel({ section, isLoopStart, isLinked }: Pick<SectionBlockProps, "section" | "isLoopStart" | "isLinked">): string {
+  const repeat = section.repeat ?? 1;
+  const parts = [`Section ${section.name}`];
+  if (repeat > 1) parts.push(`plays ${repeat} times`);
+  if (isLoopStart) parts.push("song loops from here");
+  if (isLinked) parts.push("shares notes with another section");
+  return parts.join(", ");
+}
+
 function BlockButton({ section, isSelected, isLoopStart, isLinked, handlers }: SectionBlockProps): React.JSX.Element {
   const repeat = section.repeat ?? 1;
   return (
@@ -336,7 +344,7 @@ function BlockButton({ section, isSelected, isLoopStart, isLinked, handlers }: S
       className="relative w-full h-full flex items-center gap-1 px-1.5 text-xs select-none"
       style={{ color: "var(--text-primary)", touchAction: "pan-x" }}
       aria-pressed={isSelected}
-      aria-label={`Section ${section.name}`}
+      aria-label={blockLabel({ section, isLoopStart, isLinked })}
       title={`${section.name}: click to edit. Right-click or long-press for more, drag to move.`}
     >
       <span className="truncate font-medium">{section.name}</span>

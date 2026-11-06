@@ -1,4 +1,4 @@
-import { getSections, songSteps } from "@/lib/music-sections";
+import { getSections, isLegacy, sectionNotes, songSteps } from "@/lib/music-sections";
 import type { MusicNote, MusicTrack, MusicVibrato } from "@/types";
 import { envelopeSteps, releaseSeconds, SILENT } from "./music-envelope";
 import type { MusicVoice } from "./music-instruments";
@@ -92,9 +92,11 @@ export function trackLengthSeconds(track: MusicTrack): number {
     const beats = songSteps(track, "song", getSections(track)[0].id).steps.reduce((total, step) => total + step.length, 0);
     return (beats * 60) / track.bpm;
   }
+  const [section] = getSections(track);
   let lastBeat = 0;
   for (const channel of track.channels) {
-    for (const note of channel.patterns[0]?.notes ?? []) {
+    const notes = isLegacy(track) ? (channel.patterns[0]?.notes ?? []) : sectionNotes(track, section, channel.id);
+    for (const note of notes) {
       lastBeat = Math.max(lastBeat, note.start + note.duration);
     }
   }

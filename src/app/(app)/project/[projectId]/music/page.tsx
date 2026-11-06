@@ -119,6 +119,14 @@ function playedRepeats(steps: SongStep[], stepIndex: number): number {
   return count;
 }
 
+/** How far through its song-row block playback is: a repeated block fills over all its passes in Song mode, over the one pass in Section mode. */
+function blockProgress(track: MusicTrack, steps: SongStep[], playhead: { step: number; beat: number }, mode: "song" | "section"): number {
+  const step = steps[playhead.step];
+  if (mode === "section") return Math.min(1, playhead.beat / step.length);
+  const repeat = getSections(track).find((section) => section.id === step.sectionId)?.repeat ?? 1;
+  return Math.min(1, (playhead.beat + playedRepeats(steps, playhead.step) * step.length) / (step.length * repeat));
+}
+
 const PLAY_MODES = [
   { mode: "song", label: "Song", title: "Play the whole song: the intro once, then loop" },
   { mode: "section", label: "Section", title: "Play only the section you are editing" },
@@ -594,7 +602,7 @@ export default function MusicPage() {
   const playSteps = shownTrack ? songSteps(shownTrack, effectivePlayMode, selectedSectionId).steps : [];
   const playingStep = playing && playhead ? playSteps[playhead.step] : undefined;
   const isPlayheadInRoll = playingStep?.sectionId === selectedSectionId;
-  const playingBlock = playingStep && playhead ? { sectionId: playingStep.sectionId, beat: playhead.beat + playedRepeats(playSteps, playhead.step) * playingStep.length } : null;
+  const playingBlock = playingStep && playhead && shownTrack ? { sectionId: playingStep.sectionId, progress: blockProgress(shownTrack, playSteps, playhead, effectivePlayMode) } : null;
 
 
   // Also collect all channel notes for background display

@@ -49,6 +49,7 @@ function notesBetween(song: LiveSong, step: SongStep, fromBeat: number, toBeat: 
 /**
  * Collect the notes that start between the cursor and audio time `until`, using the song as it is now.
  * Walks the steps in order; after the last one it jumps to the loop step, or reports `ended` when looping is off.
+ * A cursor past the end of a list that changed under it carries on in the loop step.
  */
 export function scheduleWindow(song: LiveSong, cursor: PlayCursor, until: number): { notes: DueNote[]; cursor: PlayCursor; ended: boolean } {
   if (song.steps.length === 0) return { notes: [], cursor, ended: true };
@@ -56,6 +57,10 @@ export function scheduleWindow(song: LiveSong, cursor: PlayCursor, until: number
   const notes: DueNote[] = [];
   let { time, step, beat } = cursor;
   let wrapped = cursor.wrapped ?? false;
+  if (step >= song.steps.length) {
+    step = Math.min(song.loopIndex, song.steps.length - 1);
+    if (beat >= song.steps[step].length) beat = 0;
+  }
   while (time < until - EPSILON) {
     while (step < song.steps.length && beat >= song.steps[step].length - EPSILON) {
       step += 1;
