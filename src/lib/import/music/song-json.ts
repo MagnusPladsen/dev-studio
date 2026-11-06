@@ -2,7 +2,7 @@ import type { MusicSection, MusicTrack } from "@/types";
 import { ImportError, jsonReimporter, oneOrMany, type Importer } from "@/lib/import";
 import { assertFileSize } from "@/lib/import/file-size";
 import { playableSound } from "@/lib/audio/music-instruments";
-import { SECTION_LENGTHS } from "@/lib/music-sections";
+import { nextSectionName, SECTION_LENGTHS } from "@/lib/music-sections";
 
 const MAX_BYTES = 5 * 1024 * 1024;
 
@@ -26,17 +26,29 @@ const isSectionShape = (value: unknown): value is MusicSection =>
   SECTION_LENGTHS.includes(value.length as MusicSection["length"]) &&
   Array.isArray(value.patterns);
 
-/** Keeps the sections whose shape is valid and whose pattern entries point at a real channel pattern; a song left with none is legacy. */
+const isValidRepeat = (value: unknown): boolean => Number.isInteger(value) && (value as number) >= 1 && (value as number) <= 8;
+
+/** Drops a bad repeat and pattern entries that point at no channel pattern; names an unnamed section after the ones before it. */
+function cleanSection(song: MusicTrack, section: MusicSection, previous: MusicSection[]): MusicSection {
+  const cleaned: MusicSection = {
+    ...section,
+    name: typeof section.name === "string" && section.name.trim() ? section.name : nextSectionName(previous),
+    patterns: section.patterns.filter((entry) =>
+      isRecord(entry) && song.channels.some((channel) => channel.id === entry.channelId && channel.patterns.some((pattern) => pattern.id === entry.patternId)),
+    ),
+  };
+  if (!isValidRepeat(cleaned.repeat)) delete cleaned.repeat;
+  return cleaned;
+}
+
+/** Keeps the first section of each id whose shape is valid, cleaned by `cleanSection`; a song left with none is legacy. */
 function withValidSections(song: MusicTrack, rawSections: unknown): MusicTrack {
   const rest: MusicTrack = { ...song };
   delete rest.sections;
   delete rest.loopStartId;
-  const sections = (Array.isArray(rawSections) ? rawSections : []).filter(isSectionShape).map((section) => ({
-    ...section,
-    patterns: section.patterns.filter((entry) =>
-      isRecord(entry) && song.channels.some((channel) => channel.id === entry.channelId && channel.patterns.some((pattern) => pattern.id === entry.patternId)),
-    ),
-  }));
+  const shaped = (Array.isArray(rawSections) ? rawSections : []).filter(isSectionShape);
+  const unique = shaped.filter((section, index) => shaped.findIndex((other) => other.id === section.id) === index);
+  const sections = unique.reduce<MusicSection[]>((kept, section) => [...kept, cleanSection(song, section, kept)], []);
   if (sections.length === 0) return rest;
   return sections.some((section) => section.id === song.loopStartId) ? { ...rest, sections, loopStartId: song.loopStartId } : { ...rest, sections };
 }

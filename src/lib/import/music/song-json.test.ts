@@ -87,6 +87,29 @@ describe("Song JSON import", () => {
       expect(song.loopStartId).toBeUndefined();
     });
 
+    it.each([0, -1, 99, 1e7, 1.5, "x"])("drops a repeat of %s", async (repeat) => {
+      const song = await importSong({ ...sectioned, sections: [sectioned.sections[0], { ...sectioned.sections[1], repeat }] });
+      expect(song.sections?.[1]).not.toHaveProperty("repeat");
+    });
+
+    it("keeps a repeat between 1 and 8", async () => {
+      const song = await importSong({ ...sectioned, sections: [{ ...sectioned.sections[0], repeat: 8 }, { ...sectioned.sections[1], repeat: 1 }] });
+      expect(song.sections?.map((section) => section.repeat)).toEqual([8, 1]);
+    });
+
+    it("names a section with a missing or blank name", async () => {
+      const unnamed = { ...sectioned.sections[1] } as Record<string, unknown>;
+      delete unnamed.name;
+      const song = await importSong({ ...sectioned, sections: [{ ...sectioned.sections[0], name: "  " }, unnamed, { ...sectioned.sections[0], id: "sec-c", name: 7 }] });
+      expect(song.sections?.map((section) => section.name)).toEqual(["A", "B", "C"]);
+    });
+
+    it("keeps only the first section with a repeated id", async () => {
+      const song = await importSong({ ...sectioned, sections: [sectioned.sections[0], { ...sectioned.sections[1], id: "sec-a" }, sectioned.sections[1]] });
+      expect(song.sections?.map((section) => section.name)).toEqual(["A", "B"]);
+      expect(new Set(song.sections?.map((section) => section.id)).size).toBe(2);
+    });
+
     it("drops malformed section entries and falls back to legacy when none are left", async () => {
       const mixed = { ...sectioned, sections: [null, 7, { name: "no id", length: 8, patterns: [] }, { id: "x", name: "X", length: 12, patterns: [] }, sectioned.sections[0]] };
       const song = await importSong(mixed);
