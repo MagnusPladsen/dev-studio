@@ -47,7 +47,7 @@ describe("sfxr import", () => {
     expect(items[0].params).toEqual({
       waveType: "sawtooth",
       frequency: 886,
-      frequencySlide: expect.closeTo(-1, 2),
+      frequencySlide: expect.closeTo(-0.927, 3),
       repeatSpeed: 0,
       attackTime: 0,
       sustainTime: 0.091,
@@ -58,11 +58,9 @@ describe("sfxr import", () => {
       volume: 0.28,
       vibratoDepth: 0,
       vibratoSpeed: 0,
+      version: 2,
     });
-    expect(warnings).toEqual([
-      "The frequency slide is a straight line here; sfxr bends it on a curve, so it sounds a little different.",
-      "Capped to this tool's ranges: frequency slide.",
-    ]);
+    expect(warnings).toEqual([]);
   });
 
   it("reads b58 codes and sfxr.me links, one sound per line", async () => {

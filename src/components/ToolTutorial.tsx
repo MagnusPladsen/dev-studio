@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useReducer, useRef, useState } from "react";
+import { useDialogKeys, useFocusOnOpen } from "@/hooks/useDialogFocus";
 import { usePathname } from "next/navigation";
 import { HELP, type HelpTopic } from "@/lib/help-content";
 import { storage } from "@/lib/storage";
@@ -63,44 +64,13 @@ export function ToolTutorial({ projectId }: { projectId: string }) {
   return <TutorialDialog key={topic} topic={topic} onDismiss={dismiss} onTurnOff={turnOff} />;
 }
 
-/** Esc dismisses and Tab cycles inside the panel; other keys stop here so tool shortcuts behind it don't fire. */
-function useTutorialKeys(panelRef: React.RefObject<HTMLDivElement | null>, onDismiss: () => void) {
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      event.stopPropagation();
-      if (event.key === "Escape") onDismiss();
-      if (event.key === "Tab") trapTab(event, panelRef.current);
-    };
-    window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
-  }, [panelRef, onDismiss]);
-}
-
-function trapTab(event: KeyboardEvent, panel: HTMLElement | null) {
-  const buttons = Array.from(panel?.querySelectorAll<HTMLButtonElement>("button") ?? []);
-  if (buttons.length === 0) return;
-  event.preventDefault();
-  const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
-  const step = event.shiftKey ? -1 : 1;
-  buttons[(index + step + buttons.length) % buttons.length].focus();
-}
-
-/** Puts focus on the main button while open and hands it back to where it was on close. */
-function useFocusOnOpen(buttonRef: React.RefObject<HTMLButtonElement | null>) {
-  useEffect(() => {
-    const previous = document.activeElement as HTMLElement | null;
-    buttonRef.current?.focus({ preventScroll: true });
-    return () => previous?.focus?.();
-  }, [buttonRef]);
-}
-
 function TutorialDialog({ topic, onDismiss, onTurnOff }: { topic: HelpTopic; onDismiss(): void; onTurnOff(): void }) {
   const help = HELP[topic];
   const titleId = useId();
   const summaryId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
   const gotItRef = useRef<HTMLButtonElement>(null);
-  useTutorialKeys(panelRef, onDismiss);
+  useDialogKeys(panelRef, onDismiss);
   useFocusOnOpen(gotItRef);
 
   return (

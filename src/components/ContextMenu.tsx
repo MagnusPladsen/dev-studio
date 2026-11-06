@@ -15,6 +15,8 @@ export type ContextMenuEntry =
       onSelect?: () => void;
       disabled?: boolean;
       hint?: string;
+      /** A second line under the label, shown whether or not the item is disabled. */
+      detail?: string;
       /** The keyboard shortcut for the same action, shown at the right, e.g. "⌘D". */
       shortcut?: string;
       danger?: boolean;
@@ -166,6 +168,11 @@ function MenuPanel({ entries, label, place, isDrillIn, autoFocus, onCloseAll, on
             >
               <span className="min-w-0 flex-1">
                 <span className="block">{entry.label}</span>
+                {entry.detail && (
+                  <span className="mt-0.5 block text-[11px]" style={{ color: "var(--text-muted)" }}>
+                    {entry.detail}
+                  </span>
+                )}
                 {entry.disabled && entry.hint && (
                   <span className="mt-0.5 block text-[11px]" style={{ color: "var(--text-muted)" }}>
                     {entry.hint}

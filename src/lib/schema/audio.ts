@@ -30,15 +30,34 @@ export const musicSchema = z.looseObject({
   ...projectRow,
   name: z.string(),
   bpm: z.number().positive(),
+  key: z.number().int().min(0).max(11).optional(),
+  scale: z.enum(["chromatic", "major", "minor", "majorPentatonic", "minorPentatonic", "blues"]).optional(),
   channels: z.array(
     z.looseObject({
       id,
       name: z.string(),
       instrument: z.string(),
+      preset: z.string().optional(),
+      envelope: z
+        .looseObject({ attack: z.number().min(0), decay: z.number().min(0), sustain: z.number().min(0).max(1), release: z.number().min(0) })
+        .optional(),
+      vibrato: z.looseObject({ rate: z.number().positive(), depth: z.number().min(0), delay: z.number().min(0) }).optional(),
       volume: z.number(),
       patterns: z.array(z.looseObject({ id, notes: z.array(musicNoteSchema) })),
     })
   ),
+  sections: z
+    .array(
+      z.looseObject({
+        id,
+        name: z.string(),
+        length: z.union([z.literal(8), z.literal(16), z.literal(32)]),
+        repeat: z.number().int().min(1).max(8).optional(),
+        patterns: z.array(z.looseObject({ channelId: z.string(), patternId: z.string() })),
+      })
+    )
+    .optional(),
+  loopStartId: z.string().optional(),
   tags,
 });
 

@@ -95,6 +95,29 @@ export interface SfxParams {
   volume: number;
   vibratoDepth: number;
   vibratoSpeed: number;
+  /** 2 = the fixed synth (curved slide, real high-pass, sfxr-style repeat). Missing = the original synth. */
+  version?: 2;
+  /** Seeds the noise, so a noise sound is the same every time it plays or exports. */
+  seed?: number;
+  /** Editing applied after the synth (trim, fades, level, pitch, reverse). Missing = none. */
+  finish?: SfxFinish;
+}
+
+export interface SfxFinish {
+  /** Share (0-1) of the sound's length cut from the start. */
+  trimStart: number;
+  /** Share (0-1) of the sound's length cut from the end. */
+  trimEnd: number;
+  /** Seconds. */
+  fadeIn: number;
+  /** Seconds. */
+  fadeOut: number;
+  /** Bring the loudest point to -1 dB before the gain. */
+  normalize: boolean;
+  gainDb: number;
+  /** Semitones; changes speed and length too, like a tape. */
+  pitch: number;
+  reverse: boolean;
 }
 
 export interface MusicTrack {
@@ -102,18 +125,67 @@ export interface MusicTrack {
   projectId: string;
   name: string;
   bpm: number;
+  /** Key note as a pitch class (0 = C … 11 = B). Missing means C. */
+  key?: number;
+  /** Notes outside the scale can't be placed. Missing means chromatic: no lock. */
+  scale?: "chromatic" | "major" | "minor" | "majorPentatonic" | "minorPentatonic" | "blues";
   channels: MusicChannel[];
+  /** Song parts played in order. Missing or empty means one section made of each channel's first pattern. */
+  sections?: MusicSection[];
+  /** Section the song returns to when it loops. Missing means the first. */
+  loopStartId?: string;
   tags: string[];
   createdAt: string;
   updatedAt: string;
 }
 
+export type MusicSectionLength = 8 | 16 | 32;
+
+export interface MusicSectionPattern {
+  channelId: string;
+  patternId: string;
+}
+
+export interface MusicSection {
+  id: string;
+  name: string;
+  /** Beats. */
+  length: MusicSectionLength;
+  /** Times played in a row, 1 to 8. Missing means once. */
+  repeat?: number;
+  /** Which pattern each channel plays here; a channel without an entry is silent. */
+  patterns: MusicSectionPattern[];
+}
+
 export interface MusicChannel {
   id: string;
   name: string;
+  /** The wave: square, sawtooth, sine, triangle or noise. */
   instrument: string;
+  /** Hand-made preset the sound started from, or "custom" once edited. Missing means Classic. */
+  preset?: string;
+  /** Missing means Classic: full volume at the start, fading out over the note. */
+  envelope?: MusicEnvelope;
+  vibrato?: MusicVibrato;
   volume: number;
   patterns: MusicPattern[];
+}
+
+/** ADSR: times in seconds, sustain as a level from 0 to 1. */
+export interface MusicEnvelope {
+  attack: number;
+  decay: number;
+  sustain: number;
+  release: number;
+}
+
+export interface MusicVibrato {
+  /** Wobbles per second. */
+  rate: number;
+  /** How far the pitch wobbles, in cents (100 = one semitone). */
+  depth: number;
+  /** Seconds into the note before the wobble starts. */
+  delay: number;
 }
 
 export interface MusicPattern {
