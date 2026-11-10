@@ -235,4 +235,15 @@ describe("connectRealtime", () => {
       { event: "*", schema: "public", table: "assets", filter: "user_id=in.(owner,u1)" },
     ]);
   });
+
+  it("refreshes sharing when one of the user's sharing events arrives", () => {
+    const mock = mockSupabase();
+    const sync = { receive: vi.fn(), written: vi.fn(), catchUp: vi.fn(async () => {}) };
+    const onSharingChange = vi.fn();
+    connectRealtime(mock.supabase, sync, USER, [USER], vi.fn(), onSharingChange);
+    expect(mock.filters).toContainEqual({ event: "INSERT", schema: "public", table: "sharing_events", filter: "user_id=eq.u1" });
+    mock.handlers.sharing_events({ eventType: "INSERT", new: { id: 1, user_id: USER }, old: {} });
+    expect(onSharingChange).toHaveBeenCalledTimes(1);
+    expect(sync.receive).not.toHaveBeenCalled();
+  });
 });

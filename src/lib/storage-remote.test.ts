@@ -108,3 +108,29 @@ describe("changesFromStorageEvent (guest tabs)", () => {
     expect(changesFromStorageEvent(null, null, new Map())).toEqual([]);
   });
 });
+
+describe("read-only projects", () => {
+  it("refuses saves and deletes for them, tells listeners, and still takes remote changes", () => {
+    storage.save("notes", note("n1"), "p1");
+    const primary = { name: "cloud", onChange: vi.fn() };
+    const refused = vi.fn();
+    const detach = [addPersister(primary), storage.onRefused(refused)];
+    storage.setReadOnly((projectId) => projectId === "p1");
+
+    storage.save("notes", note("n1", "edited"), "p1");
+    storage.delete("notes", "n1", "p1");
+    storage.save("projects", { id: "p1", name: "Renamed" } as never);
+    storage.deleteProject("p1");
+    expect(storage.getById("notes", "n1", "p1")).toMatchObject({ content: "" });
+    expect(storage.getAll("projects")).toEqual([{ id: "p1" }]);
+    expect(primary.onChange).not.toHaveBeenCalled();
+    expect(refused).toHaveBeenCalledTimes(4);
+    expect(refused).toHaveBeenCalledWith("p1");
+
+    applyRemoteChanges([{ op: "put", collection: "notes", projectId: "p1", item: note("n1", "from owner") }]);
+    expect(storage.getById("notes", "n1", "p1")).toMatchObject({ content: "from owner" });
+
+    storage.setReadOnly(() => false);
+    detach.forEach((d) => d());
+  });
+});

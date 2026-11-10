@@ -20,6 +20,14 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.4.2-beta",
+    date: "2026-11-10",
+    items: [
+      { text: "Sharing updates live: people you invite, remove or give a new role see it straight away, and so does your Shared with count." },
+      { text: "Viewers of a shared project can look around, search and export, but can no longer change anything in it." },
+    ],
+  },
+  {
     version: "0.4.1-beta",
     date: "2026-11-10",
     items: [

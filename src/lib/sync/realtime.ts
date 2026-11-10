@@ -154,14 +154,16 @@ let channels = 0;
 /**
  * Subscribes to the rows of the given owners (the user and whoever shared a project with them) and catches up whenever the channel (re)joins, the tab becomes
  * visible again or the network comes back. Realtime applies the tables' RLS policies to inserts and
- * updates; the user_id filter also narrows deletes, which RLS can't check. Returns the unsubscribe.
+ * updates; the user_id filter also narrows deletes, which RLS can't check. `onSharingChange` hears the
+ * user's sharing events (someone joined, left, was removed or got a new role). Returns the unsubscribe.
  */
 export function connectRealtime(
   supabase: SupabaseClient,
   sync: RemoteSync,
   userId: string,
   owners: string[],
-  onError: (message: string) => void
+  onError: (message: string) => void,
+  onSharingChange?: () => void
 ): () => void {
   const catchUp = () => {
     sync.catchUp().catch((err: Error) => onError(`Could not fetch the latest changes: ${err.message}`));
@@ -174,11 +176,19 @@ export function connectRealtime(
   const channel = supabase
     .channel(`live:${userId}:${++channels}`)
     .on("postgres_changes", { event: "*", schema: "public", table: "projects", filter }, handle("projects"))
-    .on("postgres_changes", { event: "*", schema: "public", table: "assets", filter }, handle("assets"))
-    .subscribe((status) => {
+    .on("postgres_changes", { event: "*", schema: "public", table: "assets", filter }, handle("assets"));
+  channel.subscribe((status) => {
       // supabase-js rejoins on its own after errors and dropped sockets; each (re)join catches up.
       if (status === "SUBSCRIBED") catchUp();
     });
+
+  // Its own channel: before the sharing_events migration is live, only this one fails, not the row updates.
+  const sharing = onSharingChange
+    ? supabase
+        .channel(`sharing:${userId}:${channels}`)
+        .on("postgres_changes", { event: "INSERT", schema: "public", table: "sharing_events", filter: `user_id=eq.${userId}` }, () => onSharingChange())
+        .subscribe()
+    : null;
 
   const onWake = () => {
     if (document.visibilityState === "visible") catchUp();
@@ -189,5 +199,6 @@ export function connectRealtime(
     document.removeEventListener("visibilitychange", onWake);
     window.removeEventListener("online", catchUp);
     void supabase.removeChannel(channel);
+    if (sharing) void supabase.removeChannel(sharing);
   };
 }
