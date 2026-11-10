@@ -15,7 +15,7 @@ import { registerSearchTool } from "./tools/search";
 import { registerSessionTools } from "./tools/session-tools";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export const SERVER_VERSION = "0.1.0-beta";
+export const SERVER_VERSION = "0.2.0-beta";
 
 const INSTRUCTIONS = `Reads and edits the user's projects in Dev Studio (planning: Task Board, Canvas, Wiki, Notebook, Decision log) and GameDev Studio (the same plus art and audio tools; its Wiki is called Story). One account holds projects of both apps; every project says which app it belongs to.
 
