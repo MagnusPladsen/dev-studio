@@ -30,6 +30,7 @@ import { ToastProvider } from "@/components/Toast";
 import { DialogProvider } from "@/components/Dialog";
 import { AssetContextMenuProvider, useAssetMenu } from "@/components/AssetContextMenu";
 import { LiveRefresh } from "@/components/LiveRefresh";
+import { ViewOnlyBanner } from "@/components/ShareProject";
 import { WhatsNewButton, WhatsNewOnUpdate } from "@/components/WhatsNew";
 import type { ContextMenuEntry } from "@/components/ContextMenu";
 import { anchorPoint, type Point } from "@/lib/menu-position";
@@ -278,6 +279,8 @@ function AppSidebar({ children }: { children: React.ReactNode }) {
           </span>
         )}
       </header>
+
+      {projectId && <ViewOnlyBanner projectId={projectId} />}
 
       {/* Main content */}
       <main className="flex-1 min-h-0 overflow-auto" style={toolTheme(activeTool?.color, activeTool?.onAccent)}>

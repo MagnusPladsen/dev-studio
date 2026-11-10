@@ -18,5 +18,5 @@ export const PRIVACY_FACTS: PrivacyFacts = {
   website: "pladsen.dev",
   contactEmail: "magnus_pladsen@hotmail.com",
   supabaseRegion: "Zurich, Switzerland (eu-central-2)",
-  lastUpdated: "2026-11-03",
+  lastUpdated: "2026-11-10",
 };

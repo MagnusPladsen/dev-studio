@@ -1,6 +1,6 @@
 {
   "name": "dev-studio-mcp",
-  "version": "0.1.0-beta",
+  "version": "0.2.0-beta",
   "description": "MCP server for Dev Studio and GameDev Studio: plan sprints, draw canvases and search your notes from Claude.",
   "keywords": [
     "mcp",

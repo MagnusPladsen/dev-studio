@@ -6,7 +6,7 @@ import { validateRow } from "@/lib/schema";
 /** Supabase's row cap is 5 MB (DB trigger); checked here first for a clear error. */
 const MAX_ROW_BYTES = 5 * 1024 * 1024;
 
-type SaveStatus = "ok" | "conflict" | "missing" | "duplicate" | "orphan";
+type SaveStatus = "ok" | "conflict" | "missing" | "duplicate" | "orphan" | "forbidden";
 type SaveResult = { id: string; rev: number | null; updated_at: string | null; status: SaveStatus };
 
 type Upsert =
@@ -81,6 +81,10 @@ export function createAwaitedPersister(client: SupabaseClient): AwaitedPersister
     if (error) throw error;
     const results = (data ?? []) as SaveResult[];
     for (const r of results) if (r.status === "ok" && r.rev !== null) revs.set(table === "projects" ? `p:${r.id}` : `a:${r.id}`, r.rev);
+    const forbidden = results.filter((r) => r.status === "forbidden");
+    if (forbidden.length) {
+      throw new WriteRefused(`This project was shared with you as a viewer, so ${forbidden.map((r) => r.id).join(", ")} can't be changed. Ask its owner to make you an editor.`);
+    }
     const failed = results.filter((r) => r.status !== "ok");
     if (failed.length) throw new ConflictError(failed);
     return results.length;

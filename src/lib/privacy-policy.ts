@@ -64,6 +64,7 @@ export function englishPolicy(facts: PrivacyFacts, appName: string): PrivacyPoli
           "In your browser: your projects and settings, if you don't sign in. They stay on your device.",
           "In a local folder: if you connect one, every project is also written there as JSON files on your computer. They stay on your device.",
           `In your account: your email address (or, with GitHub sign-in, your GitHub name, email and picture), your projects and their timestamps. They are stored with Supabase in ${region}. Supabase may handle some account and support data outside that region, under the EU's standard contractual clauses.`,
+          "Shared projects: if you invite people to a project, or join one through an invite link, everyone in that project sees its contents and each other's email addresses. A shared project stays in its owner's account; what members add to it is stored there too.",
           "Hosting: Vercel serves the website. Like any web server it sees your IP address and browser details, and keeps short-lived logs to run and protect the service.",
           "Link previews: when you paste a web link (for example on the Canvas), our server fetches that page to show its title and image. The page you linked sees a request from our server, not from you.",
           "Visit statistics: only after you click Allow, Vercel Web Analytics records page views, the referring site, your country, and your browser, system and device type. It sets no cookies. It recognises a visit by a hash of the request that is thrown away after 24 hours.",
@@ -98,7 +99,7 @@ export function englishPolicy(facts: PrivacyFacts, appName: string): PrivacyPoli
         heading: "How long we keep it",
         bullets: [
           "Browser and folder data: until you delete it. Clear data in the Account panel removes it from this browser.",
-          "Account data: for as long as you have an account. Delete account removes your projects and sign-in straight away; copies in Supabase's backups disappear as those backups expire.",
+          "Account data: for as long as you have an account. Delete account removes your projects and sign-in straight away (projects you shared go for their members too, and you leave projects others shared with you); copies in Supabase's backups disappear as those backups expire.",
           "Hosting logs: briefly, as Vercel keeps them.",
           "Visit statistics: only as counts. The visitor hash is discarded after 24 hours.",
         ],
@@ -155,6 +156,7 @@ export function norwegianPolicy(facts: PrivacyFacts, appName: string): PrivacyPo
           "I nettleseren: prosjektene og innstillingene dine, hvis du ikke logger inn. De blir på enheten din.",
           "I en lokal mappe: kobler du til en, skrives hvert prosjekt også dit som JSON-filer på datamaskinen din. De blir på enheten din.",
           `På kontoen din: e-postadressen din (eller, med GitHub-innlogging, GitHub-navn, e-post og bilde), prosjektene dine og tidspunktene for dem. De lagres hos Supabase i ${region}. Supabase kan behandle noen konto- og supportdata utenfor regionen, etter EUs standardkontraktsbestemmelser.`,
+          "Delte prosjekter: inviterer du folk til et prosjekt, eller blir med i et via en invitasjonslenke, ser alle i prosjektet innholdet og hverandres e-postadresser. Et delt prosjekt ligger på eierens konto; det medlemmene legger til, lagres også der.",
           "Drift: Vercel leverer nettsiden. Som alle nettservere ser den IP-adressen din og opplysninger om nettleseren, og lagrer logger en kort tid for å drive og beskytte tjenesten.",
           "Forhåndsvisning av lenker: limer du inn en nettlenke (for eksempel på Canvas), henter serveren vår siden for å vise tittel og bilde. Siden du lenket til, ser en forespørsel fra serveren vår, ikke fra deg.",
           "Besøksstatistikk: bare etter at du har trykket «Allow», registrerer Vercel Web Analytics sidevisninger, hvilken side du kom fra, land, og type nettleser, system og enhet. Den setter ingen informasjonskapsler. Et besøk kjennes igjen på en hash av forespørselen som slettes etter 24 timer.",
@@ -189,7 +191,7 @@ export function norwegianPolicy(facts: PrivacyFacts, appName: string): PrivacyPo
         heading: "Hvor lenge vi lagrer",
         bullets: [
           "Data i nettleseren og mappen: til du sletter dem. «Clear data» (fjern data) i kontopanelet nederst i sidemenyen fjerner dem fra denne nettleseren.",
-          "Kontodata: så lenge du har en konto. «Delete account» (slett konto) sletter prosjektene og innloggingen din med en gang; kopier i Supabases sikkerhetskopier forsvinner når kopiene går ut.",
+          "Kontodata: så lenge du har en konto. «Delete account» (slett konto) sletter prosjektene og innloggingen din med en gang (prosjekter du har delt, forsvinner også for medlemmene, og du går ut av prosjekter andre har delt med deg); kopier i Supabases sikkerhetskopier forsvinner når kopiene går ut.",
           "Driftslogger: en kort tid, slik Vercel lagrer dem.",
           "Besøksstatistikk: bare som tall. Besøks-hashen slettes etter 24 timer.",
         ],

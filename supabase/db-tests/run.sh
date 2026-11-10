@@ -19,3 +19,4 @@ for migration in ../migrations/*.sql; do
   run "$migration"
 done
 run test.sql
+run test-sharing.sql

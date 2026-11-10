@@ -20,6 +20,13 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.4.0-beta",
+    date: "2026-11-10",
+    items: [
+      { text: "Share a project: invite people with a link as editors or viewers, and work on it together live. Find Share on the project page." },
+    ],
+  },
+  {
     version: "0.3.0-beta",
     date: "2026-11-06",
     items: [

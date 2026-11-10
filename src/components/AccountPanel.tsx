@@ -21,7 +21,7 @@ function shouldWelcomeGuest(): boolean {
   }
 }
 
-function SignInDialog({ isWelcome, onClose }: { isWelcome: boolean; onClose(): void }) {
+export function SignInDialog({ isWelcome, onClose }: { isWelcome: boolean; onClose(): void }) {
   const { signInWithEmail, signInWithGitHub } = useSync();
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);

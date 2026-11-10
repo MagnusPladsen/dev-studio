@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2, FolderOpen, Download, Upload, Loader2, ExternalLink } from "lucide-react";
+import { Plus, Trash2, FolderOpen, Download, Upload, Loader2, ExternalLink, LogOut, Users } from "lucide-react";
 import { storage } from "@/lib/storage";
 import type { Project } from "@/types";
 import { v4 as uuid } from "uuid";
@@ -11,6 +11,8 @@ import { useStorageVersion } from "@/hooks/useStorage";
 import { APP, OTHER_APP, belongsToApp } from "@/lib/app-config";
 import { COPY } from "@/copy";
 import { dialog } from "@/components/Dialog";
+import { useSync } from "@/components/SyncProvider";
+import { getSharedProjects, subscribeShared, type SharedProject } from "@/lib/sharing";
 
 export default function ProjectsPage() {
   const router = useRouter();
@@ -27,6 +29,8 @@ export default function ProjectsPage() {
   const [withTutorials, setWithTutorials] = useState(true);
   const [creating, setCreating] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
+  const shared = useSyncExternalStore(subscribeShared, getSharedProjects, getSharedProjects);
+  const { leaveProject } = useSync();
 
   async function createProject() {
     if (!name.trim() || creating) return;
@@ -59,6 +63,14 @@ export default function ProjectsPage() {
   async function deleteProject(id: string) {
     if (!(await dialog.confirm({ title: "Delete project?", message: "Delete this project and everything in it? This cannot be undone.", confirmLabel: "Delete", danger: true }))) return;
     storage.delete("projects", id);
+  }
+
+  async function leave(id: string) {
+    const owner = shared.get(id)?.ownerEmail || "the owner";
+    const message = `You will lose access to this project until ${owner} invites you again. Nothing in it is deleted.`;
+    if (!(await dialog.confirm({ title: "Leave project?", message, confirmLabel: "Leave", danger: true }))) return;
+    const failure = await leaveProject(id);
+    if (failure) await dialog.alert({ title: "Could not leave the project", message: failure });
   }
 
   function exportProject(id: string) {
@@ -235,7 +247,9 @@ export default function ProjectsPage() {
               project={project}
               onOpen={() => router.push(`/project/${project.id}/assets`)}
               onExport={() => exportProject(project.id)}
-              onDelete={() => deleteProject(project.id)}
+              onDelete={shared.has(project.id) ? undefined : () => deleteProject(project.id)}
+              onLeave={shared.has(project.id) ? () => leave(project.id) : undefined}
+              badge={shared.has(project.id) ? <SharedBadge membership={shared.get(project.id)!} /> : undefined}
             />
           ))}
         </div>
@@ -248,12 +262,13 @@ export default function ProjectsPage() {
   );
 }
 
-function ProjectRow({ project, badge, onOpen, onExport, onDelete }: {
+function ProjectRow({ project, badge, onOpen, onExport, onDelete, onLeave }: {
   project: Project;
   badge?: React.ReactNode;
   onOpen(): void;
   onExport?(): void;
   onDelete?(): void;
+  onLeave?(): void;
 }) {
   return (
     <div
@@ -283,7 +298,7 @@ function ProjectRow({ project, badge, onOpen, onExport, onDelete }: {
         </p>
       </div>
       {badge}
-      {(onExport || onDelete) && (
+      {(onExport || onDelete || onLeave) && (
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 max-md:opacity-100 transition-opacity shrink-0">
           {onExport && (
             <button
@@ -313,9 +328,38 @@ function ProjectRow({ project, badge, onOpen, onExport, onDelete }: {
               <Trash2 className="w-4 h-4" />
             </button>
           )}
+          {onLeave && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onLeave();
+              }}
+              className="p-2 rounded-lg transition-colors"
+              style={{ color: "var(--red)" }}
+              title="Leave project"
+              aria-label={`Leave ${project.name}`}
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          )}
         </div>
       )}
     </div>
+  );
+}
+
+/** Who shared a project with you, and your role in it. */
+function SharedBadge({ membership }: { membership: SharedProject }) {
+  return (
+    <span
+      className="inline-flex items-center gap-1 text-xs shrink min-w-0 ml-auto"
+      style={{ color: "var(--text-secondary)" }}
+      title={`Shared with you by ${membership.ownerEmail || "its owner"}`}
+    >
+      <Users className="w-3.5 h-3.5 shrink-0" />
+      <span className="truncate max-md:hidden">{membership.ownerEmail || "Shared"}</span>
+      <span className="shrink-0 capitalize">· {membership.role}</span>
+    </span>
   );
 }
 

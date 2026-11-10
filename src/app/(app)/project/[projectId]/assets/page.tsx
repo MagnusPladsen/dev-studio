@@ -17,6 +17,7 @@ import { ExamplesBar } from "@/components/ExamplesBar";
 import { NewBadge, isNewTool } from "@/components/NewBadge";
 import { HelpButton } from "@/components/HelpButton";
 import { TutorialsToggle } from "@/components/TutorialsToggle";
+import { ShareButton } from "@/components/ShareProject";
 import { ASSET_KINDS, ASSET_TYPES, assetHref, listAssets } from "@/lib/assets";
 import { COPY } from "@/copy";
 import { getRelated, relatedKey, relatedLabel } from "@/lib/links";
@@ -150,6 +151,7 @@ export default function AssetsPage() {
         <div className="flex items-center gap-2 shrink-0">
           <HelpButton topic="assets" />
           <TutorialsToggle projectId={projectId} />
+          <ShareButton projectId={projectId} projectName={project.name} />
           <button
             onClick={exportProject}
             className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm shrink-0 max-md:flex-1"

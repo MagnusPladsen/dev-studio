@@ -22,7 +22,16 @@ import { getSupabase, supabaseEnabled } from "@/lib/supabase";
 import { clearDeviceStorage, deleteOwnAccount } from "@/lib/account";
 import { signInWithEmail, signInWithGitHub } from "@/lib/sign-in";
 import { migrateAllElementAssetLinks } from "@/lib/diagrams/element-links";
-import { createCloudPersister, createCloudReader, loadCloudSnapshot, uploadSnapshot, type SyncStatus } from "@/lib/sync/cloud";
+import {
+  createCloudPersister,
+  createCloudReader,
+  loadCloudSnapshot,
+  loadProjectRows,
+  snapshotFromRows,
+  uploadSnapshot,
+  type SyncStatus,
+} from "@/lib/sync/cloud";
+import { fetchSharedProjects, ownerOf, removeMember, roleIn, setSharedProjects, visibleOwners } from "@/lib/sharing";
 import { connectRealtime, createRemoteSync, type RemoteSync } from "@/lib/sync/realtime";
 import { listenToOtherTabs } from "@/lib/sync/tabs";
 import {
@@ -55,6 +64,12 @@ interface SyncContextValue {
   disconnectFolder(): Promise<void>;
   /** Re-mount the open editor so it re-reads storage (after bulk changes like adding examples). */
   reloadView(): void;
+  /** Waits until queued changes reached the cloud (sharing a project that was only just created). */
+  flushSaves(): Promise<void>;
+  /** Re-reads which projects are shared with the user and loads any new ones (after accepting an invite). */
+  refreshShared(): Promise<void>;
+  /** Leaves a project someone else shared with the user; it disappears from this device. Returns an error message, or null. */
+  leaveProject(projectId: string): Promise<string | null>;
   /** Deletes the signed-in account with all its projects. Returns an error message, or null when done. */
   deleteAccount(): Promise<string | null>;
   /** Guests: removes every project and setting this app keeps in this browser, and forgets the local folder. */
@@ -92,6 +107,8 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
   const switching = useRef<Promise<void>>(Promise.resolve());
   /** Stops listening for changes from other tabs or devices. */
   const stopLive = useRef<() => void>(() => {});
+  /** Signed in: re-reads shared projects, loads new ones and re-subscribes when their owners change. */
+  const refreshSharedRef = useRef<() => Promise<void>>(async () => {});
 
   const reportError = useCallback((message: string) => setStatus({ state: "error", message }), []);
 
@@ -115,6 +132,8 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
   const enterLocal = useCallback(() => {
     userIdRef.current = null;
     setUser(null);
+    setSharedProjects([]);
+    refreshSharedRef.current = async () => {};
     replaceCache(readLocalSnapshot());
     usePrimary(createLocalPersister(reportError));
     goLive(listenToOtherTabs(getSnapshot, (changes) => applyRemote(changes)));
@@ -149,6 +168,8 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
           clearLocalData();
         }
         setStatus({ state: "saving", message: "Loading your projects…" });
+        // before the sharing migration is live there is nothing shared, and that is fine
+        setSharedProjects(await fetchSharedProjects(supabase).catch(() => []));
         loaded = await loadCloudSnapshot(supabase);
         replaceCache(loaded.snapshot);
       } catch (err) {
@@ -166,7 +187,8 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         (rows) => {
           live?.written(rows).catch(() => {});
         },
-        (changes) => applyRemote(changes, persister.dropProject)
+        (changes) => applyRemote(changes, persister.dropProject),
+        { canWrite: (projectId) => roleIn(projectId) !== "viewer", ownerOf: (projectId) => ownerOf(projectId, u.id) }
       );
       persister.remember("projects", loaded.rows.projects);
       persister.remember("assets", loaded.rows.assets);
@@ -180,8 +202,30 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         isBusy: persister.isBusy,
         locate: locateCached,
         cachedIds,
+        owners: () => visibleOwners(u.id),
+        beforeCatchUp: () => refreshSharedRef.current(),
       });
-      goLive(connectRealtime(supabase, live, u.id, reportError));
+      const sync = live;
+      let listeningTo = "";
+      const listen = () => {
+        const owners = visibleOwners(u.id);
+        if (owners.join() === listeningTo) return;
+        listeningTo = owners.join();
+        goLive(connectRealtime(supabase, sync, u.id, owners, reportError));
+      };
+      refreshSharedRef.current = async () => {
+        const added = setSharedProjects(await fetchSharedProjects(supabase));
+        const cached = new Set(cachedIds().projects);
+        for (const projectId of added.filter((id) => !cached.has(id))) {
+          const rows = await loadProjectRows(supabase, projectId);
+          persister.remember("projects", rows.projects);
+          persister.remember("assets", rows.assets);
+          mergeIntoCache(snapshotFromRows(rows.projects, rows.assets));
+        }
+        if (added.length) setGeneration((g) => g + 1);
+        listen();
+      };
+      listen();
       setStatus({ state: "saved" });
       if (folderRef.current) await attachFolder(folderRef.current.handle).catch(() => {});
     },
@@ -281,6 +325,23 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       reloadView() {
         setGeneration((g) => g + 1);
       },
+      refreshShared: () => refreshSharedRef.current(),
+      async flushSaves() {
+        await primary.current?.persister.flush?.();
+      },
+      async leaveProject(projectId) {
+        const supabase = getSupabase();
+        const userId = userIdRef.current;
+        if (!supabase || !userId) return "You are not signed in.";
+        try {
+          await removeMember(supabase, ownerOf(projectId, userId), projectId, userId);
+        } catch (err) {
+          return (err as Error).message;
+        }
+        applyRemote([{ op: "deleteProject", projectId }]);
+        await refreshSharedRef.current().catch(() => {});
+        return null;
+      },
       async disconnectFolder() {
         folderRef.current?.detach();
         folderRef.current = null;
@@ -310,7 +371,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         setGeneration((g) => g + 1);
       },
     }),
-    [ready, generation, user, status, folder, folderAvailable, attachFolder, enterCloud, goLive, reportError]
+    [ready, generation, user, status, folder, folderAvailable, applyRemote, attachFolder, enterCloud, goLive, reportError]
   );
 
   return <SyncContext.Provider value={value}>{children}</SyncContext.Provider>;

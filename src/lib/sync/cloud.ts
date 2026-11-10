@@ -28,14 +28,16 @@ export type WrittenRow = { table: CloudTable; id: string; updatedAt?: string };
 type UpsertProject = { kind: "upsertProject"; id: string; data: Record<string, unknown> };
 type UpsertAsset = { kind: "upsertAsset"; id: string; projectId: string; collection: string; data: Record<string, unknown> };
 type Upsert = UpsertProject | UpsertAsset;
-type Op = Upsert | { kind: "deleteProject"; id: string } | { kind: "deleteAsset"; id: string };
+type Op = Upsert | { kind: "deleteProject"; id: string } | { kind: "deleteAsset"; id: string; projectId?: string };
 /** One row's outcome from the save_projects / save_assets RPCs (see the rev migration). */
 type SaveResult = {
   id: string;
   rev: number | null;
   updated_at: string | null;
-  status: "ok" | "conflict" | "missing" | "duplicate" | "orphan";
+  status: "ok" | "conflict" | "missing" | "duplicate" | "orphan" | "forbidden";
 };
+/** Shared projects: which ones this user may change, and whose account each one's rows are filed under. */
+export type SharingRules = { canWrite(projectId: string): boolean; ownerOf(projectId: string): string };
 /** The last version of a row we know the server holds: its rev, and its body as the base for merges. */
 type Known = { rev: number; base?: Record<string, unknown> };
 
@@ -94,6 +96,21 @@ export async function loadCloudSnapshot(
   return { snapshot: snapshotFromRows(projects, assets), cursor: newestUpdate([...projects, ...assets]), rows: { projects, assets } };
 }
 
+/** One project with its assets, for a project that was just shared with the user. */
+export async function loadProjectRows(supabase: SupabaseClient, projectId: string): Promise<Record<CloudTable, CloudRow[]>> {
+  const read = async (table: CloudTable, column: string) => {
+    const rows: CloudRow[] = [];
+    for (let from = 0; ; from += PAGE) {
+      const { data, error } = await supabase.from(table).select(ROW_COLUMNS[table]).eq(column, projectId).order("id").range(from, from + PAGE - 1);
+      if (error) throw error;
+      rows.push(...((data ?? []) as unknown as CloudRow[]));
+      if (!data || data.length < PAGE) return rows;
+    }
+  };
+  const [projects, assets] = await Promise.all([read("projects", "id"), read("assets", "project_id")]);
+  return { projects, assets };
+}
+
 /** Cache contents for project and asset rows as the server holds them. */
 export function snapshotFromRows(projects: CloudRow[], assets: CloudRow[]): Snapshot {
   const snap: Snapshot = new Map();
@@ -142,6 +159,12 @@ function assetRow(userId: string, item: { id: string }, projectId: string, colle
   return { user_id: userId, id: item.id, project_id: projectId, collection, data: item, updated_at: new Date().toISOString() };
 }
 
+function projectOf(event: ChangeEvent): string | undefined {
+  if (event.op === "deleteProject") return event.projectId;
+  if (event.collection === "projects") return event.op === "put" ? event.item.id : event.id;
+  return event.projectId;
+}
+
 export type SyncStatus = { state: "idle" | "saving" | "saved" | "error"; message?: string };
 
 /**
@@ -158,7 +181,8 @@ export function createCloudPersister(
   userId: string,
   onStatus: (s: SyncStatus) => void,
   onWritten: (rows: WrittenRow[]) => void = () => {},
-  applyLocally: (changes: ChangeEvent[]) => void = () => {}
+  applyLocally: (changes: ChangeEvent[]) => void = () => {},
+  sharing: SharingRules = { canWrite: () => true, ownerOf: () => userId }
 ): Persister & {
   flush(): Promise<void>;
   /** Whether a write for this row is queued or in flight (live updates hold off on it until it lands). */
@@ -244,6 +268,29 @@ export function createCloudPersister(
     }
   }
 
+  /** A viewer's write the server refused: put the server's copy back. */
+  async function refused(table: CloudTable, ops: Upsert[]) {
+    if (!ops.length) return;
+    const theirs = new Map((await reader.rows(table, ops.map((o) => o.id))).map((r) => [r.id, r]));
+    for (const op of ops) {
+      const key = keyOf(table, op.id);
+      if (pending.get(key)?.kind === op.kind) pending.delete(key);
+      const row = theirs.get(op.id);
+      if (!row?.data) {
+        deletedElsewhere(op);
+        continue;
+      }
+      known.set(key, { rev: row.rev ?? 0, base: row.data });
+      const item = { ...row.data, id: op.id };
+      applyLocally([
+        op.kind === "upsertProject"
+          ? { op: "put", collection: "projects", item }
+          : { op: "put", collection: op.collection as ProjectCollection, projectId: op.projectId, item },
+      ]);
+    }
+    onStatus({ state: "error", message: "You can only view this project, so your changes were not saved." });
+  }
+
   async function takenValues(projectId: string, collection: string, field: string, exceptId: string): Promise<unknown[]> {
     const values: unknown[] = [];
     for (let from = 0; ; from += PAGE) {
@@ -291,16 +338,23 @@ export function createCloudPersister(
       onWritten(results.filter((r) => r.status === "ok").map((r) => ({ table, id: r.id, updatedAt: r.updated_at ?? undefined })));
       outcome("missing").forEach(deletedElsewhere);
       await resolveConflicts(table, outcome("conflict"));
+      await refused(table, outcome("forbidden"));
       await renumberDuplicates(outcome("duplicate") as UpsertAsset[]);
     }
   }
 
-  async function remove(table: CloudTable, ids: string[]) {
-    if (!ids.length) return;
-    const { data, error } = await supabase.from(table).delete().eq("user_id", userId).in("id", ids).select("id, updated_at");
-    if (error) throw error;
-    for (const id of ids) known.delete(keyOf(table, id));
-    onWritten(((data ?? []) as CloudRow[]).map((r) => ({ table, id: r.id, updatedAt: r.updated_at })));
+  async function remove(table: CloudTable, ops: { id: string; projectId?: string }[]) {
+    const byOwner = new Map<string, string[]>();
+    for (const op of ops) {
+      const owner = table === "assets" && op.projectId ? sharing.ownerOf(op.projectId) : userId;
+      byOwner.set(owner, [...(byOwner.get(owner) ?? []), op.id]);
+    }
+    for (const [owner, ids] of byOwner) {
+      const { data, error } = await supabase.from(table).delete().eq("user_id", owner).in("id", ids).select("id, updated_at");
+      if (error) throw error;
+      for (const id of ids) known.delete(keyOf(table, id));
+      onWritten(((data ?? []) as CloudRow[]).map((r) => ({ table, id: r.id, updatedAt: r.updated_at })));
+    }
   }
 
   async function run(ops: Op[]) {
@@ -310,8 +364,8 @@ export function createCloudPersister(
 
     await save("projects", ofKind("upsertProject"));
     await save("assets", ofKind("upsertAsset"));
-    await remove("assets", ofKind("deleteAsset").map((o) => o.id));
-    await remove("projects", ofKind("deleteProject").map((o) => o.id));
+    await remove("assets", ofKind("deleteAsset"));
+    await remove("projects", ofKind("deleteProject"));
   }
 
   async function flush(): Promise<void> {
@@ -362,6 +416,8 @@ export function createCloudPersister(
       }
     },
     onChange(event: ChangeEvent) {
+      const projectId = projectOf(event);
+      if (projectId && !sharing.canWrite(projectId)) return;
       if (event.op === "deleteProject") {
         for (const [k, op] of pending) if ("projectId" in op && op.projectId === event.projectId) pending.delete(k);
         pending.delete(`p:${event.projectId}`);
@@ -382,7 +438,7 @@ export function createCloudPersister(
           data: event.item as Record<string, unknown>,
         });
       } else if (event.op === "delete") {
-        pending.set(`a:${event.id}`, { kind: "deleteAsset", id: event.id });
+        pending.set(`a:${event.id}`, { kind: "deleteAsset", id: event.id, projectId: event.projectId });
       }
       schedule(event.op === "put" && event.collection !== "projects" ? 700 : 0);
     },
