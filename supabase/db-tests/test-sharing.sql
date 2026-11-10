@@ -179,6 +179,31 @@ begin
   assert not exists (select 1 from public.list_project_members('00000000-0000-0000-0000-000000000001', 'p1')), 'no member list after leaving';
 end $$;
 
+-- ── every membership change leaves a sharing event for the member and the owner, readable only by them ──
+do $$
+begin
+  assert (select count(*) from public.sharing_events) >= 3, 'user 3 has events for joining, the role change and leaving';
+  assert not exists (select 1 from public.sharing_events where user_id <> auth.uid()), 'only own events';
+  begin
+    insert into public.sharing_events (user_id) values (auth.uid());
+    raise exception 'client wrote a sharing event';
+  exception when insufficient_privilege then null;
+  end;
+end $$;
+select pg_temp.as_user(2);
+do $$
+begin
+  assert not exists (select 1 from public.sharing_events where user_id <> auth.uid()), 'user 2 sees only own events';
+end $$;
+select pg_temp.as_user(1);
+do $$
+declare before int := (select count(*) from public.sharing_events);
+begin
+  assert before >= 4, 'owner gets an event for each change in their project';
+  update public.project_members set role = role;
+  assert (select count(*) from public.sharing_events) = before, 'an unchanged role sends nothing';
+end $$;
+
 -- ── expired links do nothing ──
 reset role;
 update public.project_invites set expires_at = now() - interval '1 minute';

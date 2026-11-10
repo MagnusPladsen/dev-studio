@@ -8,6 +8,7 @@ import { useSync } from "@/components/SyncProvider";
 import { dialog } from "@/components/Dialog";
 import { useOwnedShares, useSharedProject } from "@/hooks/useSharedProject";
 import { getSupabase } from "@/lib/supabase";
+import { storage } from "@/lib/storage";
 import {
   createInvite,
   inviteUrl,
@@ -405,12 +406,72 @@ function ErrorLine({ message }: { message: string }) {
 }
 
 /** Shown above every tool in a project the user can only view: their changes stay in this tab and are not saved. */
+/** How soon after the viewer's own click or key press a refused save counts as theirs and is undone. */
+const UNDO_WINDOW_MS = 2000;
+
+/** Search and filter boxes only narrow what is shown, so viewers may type in them. */
+function isLookupField(target: Element): boolean {
+  if (!(target instanceof HTMLInputElement)) return false;
+  return target.type === "search" || /^(search|filter)/i.test(target.placeholder);
+}
+
+/**
+ * Viewers: typing, pasting and dropping into the workspace do nothing, and any other change they
+ * make (a drag, a delete key) is refused by storage and undone by re-opening the editor.
+ */
+function useViewOnlyGuard(projectId: string, isViewer: boolean, onUndone: () => void) {
+  const { reloadView } = useSync();
+  useEffect(() => {
+    if (!isViewer) return;
+    let lastInput = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const noteInput = () => {
+      lastInput = Date.now();
+    };
+    const block = (event: Event) => {
+      const target = event.target instanceof Element ? event.target : null;
+      if (!target?.closest("main") || isLookupField(target)) return;
+      event.preventDefault();
+      event.stopPropagation();
+    };
+    const stopRefused = storage.onRefused((refusedId) => {
+      if (refusedId !== projectId || Date.now() - lastInput > UNDO_WINDOW_MS) return;
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        reloadView();
+        onUndone();
+      }, 300);
+    });
+    const inputs = ["pointerdown", "keydown"] as const;
+    const blocked = ["beforeinput", "paste", "cut", "drop"] as const;
+    for (const type of inputs) document.addEventListener(type, noteInput, true);
+    for (const type of blocked) document.addEventListener(type, block, true);
+    return () => {
+      clearTimeout(timer);
+      stopRefused();
+      for (const type of inputs) document.removeEventListener(type, noteInput, true);
+      for (const type of blocked) document.removeEventListener(type, block, true);
+    };
+  }, [isViewer, projectId, reloadView, onUndone]);
+}
+
+/** Viewers see this above the workspace, and can't change the project. */
 export function ViewOnlyBanner({ projectId }: { projectId: string }) {
   const shared = useSharedProject(projectId);
+  const [undoneAt, setUndoneAt] = useState(0);
+  const markUndone = useCallback(() => setUndoneAt(Date.now()), []);
+  useViewOnlyGuard(projectId, shared?.role === "viewer", markUndone);
+  useEffect(() => {
+    if (!undoneAt) return;
+    const timer = setTimeout(() => setUndoneAt(0), 4000);
+    return () => clearTimeout(timer);
+  }, [undoneAt]);
   if (shared?.role !== "viewer") return null;
   return (
     <div className="px-4 py-1.5 text-xs text-center" role="status" style={{ background: "color-mix(in srgb, var(--yellow) 14%, var(--bg-secondary))", color: "var(--text-primary)" }}>
-      View only: {shared.ownerEmail || "the owner"} shared this project with you as a viewer, so changes you make here are not saved.
+      {undoneAt
+        ? "That change was undone: this project is view only."
+        : `View only: ${shared.ownerEmail || "the owner"} shared this project with you as a viewer. You can look around and export, not change anything.`}
     </div>
   );
 }

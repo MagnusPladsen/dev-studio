@@ -107,6 +107,16 @@ const remoteListeners = new Set<(changes: ChangeEvent[]) => void>();
 /** Bumped per cache key, so a hook can re-render only for the collection it shows. */
 const keyVersions = new Map<string, number>();
 let version = 0;
+/** Projects nobody here may change (shared with the user as a viewer): their writes are refused. */
+let isReadOnly: (projectId: string) => boolean = () => false;
+const refusedListeners = new Set<(projectId: string) => void>();
+
+/** True (and listeners told) when a write to this project must not happen. */
+function refuse(projectId: string | undefined): boolean {
+  if (!projectId || !isReadOnly(projectId)) return false;
+  for (const listener of refusedListeners) listener(projectId);
+  return true;
+}
 
 function touchKey(key: string) {
   keyVersions.set(key, (keyVersions.get(key) ?? 0) + 1);
@@ -144,6 +154,7 @@ export const storage = {
     const key = cacheKey(collection, projectId);
     const items = [...(cache.get(key) ?? [])];
     const stored = item as unknown as Item;
+    if (refuse(collection === "projects" ? stored.id : projectId)) return;
     const index = items.findIndex((i) => i.id === stored.id);
     if (index >= 0) items[index] = stored;
     else items.push(stored);
@@ -156,6 +167,7 @@ export const storage = {
       this.deleteProject(id);
       return;
     }
+    if (refuse(projectId)) return;
     const key = cacheKey(collection, projectId);
     cache.set(key, (cache.get(key) ?? []).filter((i) => i.id !== id));
     if (projectId) removeRelationsTo(projectId, id);
@@ -163,6 +175,7 @@ export const storage = {
   },
 
   deleteProject(projectId: string): void {
+    if (refuse(projectId)) return;
     const key = cacheKey("projects");
     cache.set(key, (cache.get(key) ?? []).filter((i) => i.id !== projectId));
     for (const col of PROJECT_COLLECTIONS) cache.delete(cacheKey(col, projectId));
@@ -181,6 +194,17 @@ export const storage = {
   /** A counter that changes only when this collection (of this project) changes. */
   versionOf(collection: CollectionName, projectId?: string): number {
     return keyVersions.get(cacheKey(collection, projectId)) ?? 0;
+  },
+
+  /** Decides which projects are read-only; their saves and deletes are dropped before reaching the cache. */
+  setReadOnly(predicate: (projectId: string) => boolean): void {
+    isReadOnly = predicate;
+  },
+
+  /** Hears every refused write, with the read-only project it was meant for. */
+  onRefused(listener: (projectId: string) => void): () => void {
+    refusedListeners.add(listener);
+    return () => refusedListeners.delete(listener);
   },
 
   /** Hears changes that came from another tab, device or the MCP server, after they are in the cache. */

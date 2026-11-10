@@ -50,6 +50,11 @@ tools comes from `COPY.help`. `npm test` checks both objects have the same keys 
   otherwise the remote copy replaces the open asset (selection/view kept) and undo history restarts, so undo never
   reverts someone else's change. Canvas, Task Board, Notebook, Wiki/Story and Decision log do this; other editors
   are re-mounted on their open asset by `<LiveRefresh>`, which also shows the "deleted elsewhere" notice.
+- **Shared projects** (`src/lib/sharing.ts`): membership changes insert a row per affected user in `sharing_events`;
+  `connectRealtime` hears them and `refreshShared` re-reads memberships, drops projects the user lost and loads new
+  ones. Viewer projects are read-only in `storage` (`setReadOnly`: saves/deletes refused, `onRefused` heard); the
+  `ViewOnlyBanner` blocks typing/paste/drop in `<main>` (search/filter boxes excepted) and re-mounts the editor when a
+  refused write follows the viewer's own input.
 - **Compare-and-swap saves**: rows carry a server `rev` (bumped by trigger). The cloud persister saves through the
   `save_projects` / `save_assets` RPCs with the rev it last saw; on a conflict it fetches the server copy, merges
   (`src/lib/sync/merge.ts`: per field, canvas elements by id, tags as sets, text by line; deletes win) and saves

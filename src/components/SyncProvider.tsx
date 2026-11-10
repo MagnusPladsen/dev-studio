@@ -15,6 +15,7 @@ import {
   readLocalSnapshot,
   replaceCache,
   PROJECT_COLLECTIONS,
+  storage,
   type ChangeEvent,
   type Persister,
 } from "@/lib/storage";
@@ -190,6 +191,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         return;
       }
       setUser({ id: u.id, email: u.email });
+      storage.setReadOnly((projectId) => roleIn(projectId) === "viewer");
       let live: RemoteSync | null = null;
       const persister = createCloudPersister(
         supabase,
@@ -222,11 +224,31 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         const owners = visibleOwners(u.id);
         if (owners.join() === listeningTo) return;
         listeningTo = owners.join();
-        goLive(connectRealtime(supabase, sync, u.id, owners, reportError));
+        goLive(connectRealtime(supabase, sync, u.id, owners, reportError, onSharingChange));
+      };
+      // a burst of events (several people joining) runs one refresh now and at most one more after it
+      let refreshing: Promise<void> | null = null;
+      let again = false;
+      const onSharingChange = () => {
+        if (refreshing) {
+          again = true;
+          return;
+        }
+        refreshing = refreshSharedRef
+          .current()
+          .catch((err: Error) => reportError(`Could not update shared projects: ${err.message}`))
+          .finally(() => {
+            refreshing = null;
+            if (again) {
+              again = false;
+              onSharingChange();
+            }
+          });
       };
       refreshSharedRef.current = async () => {
-        const added = setSharedProjects(await fetchSharedProjects(supabase));
+        const { added, removed } = setSharedProjects(await fetchSharedProjects(supabase));
         setOwnedShares(await fetchOwnedShares(supabase, u.id));
+        if (removed.length) applyRemote(removed.map((projectId) => ({ op: "deleteProject", projectId })), persister.dropProject);
         const cached = new Set(cachedIds().projects);
         for (const projectId of added.filter((id) => !cached.has(id))) {
           const rows = await loadProjectRows(supabase, projectId);

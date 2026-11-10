@@ -33,12 +33,14 @@ export function getSharedProjects(): Map<string, SharedProject> {
   return shared;
 }
 
-/** Replaces the known memberships. Returns the project ids that are new. */
-export function setSharedProjects(list: SharedProject[]): string[] {
+/** Replaces the known memberships. Returns the project ids that are new and the ones no longer shared. */
+export function setSharedProjects(list: SharedProject[]): { added: string[]; removed: string[] } {
+  const next = new Map(list.map((p) => [p.projectId, p]));
   const added = list.filter((p) => !shared.has(p.projectId)).map((p) => p.projectId);
-  shared = new Map(list.map((p) => [p.projectId, p]));
+  const removed = [...shared.keys()].filter((projectId) => !next.has(projectId));
+  shared = next;
   notify();
-  return added;
+  return { added, removed };
 }
 
 export function getOwnedShares(): Map<string, number> {
