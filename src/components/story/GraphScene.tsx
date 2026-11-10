@@ -4,6 +4,7 @@ import type { MenuTriggerProps } from "@/components/AssetContextMenu";
 import type { Camera } from "@/lib/graph-camera";
 import { isLabelVisible, pickVisibleLabels, type GraphEdge, type GraphNode, type SimNode } from "@/lib/story-graph";
 import type { GraphGestures } from "./useGraphGestures";
+import { useSpaceHeld } from "@/hooks/useSpacePan";
 
 const DIMMED_OPACITY = 0.12;
 const LABEL_FONT_PX = 12;
@@ -153,11 +154,13 @@ export function GraphScene({ svgRef, nodes, edges, positions, camera, highlight,
   const byKey = new Map(nodes.map((node, index) => [node.key, index]));
   const activeColor = highlight.activeKey ? nodes[byKey.get(highlight.activeKey) ?? -1]?.color : undefined;
   const labelKeys = visibleLabelKeys(nodes, positions, camera, highlight);
+  const isSpacePanning = useSpaceHeld();
   return (
     <svg
       ref={svgRef}
       className="absolute inset-0 w-full h-full touch-none select-none"
       style={{ cursor: "grab" }}
+      data-space-pan={isSpacePanning || undefined}
       onPointerDown={handlers.gestures.onBackgroundPointerDown}
       aria-label="Connection graph"
     >

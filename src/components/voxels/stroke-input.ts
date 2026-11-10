@@ -10,6 +10,8 @@ export interface StrokeInputOptions {
   canvas: HTMLCanvasElement;
   pick(clientX: number, clientY: number): RayHit | null;
   isOrbitPrimary(): boolean;
+  /** Space is held: the drag only moves the camera, so no cube is placed, painted or removed. */
+  isSpaceHeld(): boolean;
   onStroke(event: StrokeEvent): void;
   onHover(hit: RayHit | null): void;
 }
@@ -140,7 +142,7 @@ export class StrokeInput {
       this.isGestureBlocked = true;
       return;
     }
-    if (this.isGestureBlocked || event.button !== 0) return;
+    if (this.isGestureBlocked || event.button !== 0 || this.options.isSpaceHeld()) return;
     if (this.options.isOrbitPrimary()) {
       this.tap = toOrigin(event);
       return;

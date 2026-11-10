@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import type { Vec3, VoxelGrid } from "@/lib/voxels/grid";
 import type { RayHit } from "@/lib/voxels/raycast";
 import { StrokeInput } from "./stroke-input";
+import { isSpaceHeld, useSpaceHeld } from "@/hooks/useSpacePan";
 import type { StrokeEvent, ViewPreset, VoxelTool } from "./types";
 import { getPresetPose } from "./viewport-helpers";
 import {
@@ -83,6 +84,7 @@ export default function VoxelViewport(props: VoxelViewportProps): React.JSX.Elem
   const viewportRef = useRef<ViewportScene | null>(null);
   const inputRef = useRef<StrokeInput | null>(null);
   const latestProps = useRef(props);
+  const isSpacePanning = useSpaceHeld();
 
   useEffect(() => {
     latestProps.current = props;
@@ -101,6 +103,7 @@ export default function VoxelViewport(props: VoxelViewportProps): React.JSX.Elem
       canvas,
       pick: (clientX, clientY) => pickGridHit(viewport, clientX, clientY, latestProps.current.grid),
       isOrbitPrimary: () => latestProps.current.oneFingerOrbit,
+      isSpaceHeld,
       onStroke: (event) => latestProps.current.onStroke(event),
       onHover: (hit) => latestProps.current.onHover?.(hit),
     });
@@ -151,8 +154,8 @@ export default function VoxelViewport(props: VoxelViewportProps): React.JSX.Elem
   useEffect(() => {
     const viewport = viewportRef.current;
     if (!viewport) return;
-    applyControlScheme(viewport.controls, oneFingerOrbit);
-  }, [oneFingerOrbit]);
+    applyControlScheme(viewport.controls, oneFingerOrbit || isSpacePanning);
+  }, [oneFingerOrbit, isSpacePanning]);
 
   useEffect(() => {
     const viewport = viewportRef.current;
@@ -173,7 +176,7 @@ export default function VoxelViewport(props: VoxelViewportProps): React.JSX.Elem
     <div ref={containerRef} className="relative h-full w-full overflow-hidden">
       <canvas
         ref={canvasRef}
-        className={`block h-full w-full ${oneFingerOrbit ? "cursor-grab" : "cursor-crosshair"}`}
+        className={`block h-full w-full ${oneFingerOrbit || isSpacePanning ? "cursor-grab" : "cursor-crosshair"}`}
         style={{ touchAction: "none" }}
       />
     </div>

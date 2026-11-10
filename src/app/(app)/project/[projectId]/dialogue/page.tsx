@@ -48,6 +48,7 @@ import { FIELD_STYLE } from "@/components/dialogue/ValueInput";
 import { useOpenParam, useTrackOpenAsset } from "@/hooks/useStorage";
 import { LinkedAssets } from "@/components/LinkedAssets";
 import { dialog } from "@/components/Dialog";
+import { isSpaceHeld, useSpaceHeld } from "@/hooks/useSpacePan";
 
 type NodeType = DialogueNode["type"];
 
@@ -219,6 +220,7 @@ export default function DialoguePage() {
   const [zoom, setZoom] = useState(1);
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+  const isSpacePanning = useSpaceHeld();
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [isVariablesOpen, setIsVariablesOpen] = useState(false);
   const [editingNode, setEditingNode] = useState<string | null>(null);
@@ -413,6 +415,16 @@ export default function DialoguePage() {
       x: (cx - rect.left - pan.x) / zoom,
       y: (cy - rect.top - pan.y) / zoom,
     };
+  }
+
+  /** Space + drag pans from anywhere, nodes included, so nothing is selected or moved by accident. */
+  function handleSpacePanStart(e: React.PointerEvent<HTMLDivElement>) {
+    if (!isSpaceHeld() || e.button !== 0) return;
+    e.stopPropagation();
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    setIsPanning(true);
+    setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
   }
 
   function handleCanvasMouseDown(e: React.MouseEvent) {
@@ -1068,7 +1080,9 @@ export default function DialoguePage() {
         <div
           ref={canvasRef}
           className="absolute inset-0 cursor-grab active:cursor-grabbing"
-          style={{ touchAction: "none" }}
+          style={{ touchAction: "none", cursor: isSpacePanning ? (isPanning ? "grabbing" : "grab") : undefined }}
+          data-space-pan={isSpacePanning || undefined}
+          onPointerDownCapture={handleSpacePanStart}
           onPointerDown={handleCanvasMouseDown}
           onPointerMove={handleCanvasMouseMove}
           onPointerUp={handleCanvasMouseUp}

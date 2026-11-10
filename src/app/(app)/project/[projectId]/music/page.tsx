@@ -58,6 +58,7 @@ import { cellsBetween, coversCell, eraseCells, paintCells, type GridCell, type N
 import type { MusicTrack, MusicChannel, MusicNote, MusicSectionLength } from "@/types";
 import { v4 as uuid } from "uuid";
 import { dialog } from "@/components/Dialog";
+import { useSpaceScrollPan } from "@/hooks/useSpacePan";
 
 function midiToName(midi: number): string {
   const octave = Math.floor(midi / 12) - 1;
@@ -181,6 +182,7 @@ export default function MusicPage() {
   const [tracksOpen, setTracksOpen] = useState(false);
   const [isInstrumentOpen, setIsInstrumentOpen] = useState(false);
   const rollRef = useRef<HTMLDivElement>(null);
+  const isSpacePanning = useSpaceScrollPan(rollRef);
   const rootRef = useRef<HTMLDivElement>(null);
   const [rollW, setRollW] = useState(0);
   // when zoomed out, the beats stretch to fill the visible width instead of leaving empty space
@@ -1030,7 +1032,12 @@ export default function MusicPage() {
             )}
 
             {/* Piano roll */}
-            <div ref={rollRef} className="flex-1 overflow-auto relative">
+            <div
+              ref={rollRef}
+              data-space-pan={isSpacePanning || undefined}
+              className="flex-1 overflow-auto relative"
+              style={{ cursor: isSpacePanning ? "grab" : undefined }}
+            >
               <div className="flex" style={{ minWidth: gridW + 50 }}>
                 {/* Piano keys */}
                 <div className="sticky left-0 z-10 shrink-0" style={{ width: 50, background: "var(--bg-secondary)" }}>
