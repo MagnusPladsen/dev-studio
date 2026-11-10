@@ -49,6 +49,7 @@ import { COLLISION, collisionGrid, paintCollision, type CollisionValue } from "@
 import { TerrainPanel } from "@/components/tilemap/TerrainPanel";
 import type { TilemapData, TilemapLayer, TilemapTerrain, Sprite } from "@/types";
 import { v4 as uuid } from "uuid";
+import { dialog } from "@/components/Dialog";
 
 type Tile = number | string | null;
 type Tool = "paint" | "erase" | "fill" | "collision";
@@ -425,8 +426,8 @@ export default function TilemapPage() {
     lastCell.current = null;
   }
 
-  function deleteTilemap(id: string) {
-    if (!confirm("Delete this tilemap?")) return;
+  async function deleteTilemap(id: string) {
+    if (!(await dialog.confirm({ message: "Delete this tilemap?", confirmLabel: "Delete", danger: true }))) return;
     storage.delete("tilemaps", id, projectId);
     if (current?.id === id) setCurrent(null);
   }

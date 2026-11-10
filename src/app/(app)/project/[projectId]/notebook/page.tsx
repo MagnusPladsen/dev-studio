@@ -43,6 +43,7 @@ import { ImportDropZone } from "@/components/ImportDropZone";
 import { useImport } from "@/hooks/useImport";
 import { importAsNewAssets } from "@/lib/import";
 import { NOTEBOOK_IMPORTERS } from "@/lib/import/notebook";
+import { dialog } from "@/components/Dialog";
 
 const ACCENT = "#a3e635";
 const SAVE_DELAY = 600;
@@ -303,9 +304,9 @@ export default function NotebookPage() {
     if (viewMode === "preview") setViewMode(window.matchMedia("(max-width: 1023px)").matches ? "edit" : "split");
   }
 
-  function deleteNote() {
+  async function deleteNote() {
     if (!draft) return;
-    if (!confirm(`Delete “${draft.title || "Untitled note"}”? This cannot be undone.`)) return;
+    if (!(await dialog.confirm({ message: `Delete “${draft.title || "Untitled note"}”? This cannot be undone.`, confirmLabel: "Delete", danger: true }))) return;
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = null;
     storage.delete("notes", draft.id, projectId);

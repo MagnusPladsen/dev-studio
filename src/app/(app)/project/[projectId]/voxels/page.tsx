@@ -42,6 +42,7 @@ import { renderThumbnail } from "@/lib/voxels/thumbnail";
 import { decodeVoxels } from "@/lib/voxels/codec";
 import { AXIS_INDEX, layerCount, sliceToCell, type SliceAxis } from "@/lib/voxels/slice";
 import type { Palette, VoxelModel } from "@/types";
+import { dialog } from "@/components/Dialog";
 
 const VoxelViewport = dynamic(() => import("@/components/voxels/VoxelViewport"), {
   ssr: false,
@@ -315,18 +316,18 @@ export default function VoxelsPage(): React.JSX.Element {
     addLink(projectId, { type: "model", id: model.id }, { type: "sprite", id: sprite.id });
   }
 
-  function deleteModel(model: VoxelModel): void {
-    if (!confirm(`Delete model "${model.name}"?`)) return;
+  async function deleteModel(model: VoxelModel): Promise<void> {
+    if (!(await dialog.confirm({ message: `Delete model "${model.name}"?`, confirmLabel: "Delete", danger: true }))) return;
     if (model.id === activeModelId) strokes.reset();
     editor.deleteModel(model.id);
   }
 
-  function changeSize(side: number): void {
+  async function changeSize(side: number): Promise<void> {
     if (!doc || side === doc.grid.size[0]) return;
     const resized = resizeGrid(doc.grid, [side, side, side]);
     const sizeLabel = `${side}×${side}×${side}`;
     const lostLabel = `${resized.lost} cube${resized.lost === 1 ? "" : "s"}`;
-    if (resized.lost > 0 && !confirm(`Making the grid ${sizeLabel} removes ${lostLabel} that no longer fit. Continue?`)) return;
+    if (resized.lost > 0 && !(await dialog.confirm({ message: `Making the grid ${sizeLabel} removes ${lostLabel} that no longer fit. Continue?`, confirmLabel: "Resize", danger: true }))) return;
     strokes.reset();
     selection.deselect();
     updateDoc({ grid: resized.grid });

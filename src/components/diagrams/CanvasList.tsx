@@ -12,6 +12,7 @@ import type { ImportController } from "@/hooks/useImport";
 import { COPY } from "@/copy";
 import type { CanvasTemplate } from "@/lib/canvas-shapes/templates";
 import { TemplatePicker } from "./TemplatePicker";
+import { dialog } from "@/components/Dialog";
 
 interface CanvasListProps {
   projectId: string;
@@ -99,7 +100,7 @@ export function CanvasList({ projectId, diagrams, onOpen, onNew, onDelete, impor
               </div>
               <div className="flex items-center gap-1">
                 <button
-                  onClick={(e) => { e.stopPropagation(); if (confirm(`Delete "${d.name}"?`)) onDelete(d.id); }}
+                  onClick={(e) => { e.stopPropagation(); void dialog.confirm({ message: `Delete "${d.name}"?`, confirmLabel: "Delete", danger: true }).then((isConfirmed) => isConfirmed && onDelete(d.id)); }}
                   className="p-2 rounded md:opacity-0 md:group-hover:opacity-100 transition-opacity"
                   style={{ color: "var(--red)" }}
                   title="Delete canvas"

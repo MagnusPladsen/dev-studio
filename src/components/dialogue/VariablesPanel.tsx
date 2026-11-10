@@ -6,6 +6,7 @@ import type { DialogueTree, DialogueVariable } from "@/types";
 import { cleanVariableName, coerceValue, defaultValueFor, removeVariable, renameVariable, variableUses } from "@/lib/dialogue/logic";
 import { isUsableLanguage, removeLanguage, translatedCount } from "@/lib/dialogue/localisation";
 import { FIELD_CLASS, FIELD_STYLE, ValueInput } from "./ValueInput";
+import { dialog } from "@/components/Dialog";
 
 const TYPE_LABELS: Record<DialogueVariable["type"], string> = { bool: "true/false", number: "number", string: "text" };
 
@@ -45,7 +46,7 @@ function VariableRow({ tree, variable, onChange }: { tree: DialogueTree; variabl
       <div className="flex gap-1 items-center">
         <NameInput tree={tree} name={variable.name} onChange={onChange} />
         <button
-          onClick={() => (!uses || confirm(`${variable.name} is used by ${uses} ${uses === 1 ? "node" : "nodes"}. They keep their text for your game's code. Delete it?`)) && onChange(removeVariable(tree, variable.name))}
+          onClick={() => void (uses ? dialog.confirm({ message: `${variable.name} is used by ${uses} ${uses === 1 ? "node" : "nodes"}. They keep their text for your game's code. Delete it?`, confirmLabel: "Delete", danger: true }) : Promise.resolve(true)).then((isConfirmed) => isConfirmed && onChange(removeVariable(tree, variable.name)))}
           className="p-1 rounded"
           style={{ color: "var(--red)" }}
           title="Delete variable"
@@ -106,7 +107,7 @@ function LanguagesSection({ tree, onChange }: { tree: DialogueTree; onChange(tre
             <button
               onClick={() => {
                 const count = translatedCount(tree, language);
-                if (!count || confirm(`Remove ${language} and its ${count} ${count === 1 ? "translation" : "translations"}?`)) onChange(removeLanguage(tree, language));
+                void (count ? dialog.confirm({ message: `Remove ${language} and its ${count} ${count === 1 ? "translation" : "translations"}?`, confirmLabel: "Remove", danger: true }) : Promise.resolve(true)).then((isConfirmed) => isConfirmed && onChange(removeLanguage(tree, language)));
               }}
               title={`Remove ${language}`}
               aria-label={`Remove ${language}`}

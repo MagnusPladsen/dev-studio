@@ -83,6 +83,7 @@ import { useToast } from "@/components/Toast";
 import { copyToSystemClipboard } from "@/lib/clipboard";
 import { AssetMenuButton, AssetPinButton, PasteButton } from "@/components/AssetMenuButton";
 import type { AnimationDirection, FrameTag, Sprite, SpriteFrame } from "@/types";
+import { dialog } from "@/components/Dialog";
 
 // ─── types ───────────────────────────────────────────────────────────
 type Tool = "pencil" | "eraser" | "fill" | "line" | "rect" | "circle" | "picker" | "move";
@@ -458,9 +459,9 @@ export default function PixelArtPage() {
   const { state: saveState, flush } = useAutosave(doc, persist, { resetKey: activeSpriteId, enabled: touched });
   const savedSpriteId = activeSpriteId && sprites.some((s) => s.id === activeSpriteId) ? activeSpriteId : null;
 
-  function deleteSprite(id: string) {
+  async function deleteSprite(id: string) {
     const s = sprites.find((x) => x.id === id);
-    if (!confirm(`Delete sprite "${s?.name ?? DEFAULT_NAME}"?`)) return;
+    if (!(await dialog.confirm({ message: `Delete sprite "${s?.name ?? DEFAULT_NAME}"?`, confirmLabel: "Delete", danger: true }))) return;
     deletedRef.current.add(id);
     storage.delete("sprites", id, projectId);
     if (activeSpriteId === id) startSprite(canvasW, canvasH, false);

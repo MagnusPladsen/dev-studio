@@ -43,6 +43,7 @@ import { toggleChecklistLine, type RenderCtx, type WikiTarget } from "@/componen
 import { DecisionList, type StatusFilter } from "@/components/decisions/DecisionList";
 import { DecisionFields, type FieldsMode } from "@/components/decisions/DecisionFields";
 import { StatusBadge } from "@/components/decisions/StatusBadge";
+import { dialog } from "@/components/Dialog";
 
 const SAVE_DELAY = 600;
 
@@ -229,9 +230,9 @@ export default function DecisionLogPage() {
     setFilter("all");
   }
 
-  function remove() {
+  async function remove() {
     if (!draft) return;
-    if (!confirm(`Delete ${decisionCode(draft.number)} “${draft.title || "Untitled decision"}”? Its links are removed too.`)) return;
+    if (!(await dialog.confirm({ message: `Delete ${decisionCode(draft.number)} “${draft.title || "Untitled decision"}”? Its links are removed too.`, confirmLabel: "Delete", danger: true }))) return;
     storage.delete("decisions", draft.id, projectId);
     for (const d of storage.getAll("decisions", projectId)) {
       if (d.supersededBy === draft.id) storage.save("decisions", { ...d, supersededBy: undefined, updatedAt: new Date().toISOString() }, projectId);
