@@ -177,14 +177,18 @@ export function connectRealtime(
     .channel(`live:${userId}:${++channels}`)
     .on("postgres_changes", { event: "*", schema: "public", table: "projects", filter }, handle("projects"))
     .on("postgres_changes", { event: "*", schema: "public", table: "assets", filter }, handle("assets"));
-  if (onSharingChange) {
-    const own = `user_id=eq.${userId}`;
-    channel.on("postgres_changes", { event: "INSERT", schema: "public", table: "sharing_events", filter: own }, () => onSharingChange());
-  }
   channel.subscribe((status) => {
       // supabase-js rejoins on its own after errors and dropped sockets; each (re)join catches up.
       if (status === "SUBSCRIBED") catchUp();
     });
+
+  // Its own channel: before the sharing_events migration is live, only this one fails, not the row updates.
+  const sharing = onSharingChange
+    ? supabase
+        .channel(`sharing:${userId}:${channels}`)
+        .on("postgres_changes", { event: "INSERT", schema: "public", table: "sharing_events", filter: `user_id=eq.${userId}` }, () => onSharingChange())
+        .subscribe()
+    : null;
 
   const onWake = () => {
     if (document.visibilityState === "visible") catchUp();
@@ -195,5 +199,6 @@ export function connectRealtime(
     document.removeEventListener("visibilitychange", onWake);
     window.removeEventListener("online", catchUp);
     void supabase.removeChannel(channel);
+    if (sharing) void supabase.removeChannel(sharing);
   };
 }
