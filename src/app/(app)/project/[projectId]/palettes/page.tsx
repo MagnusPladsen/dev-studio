@@ -25,6 +25,7 @@ import { ExamplesBar } from "@/components/ExamplesBar";
 import { rowButtonProps } from "@/lib/row-button";
 import { useAssetMenu } from "@/components/AssetContextMenu";
 import { AssetMenuButton, AssetPinButton, PasteButton } from "@/components/AssetMenuButton";
+import { dialog } from "@/components/Dialog";
 
 const PRESET_PALETTES: { name: string; colors: string[] }[] = [
   {
@@ -197,8 +198,8 @@ export default function PalettesPage() {
     update({ colors: selected.colors.filter((_, idx) => idx !== i) });
   }
 
-  function deletePalette(p: Palette) {
-    if (!confirm(`Delete the palette "${p.name}"?`)) return;
+  async function deletePalette(p: Palette) {
+    if (!(await dialog.confirm({ message: `Delete the palette "${p.name}"?`, confirmLabel: "Delete", danger: true }))) return;
     storage.delete("palettes", p.id, projectId);
     if (selected?.id === p.id) setSelected(null);
   }

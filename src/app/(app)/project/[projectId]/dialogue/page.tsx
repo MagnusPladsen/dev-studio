@@ -47,6 +47,7 @@ import { ActionFields, ConditionFields } from "@/components/dialogue/LogicFields
 import { FIELD_STYLE } from "@/components/dialogue/ValueInput";
 import { useOpenParam, useTrackOpenAsset } from "@/hooks/useStorage";
 import { LinkedAssets } from "@/components/LinkedAssets";
+import { dialog } from "@/components/Dialog";
 
 type NodeType = DialogueNode["type"];
 
@@ -903,7 +904,7 @@ export default function DialoguePage() {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (confirm(`Delete "${t.name}"?`)) deleteTree(t.id);
+                      void dialog.confirm({ message: `Delete "${t.name}"?`, confirmLabel: "Delete", danger: true }).then((isConfirmed) => isConfirmed && deleteTree(t.id));
                     }}
                     className="p-2 rounded-lg md:opacity-0 md:group-hover:opacity-100 transition-opacity"
                     style={{ color: "var(--red)" }}

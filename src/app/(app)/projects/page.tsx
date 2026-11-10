@@ -10,6 +10,7 @@ import { addExamples } from "@/lib/examples";
 import { useStorageVersion } from "@/hooks/useStorage";
 import { APP, OTHER_APP, belongsToApp } from "@/lib/app-config";
 import { COPY } from "@/copy";
+import { dialog } from "@/components/Dialog";
 
 export default function ProjectsPage() {
   const router = useRouter();
@@ -55,8 +56,8 @@ export default function ProjectsPage() {
     router.push(`/project/${project.id}/assets`);
   }
 
-  function deleteProject(id: string) {
-    if (!confirm("Delete this project and everything in it? This cannot be undone.")) return;
+  async function deleteProject(id: string) {
+    if (!(await dialog.confirm({ title: "Delete project?", message: "Delete this project and everything in it? This cannot be undone.", confirmLabel: "Delete", danger: true }))) return;
     storage.delete("projects", id);
   }
 

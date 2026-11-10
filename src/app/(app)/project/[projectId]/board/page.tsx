@@ -87,6 +87,7 @@ import {
   startSprint,
 } from "@/lib/board";
 import { COPY } from "@/copy";
+import { dialog } from "@/components/Dialog";
 
 const MOVE_MENU_WIDTH = 176;
 const MOVE_MENU_ROW_HEIGHT = 30;
@@ -1022,8 +1023,8 @@ function BacklogView({
   const moveTo = (issueId: string, sprintId: string | null, before: string | null) => moveIssueToSprint(projectId, board, issueId, sprintId, before);
   const patchSprintFields = (id: string, p: Partial<Sprint>) => patchSprint(projectId, board, id, p);
 
-  function confirmDeleteSprint(s: Sprint) {
-    if (!confirm(`Delete "${s.name}"? Its issues go back to the backlog.`)) return;
+  async function confirmDeleteSprint(s: Sprint) {
+    if (!(await dialog.confirm({ message: `Delete "${s.name}"? Its issues go back to the backlog.`, confirmLabel: "Delete", danger: true }))) return;
     deleteSprint(projectId, board, s.id);
   }
 
@@ -1577,11 +1578,11 @@ function CompleteSprintDialog({
   const planned = board.sprints.filter((s) => s.state === "planned" && s.id !== sprint.id);
   const [target, setTarget] = useState<string>("");
 
-  function complete() {
+  async function complete() {
     const targetName = planned.find((s) => s.id === target)?.name ?? "the backlog";
     const archiving = done.length ? `${done.length} done issue${done.length === 1 ? " is" : "s are"} archived` : "Nothing is archived";
     const moving = open.length ? ` and ${open.length} open issue${open.length === 1 ? " moves" : "s move"} to ${targetName}` : "";
-    if (!confirm(`Complete "${sprint.name}"? ${archiving}${moving}.`)) return;
+    if (!(await dialog.confirm({ title: `Complete ${sprint.name}?`, message: `${archiving}${moving}.`, confirmLabel: "Complete sprint" }))) return;
     completeSprint(projectId, board, sprint.id, target || null);
     onClose();
   }

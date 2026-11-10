@@ -31,6 +31,7 @@ import { useAssetMenu } from "@/components/AssetContextMenu";
 import { AssetMenuButton, AssetPinButton, PasteButton } from "@/components/AssetMenuButton";
 import type { Sprite, SpriteSheet } from "@/types";
 import { v4 as uuid } from "uuid";
+import { dialog } from "@/components/Dialog";
 
 interface AtlasFrame {
   x: number;
@@ -312,8 +313,8 @@ export default function SpriteSheetPage() {
     setSelectedSpriteIds((ids) => (ids.includes(id) ? ids.filter((i) => i !== id) : [...ids, id]));
   }
 
-  function deleteSheet(id: string) {
-    if (!confirm("Delete this sprite sheet?")) return;
+  async function deleteSheet(id: string) {
+    if (!(await dialog.confirm({ message: "Delete this sprite sheet?", confirmLabel: "Delete", danger: true }))) return;
     storage.delete("spritesheets", id, projectId);
     if (current?.id === id) setCurrent(null);
   }

@@ -57,6 +57,7 @@ import { isInScale, isScaleLocked, KEY_NAMES, SCALE_IDS, SCALES, songScale, type
 import { cellsBetween, coversCell, eraseCells, paintCells, type GridCell, type NoteCell } from "@/lib/music-draw";
 import type { MusicTrack, MusicChannel, MusicNote, MusicSectionLength } from "@/types";
 import { v4 as uuid } from "uuid";
+import { dialog } from "@/components/Dialog";
 
 function midiToName(midi: number): string {
   const octave = Math.floor(midi / 12) - 1;
@@ -490,9 +491,9 @@ export default function MusicPage() {
     openTrack(t);
   }
 
-  function deleteTrack(id: string) {
+  async function deleteTrack(id: string) {
     const t = tracks.find((x) => x.id === id);
-    if (!confirm(`Delete "${t?.name ?? "this track"}"?`)) return;
+    if (!(await dialog.confirm({ message: `Delete "${t?.name ?? "this track"}"?`, confirmLabel: "Delete", danger: true }))) return;
     storage.delete("music", id, projectId);
     const remaining = tracks.filter((t) => t.id !== id);
     setTracks(remaining);

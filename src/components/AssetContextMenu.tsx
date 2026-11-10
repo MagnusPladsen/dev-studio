@@ -44,6 +44,7 @@ import { anchorPoint, contextMenuDecision, shouldUseNativeMenu, type Point } fro
 import { isAssetPinned, toggleAssetPin } from "@/lib/pins";
 import { loadImage, spriteFrameSrc } from "@/lib/pixels";
 import { storage } from "@/lib/storage";
+import { dialog } from "@/components/Dialog";
 
 export interface MenuTriggerProps {
   "data-asset-menu": "";
@@ -361,8 +362,8 @@ function toggleSidebarPin({ services, context }: ActionRun): void {
 }
 
 async function rename({ services, context }: ActionRun): Promise<void> {
-  const next = window.prompt("Rename", context.name);
-  if (next === null || !next.trim() || next.trim() === context.name) return;
+  const next = await dialog.prompt({ title: "Rename", defaultValue: context.name, confirmLabel: "Rename" });
+  if (next === null || next === context.name) return;
   await mutate(services, () => {
     renameAsset(services.projectId, context.ref, next);
     return { kind: "changed", ref: context.ref };
@@ -370,7 +371,7 @@ async function rename({ services, context }: ActionRun): Promise<void> {
 }
 
 async function remove({ services, context }: ActionRun): Promise<void> {
-  if (!window.confirm(deleteConfirmMessage(services.projectId, context.ref))) return;
+  if (!(await dialog.confirm({ message: deleteConfirmMessage(services.projectId, context.ref), confirmLabel: "Delete", danger: true }))) return;
   await mutate(services, () => {
     deleteAsset(services.projectId, context.ref);
     return { kind: "deleted", ref: context.ref };
@@ -702,6 +703,47 @@ function OpenPicker({ projectId, request, onClose }: { projectId: string; reques
   );
 }
 
+const NO_ACTIONS_ENTRIES: ContextMenuEntry[] = [
+  { kind: "item", key: "no-actions", label: "No actions here", detail: "Right-click an asset, card or item to see what you can do with it.", disabled: true },
+];
+
+function linkEntries(link: HTMLAnchorElement, showToast: (options: ToastOptions) => void): ContextMenuEntry[] {
+  const copyLink = async (): Promise<void> => {
+    const isCopied = await copyToSystemClipboard({ kind: "text", text: link.href });
+    showToast({ message: isCopied ? "Link copied" : COPY_FAILED_MESSAGE });
+  };
+  return [
+    { kind: "item", key: "open", label: "Open", onSelect: () => link.click() },
+    { kind: "item", key: "open-new-tab", label: "Open in new tab", onSelect: () => void window.open(link.href, "_blank", "noopener") },
+    { kind: "item", key: "copy-link", label: "Copy link", onSelect: () => void copyLink() },
+  ];
+}
+
+/**
+ * Right-clicks nothing else handled get our menu too, so the studio never mixes in the browser's own menu:
+ * links get open / copy, everything else a short "No actions here". Text fields and selected text keep the browser's.
+ */
+function useFallbackContextMenu(openMenu: AssetMenuApi["openMenu"], showToast: (options: ToastOptions) => void): void {
+  const lastPointerType = useLastPointerType();
+  useEffect(() => {
+    const openFallback = (event: MouseEvent): void => {
+      if (event.defaultPrevented) return;
+      const decision = contextMenuDecision({ isNativeTarget: isNativeMenuTarget(event.target), lastPointerType: lastPointerType.current });
+      if (decision !== "open") return;
+      event.preventDefault();
+      const target = event.target instanceof Element ? event.target : null;
+      if (target?.closest('[role="menu"], [role="dialog"], [role="alertdialog"]')) return;
+      const link = target?.closest("a[href]");
+      const opener = target instanceof HTMLElement ? target : null;
+      const anchor = anchorPoint(event, (target ?? document.body).getBoundingClientRect());
+      if (link instanceof HTMLAnchorElement) openMenu(anchor, linkEntries(link, showToast), link.textContent?.trim() || "Link", opener);
+      else openMenu(anchor, NO_ACTIONS_ENTRIES, "No actions", opener);
+    };
+    window.addEventListener("contextmenu", openFallback);
+    return () => window.removeEventListener("contextmenu", openFallback);
+  }, [openMenu, showToast, lastPointerType]);
+}
+
 /** Holds the one asset menu and picker; surfaces only spread the trigger props it hands out. */
 export function AssetContextMenuProvider({ children }: { children: React.ReactNode }): React.JSX.Element {
   const projectId = usePathname().match(PROJECT_PATH)?.[1] ?? null;
@@ -709,6 +751,8 @@ export function AssetContextMenuProvider({ children }: { children: React.ReactNo
   const { picker, openPicker, closePicker } = usePickerState();
   const services = useMenuServices(projectId, openPicker);
   const createTriggerProps = useTriggerFactory();
+  const { showToast } = useToast();
+  useFallbackContextMenu(openMenu, showToast);
 
   const api = useMemo(
     () => createAssetMenuApi(projectId, services, openMenu, createTriggerProps),

@@ -36,6 +36,7 @@ import { SfxParameterGroups } from "@/components/sfx/SfxParameterGroups";
 import { MAX_DRAFTS, SfxDraftsStrip, type SfxDraft } from "@/components/sfx/SfxDraftsStrip";
 import { SfxWavFormatPicker } from "@/components/sfx/SfxWavFormatPicker";
 import type { SoundEffect, SfxFinish, SfxParams } from "@/types";
+import { dialog } from "@/components/Dialog";
 
 const DEFAULT_PARAMS: SfxParams = {
   waveType: "square",
@@ -394,8 +395,8 @@ export default function SfxPage() {
     loadSaved(sound, false);
   }
 
-  function deleteSound(sound: SoundEffect) {
-    if (!confirm(`Delete "${sound.name}"?`)) return;
+  async function deleteSound(sound: SoundEffect) {
+    if (!(await dialog.confirm({ message: `Delete "${sound.name}"?`, confirmLabel: "Delete", danger: true }))) return;
     storage.delete("sounds", sound.id, projectId);
     if (activeId === sound.id) {
       setActiveId(null);

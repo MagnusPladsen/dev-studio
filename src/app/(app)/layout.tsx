@@ -27,6 +27,7 @@ import {
 import { useState, Suspense } from "react";
 import { SyncProvider, useSync } from "@/components/SyncProvider";
 import { ToastProvider } from "@/components/Toast";
+import { DialogProvider } from "@/components/Dialog";
 import { AssetContextMenuProvider, useAssetMenu } from "@/components/AssetContextMenu";
 import { LiveRefresh } from "@/components/LiveRefresh";
 import { WhatsNewButton, WhatsNewOnUpdate } from "@/components/WhatsNew";
@@ -310,11 +311,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }>
       <SyncProvider>
         <ToastProvider>
-          <AssetContextMenuProvider>
-            <LiveRefresh />
-            <WhatsNewOnUpdate />
-            <AppSidebar>{children}</AppSidebar>
-          </AssetContextMenuProvider>
+          <DialogProvider>
+            <AssetContextMenuProvider>
+              <LiveRefresh />
+              <WhatsNewOnUpdate />
+              <AppSidebar>{children}</AppSidebar>
+            </AssetContextMenuProvider>
+          </DialogProvider>
         </ToastProvider>
       </SyncProvider>
     </Suspense>
