@@ -134,6 +134,11 @@ main [style*="background-color: var(--accent)"] {
   color: var(--on-accent, #fff) !important;
 }
 
+/* ── hold Space to pan: the view's grab cursor wins over cards, nodes and handles inside it ── */
+[data-space-pan] * {
+  cursor: inherit !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   button, a[href], [role="button"] { transition: none; }
 }

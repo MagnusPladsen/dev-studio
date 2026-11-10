@@ -101,7 +101,7 @@ export const GAMEDEV_STUDIO_COPY = {
         "Shift+drag (or the box-select tool on touch) around cards to select several.",
       ],
       tips: [
-        "Drag empty space to pan; scroll or pinch to zoom. Shift+click adds or removes a card.",
+        "Drag empty space, or hold Space and drag anywhere, to pan; scroll or pinch to zoom. Shift+click adds or removes a card.",
         "Ctrl/⌘+C, Ctrl/⌘+V and Ctrl/⌘+D copy, paste and duplicate cards, lines included.",
         "Double-click a card or line to edit it. Delete removes the selection; Ctrl/⌘+Z undoes.",
         "Press / on the board to search for a shape and drop it where the pointer is.",

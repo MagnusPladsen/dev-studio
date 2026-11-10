@@ -76,6 +76,7 @@ import { ShapeLibrary, ShapeLibraryToggle, isPhoneLayout, useShapeLibraryOpen } 
 import { QuickAdd } from "@/components/diagrams/QuickAdd";
 import { SelectionContextBar } from "@/components/diagrams/SelectionContextBar";
 import type { BoardTool } from "@/components/diagrams/ToolPicker";
+import { isSpaceHeld, useSpaceHeld } from "@/hooks/useSpacePan";
 
 type Interaction =
   // `releaseTo`: the selection to switch to when the card is let go without moving (a tap, not a drag).
@@ -162,6 +163,7 @@ export default function DiagramsPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const [isInteracting, setIsInteracting] = useState(false);
+  const isSpacePanning = useSpaceHeld();
   const [connectFrom, setConnectFrom] = useState<string | null>(null);
   const [connectDraft, setConnectDraft] = useState<{ fromId: string; fromRow?: string; to: Point } | null>(null);
   /** The table row the Connect tool's first click landed on, if any. */
@@ -802,6 +804,16 @@ export default function DiagramsPage() {
     setIsInteracting(true);
   }
 
+  /** Space + drag pans from anywhere, cards included, so nothing is selected or moved by accident. */
+  function handleSpacePanStart(e: React.PointerEvent<HTMLDivElement>) {
+    if (!isSpaceHeld() || e.button !== 0) return;
+    e.stopPropagation();
+    e.preventDefault();
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    interaction.current = { kind: "pan", start: { x: e.clientX, y: e.clientY }, pan: view.current.pan };
+    setIsInteracting(true);
+  }
+
   function handlePointerDown(e: React.PointerEvent<HTMLDivElement>) {
     if (e.pointerType === "mouse" && e.button !== 0) return;
     if (closestData(e.target, "data-card-control") !== null) return;
@@ -1283,13 +1295,15 @@ export default function DiagramsPage() {
           ref={viewportRef}
           className="flex-1 min-w-0 relative overflow-hidden select-none outline-none"
           style={{
-            cursor: mode === "connect" || mode === "draw" ? "crosshair" : isInteracting ? "grabbing" : "default",
+            cursor: isSpacePanning ? (isInteracting ? "grabbing" : "grab") : mode === "connect" || mode === "draw" ? "crosshair" : isInteracting ? "grabbing" : "default",
             touchAction: "none",
             background: "var(--bg-primary)",
             backgroundImage: "linear-gradient(#1a1a28 1px, transparent 1px), linear-gradient(90deg, #1a1a28 1px, transparent 1px)",
             backgroundSize: `${GRID * zoom}px ${GRID * zoom}px`,
             backgroundPosition: `${pan.x}px ${pan.y}px`,
           }}
+          data-space-pan={isSpacePanning || undefined}
+          onPointerDownCapture={handleSpacePanStart}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerEnd}

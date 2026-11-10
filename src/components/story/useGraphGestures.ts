@@ -3,6 +3,7 @@ import { distance, midpoint, screenToWorld, zoomAt, type Camera } from "@/lib/gr
 import type { Point } from "@/lib/menu-position";
 import type { GraphLayout } from "./useGraphLayout";
 import type { GraphViewport } from "./useGraphViewport";
+import { isSpaceHeld } from "@/hooks/useSpacePan";
 
 const TAP_TOLERANCE_PX = 4;
 
@@ -51,6 +52,13 @@ function startGesture(state: GestureState, point: Point, pointerId: number, node
   else if (state.pointers.size === 1) {
     state.gesture = nodeIndex === null ? { kind: "pan", travelled: 0 } : { kind: "node", index: nodeIndex, travelled: 0 };
   }
+}
+
+/** Space + drag pans even from a node, so nodes aren't moved or opened by accident. */
+function startSpacePan(state: GestureState, point: Point, pointerId: number, isOnNode: boolean): void {
+  state.pointers.set(pointerId, point);
+  state.gesture = { kind: "pan", travelled: Infinity };
+  state.wasDrag = isOnNode;
 }
 
 function moveGesture(state: GestureState, deps: GestureDeps, pointerId: number, point: Point): void {
@@ -109,12 +117,15 @@ export function useGraphGestures(deps: GestureDeps): GraphGestures {
   return {
     onBackgroundPointerDown(event) {
       if (event.button !== 0) return;
+      if (isSpaceHeld()) return startSpacePan(stateRef.current, localPoint(event.currentTarget, event), event.pointerId, false);
       startGesture(stateRef.current, localPoint(event.currentTarget, event), event.pointerId, null);
     },
     onNodePointerDown(event, index) {
       if (event.button !== 0) return;
       event.stopPropagation();
-      startGesture(stateRef.current, localPoint(depsRef.current.svgRef.current, event), event.pointerId, index);
+      const point = localPoint(depsRef.current.svgRef.current, event);
+      if (isSpaceHeld()) return startSpacePan(stateRef.current, point, event.pointerId, true);
+      startGesture(stateRef.current, point, event.pointerId, index);
     },
     consumeDrag() {
       const wasDrag = stateRef.current.wasDrag;

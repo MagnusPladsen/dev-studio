@@ -53,6 +53,7 @@ export const CHANGELOG: ChangelogEntry[] = [
         tool: "sound",
       },
       { text: "Undo right after an undo or redo now steps back one change at a time." },
+      { text: "Hold Space and drag to move around Canvas, Dialogue, the connection graph, Pixel Art, the Music piano roll and 3D Pixel Art without moving or drawing anything." },
       { text: "Right-click works everywhere in the studio: links can be opened or copied, and spots with nothing to do say so. Deletes and renames ask in the app instead of a browser popup." },
       {
         text: "Export for engine: Pixel Art and Tilemap download a ready-to-load zip for Godot 4, Unity, Phaser 3 or Tiled.",

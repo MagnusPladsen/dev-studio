@@ -64,7 +64,7 @@ export const HELP: Record<HelpTopic, HelpContent> = {
     ],
     tips: [
       "Select a node and press Delete to remove it.",
-      "Drag empty space to pan; scroll or the buttons zoom.",
+      "Drag empty space, or hold Space and drag anywhere, to pan; scroll or the buttons zoom.",
       UNDO_TIP,
       MENU_TIP,
     ],
@@ -89,7 +89,7 @@ export const HELP: Record<HelpTopic, HelpContent> = {
     tips: [
       "Click a note again to remove it, or start a drag on a note to erase along the way.",
       "Mute or solo channels while you listen.",
-      "Ctrl/⌘ + scroll zooms time; add Shift to zoom pitch.",
+      "Ctrl/⌘ + scroll zooms time; add Shift to zoom pitch. Hold Space and drag to scroll without adding notes.",
       "Scale greys out the rows outside the key. Chromatic turns the lock off; drums are never locked.",
       "The sliders button on a channel opens its instrument: Attack fades a note in, Decay and Sustain set how it settles, Release how long it rings after. Classic is the original sound.",
       "Right-click or long-press a section to rename, repeat, move or loop from it.",
@@ -140,7 +140,7 @@ export const HELP: Record<HelpTopic, HelpContent> = {
     ],
     tips: [
       "Keys: B pencil, E eraser, G fill, L line, R rectangle, O circle, I picker, M move.",
-      "Scroll over the canvas to zoom.",
+      "Scroll over the canvas to zoom; hold Space and drag to move around a zoomed-in sprite without drawing.",
       "To make a sprite bigger without redrawing it, open the Canvas menu and use Scale up.",
       UNDO_TIP,
       "Right-click a frame to duplicate, move or copy it as PNG.",
@@ -232,7 +232,7 @@ export const HELP: Record<HelpTopic, HelpContent> = {
     steps: [
       "Press New model, or make one from a sprite.",
       "Pick a colour and the Add tool, then click to place cubes.",
-      "Right-drag to turn the view, scroll to zoom.",
+      "Right-drag, or hold Space and drag, to turn the view; scroll to zoom.",
       "Export it for Blender, Godot, Unity or the web.",
     ],
     tips: [

@@ -84,6 +84,7 @@ import { copyToSystemClipboard } from "@/lib/clipboard";
 import { AssetMenuButton, AssetPinButton, PasteButton } from "@/components/AssetMenuButton";
 import type { AnimationDirection, FrameTag, Sprite, SpriteFrame } from "@/types";
 import { dialog } from "@/components/Dialog";
+import { useSpaceScrollPan } from "@/hooks/useSpacePan";
 
 // ─── types ───────────────────────────────────────────────────────────
 type Tool = "pencil" | "eraser" | "fill" | "line" | "rect" | "circle" | "picker" | "move";
@@ -333,6 +334,8 @@ export default function PixelArtPage() {
 
   // ── drawing refs ──
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const canvasAreaRef = useRef<HTMLDivElement>(null);
+  const isSpacePanning = useSpaceScrollPan(canvasAreaRef);
   const isDrawingRef = useRef(false);
   const drawStartRef = useRef<{ x: number; y: number } | null>(null);
   const lastPixelRef = useRef<{ x: number; y: number } | null>(null);
@@ -1754,7 +1757,12 @@ export default function PixelArtPage() {
         </div>
 
         {/* Center: canvas */}
-        <div className="flex-1 flex items-center justify-center overflow-auto p-4 max-md:p-2 min-h-0">
+        <div
+          ref={canvasAreaRef}
+          data-space-pan={isSpacePanning || undefined}
+          className="flex-1 flex items-center justify-center overflow-auto p-4 max-md:p-2 min-h-0"
+          style={{ cursor: isSpacePanning ? "grab" : undefined }}
+        >
           <canvas
             ref={canvasRef}
             onPointerDown={handleMouseDown}
