@@ -29,6 +29,10 @@ export interface RemoteSyncDeps {
   cachedIds(): Record<CloudTable, string[]>;
   /** The newest `updated_at` the initial load saw. */
   cursor: string | null;
+  /** Accounts whose rows we may see: our own and the owners of projects shared with us. */
+  owners?(): string[];
+  /** Runs first on every catch-up (refreshes which projects are shared with us). */
+  beforeCatchUp?(): Promise<void>;
   /** A server version of a row was applied (or a row deleted), so the next save expects its rev. */
   onServerRow?(table: CloudTable, kind: "upsert" | "delete", row: CloudRow): void;
   now?: () => number;
@@ -69,7 +73,7 @@ export function createRemoteSync(deps: RemoteSyncDeps): RemoteSync {
   }
 
   function receive(table: CloudTable, kind: "upsert" | "delete", row: CloudRow) {
-    if (row.user_id && row.user_id !== deps.userId) return;
+    if (row.user_id && !(deps.owners?.() ?? [deps.userId]).includes(row.user_id)) return;
     const key = keyOf(table, row.id);
     const time = timeOf(row);
     cursor = Math.max(cursor, time);
@@ -115,6 +119,7 @@ export function createRemoteSync(deps: RemoteSyncDeps): RemoteSync {
 
   async function runCatchUp() {
     const startedAt = now();
+    await deps.beforeCatchUp?.();
     const since = new Date(Math.max(0, cursor - CATCH_UP_MARGIN_MS)).toISOString();
     for (const table of ["projects", "assets"] as const) {
       for (const row of await deps.reader.changedSince(table, since)) receive(table, "upsert", row);
@@ -143,13 +148,21 @@ export function createRemoteSync(deps: RemoteSyncDeps): RemoteSync {
 }
 
 type RowPayload = RealtimePostgresChangesPayload<CloudRow>;
+/** Each connection gets its own channel name: a reconnect for a new set of owners must not reuse one being removed. */
+let channels = 0;
 
 /**
- * Subscribes to the user's rows and catches up whenever the channel (re)joins, the tab becomes
+ * Subscribes to the rows of the given owners (the user and whoever shared a project with them) and catches up whenever the channel (re)joins, the tab becomes
  * visible again or the network comes back. Realtime applies the tables' RLS policies to inserts and
  * updates; the user_id filter also narrows deletes, which RLS can't check. Returns the unsubscribe.
  */
-export function connectRealtime(supabase: SupabaseClient, sync: RemoteSync, userId: string, onError: (message: string) => void): () => void {
+export function connectRealtime(
+  supabase: SupabaseClient,
+  sync: RemoteSync,
+  userId: string,
+  owners: string[],
+  onError: (message: string) => void
+): () => void {
   const catchUp = () => {
     sync.catchUp().catch((err: Error) => onError(`Could not fetch the latest changes: ${err.message}`));
   };
@@ -157,9 +170,9 @@ export function connectRealtime(supabase: SupabaseClient, sync: RemoteSync, user
     if (payload.eventType === "DELETE") sync.receive(table, "delete", payload.old as CloudRow);
     else sync.receive(table, "upsert", payload.new);
   };
-  const filter = `user_id=eq.${userId}`;
+  const filter = owners.length > 1 ? `user_id=in.(${owners.join(",")})` : `user_id=eq.${userId}`;
   const channel = supabase
-    .channel(`live:${userId}`)
+    .channel(`live:${userId}:${++channels}`)
     .on("postgres_changes", { event: "*", schema: "public", table: "projects", filter }, handle("projects"))
     .on("postgres_changes", { event: "*", schema: "public", table: "assets", filter }, handle("assets"))
     .subscribe((status) => {

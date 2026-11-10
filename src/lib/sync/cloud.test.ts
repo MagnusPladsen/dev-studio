@@ -15,12 +15,16 @@ function fakeServer({ gated = false } = {}) {
   const tables: Record<string, Map<string, Row>> = { projects: new Map(), assets: new Map() };
   const releases: (() => void)[] = [];
   const calls: { rpc: string; rows: SaveRow[] }[] = [];
+  /** Rows this user may only read (a viewer's): saves come back "forbidden". */
+  const readOnly = new Set<string>();
+  const deletes: { table: string; filters: [string, unknown][] }[] = [];
   let clock = 0;
   const later = <T>(value: T) =>
     gated ? new Promise<T>((resolve) => releases.push(() => resolve(value))) : Promise.resolve(value);
 
   function saveOne(table: string, row: SaveRow) {
     const current = tables[table].get(row.id);
+    if (readOnly.has(row.id)) return { id: row.id, rev: current?.rev ?? null, updated_at: null, status: "forbidden" };
     const keyTaken = (key: unknown) =>
       row.collection === "issues" &&
       [...tables.assets.values()].some((r) => r.id !== row.id && r.collection === "issues" && r.data.key === key);
@@ -58,14 +62,20 @@ function fakeServer({ gated = false } = {}) {
     from: (table: string) => ({
       select: () => select(table),
       delete: () => {
-        const chain = { eq: () => chain, in: () => chain, select: () => later({ data: [], error: null }) };
+        const filters: [string, unknown][] = [];
+        deletes.push({ table, filters });
+        const chain = {
+          eq: (column: string, value: unknown) => (filters.push([column, value]), chain),
+          in: (column: string, values: unknown[]) => (filters.push([column, values]), chain),
+          select: () => later({ data: [], error: null }),
+        };
         return chain;
       },
     }),
   };
   /** Another writer (a second tab, the MCP server) changes a row directly. */
   const writeElsewhere = (table: string, row: Omit<Row, "rev" | "updated_at">) => saveOne(table, { ...row, rev: tables[table].get(row.id)?.rev ?? null });
-  return { supabase: supabase as unknown as SupabaseClient, tables, calls, writeElsewhere, release() {
+  return { supabase: supabase as unknown as SupabaseClient, tables, calls, readOnly, deletes, writeElsewhere, release() {
       const next = releases.shift();
       if (!next) throw new Error("no write in flight yet");
       next();
@@ -223,6 +233,60 @@ describe("compare-and-swap saves", () => {
     await persister.flush();
 
     expect(server.calls[0].rows[0].rev).toBeNull();
+  });
+});
+
+describe("shared projects", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+  const viewerOfP1 = { canWrite: (projectId: string) => projectId !== "p1", ownerOf: (projectId: string) => (projectId === "p1" ? "owner" : "u1") };
+
+  it("never sends a viewer's edits", async () => {
+    const server = fakeServer();
+    const persister = createCloudPersister(server.supabase, "u1", () => {}, () => {}, () => {}, viewerOfP1);
+
+    persister.onChange(note("n1", { title: "mine?" }), new Map());
+    persister.onChange({ op: "put", collection: "projects", item: { id: "p1" } }, new Map());
+    persister.onChange({ op: "put", collection: "notes", projectId: "p2", item: { id: "n2" } }, new Map());
+    await persister.flush();
+
+    expect(server.calls.flatMap((c) => c.rows.map((r) => r.id))).toEqual(["n2"]);
+  });
+
+  it("puts the server's copy back when a save is refused", async () => {
+    const server = fakeServer();
+    const applied: ChangeEvent[] = [];
+    const statuses: string[] = [];
+    const persister = createCloudPersister(server.supabase, "u1", (s) => statuses.push(s.state), () => {}, (c) => applied.push(...c));
+    server.writeElsewhere("assets", { id: "n1", project_id: "p1", collection: "notes", data: { id: "n1", title: "Theirs" } });
+    persister.remember("assets", [{ id: "n1", rev: 1, data: { id: "n1", title: "Theirs" } }]);
+    server.readOnly.add("n1");
+
+    persister.onChange(note("n1", { title: "Mine" }), new Map());
+    await persister.flush();
+    await vi.runAllTimersAsync();
+
+    expect(server.calls).toHaveLength(1);
+    expect(applied).toEqual([{ op: "put", collection: "notes", projectId: "p1", item: { id: "n1", title: "Theirs" } }]);
+    expect(statuses).toContain("error");
+    expect(persister.isBusy("assets", "n1")).toBe(false);
+  });
+
+  it("deletes a shared project's assets under its owner", async () => {
+    const server = fakeServer();
+    const persister = createCloudPersister(server.supabase, "u1", () => {}, () => {}, () => {}, {
+      canWrite: () => true,
+      ownerOf: (projectId) => (projectId === "p1" ? "owner" : "u1"),
+    });
+
+    persister.onChange({ op: "delete", collection: "notes", projectId: "p1", id: "n1" }, new Map());
+    persister.onChange({ op: "delete", collection: "notes", projectId: "p2", id: "n2" }, new Map());
+    await persister.flush();
+
+    expect(server.deletes.map((d) => d.filters)).toEqual([
+      [["user_id", "owner"], ["id", ["n1"]]],
+      [["user_id", "u1"], ["id", ["n2"]]],
+    ]);
   });
 });
 

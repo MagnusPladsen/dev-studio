@@ -25,6 +25,13 @@ describe("the awaited persister", () => {
     expect(page.rev).toBe(2);
   });
 
+  it("refuses, without retrying, a write to a project shared with the user as a viewer", async () => {
+    const persister = createAwaitedPersister(db.client);
+    db.forcedStatuses.push(["forbidden"]);
+    persister.onChange({ op: "put", collection: "links", projectId: P, item: link("l1") }, new Map());
+    await expect(persister.flush()).rejects.toThrow(/shared with you as a viewer/);
+  });
+
   it("writes nothing when one body is invalid", async () => {
     const persister = createAwaitedPersister(db.client);
     persister.onChange({ op: "put", collection: "links", projectId: P, item: link("l1") }, new Map());

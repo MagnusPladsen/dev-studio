@@ -62,6 +62,21 @@ describe("applying remote changes", () => {
     expect(applied).toEqual([]);
   });
 
+  it("applies rows of projects shared with the user, from their owners only", () => {
+    const { sync, applied } = setup({ owners: () => [USER, "owner"] });
+    sync.receive("assets", "upsert", { ...assetRow("n1", 1), user_id: "owner" });
+    sync.receive("assets", "upsert", { ...assetRow("n2", 1), user_id: "someone-else" });
+    expect(applied.map((c) => (c.op === "put" ? c.item.id : null))).toEqual(["n1"]);
+  });
+
+  it("refreshes shared projects before catching up", async () => {
+    const order: string[] = [];
+    const { sync, reader } = setup({ beforeCatchUp: async () => void order.push("shared") });
+    (reader.changedSince as ReturnType<typeof vi.fn>).mockImplementation(async () => (order.push("changes"), []));
+    await sync.catchUp();
+    expect(order[0]).toBe("shared");
+  });
+
   it("fetches rows that Realtime sent without their data (too large for one message)", async () => {
     const { sync, applied, server } = setup();
     server.assets = [assetRow("n1", 5, { title: "big" })];
@@ -187,7 +202,7 @@ describe("connectRealtime", () => {
   it("filters to the user, routes events and catches up on every (re)join and wake-up", () => {
     const mock = mockSupabase();
     const sync = { receive: vi.fn(), written: vi.fn(), catchUp: vi.fn(async () => {}) };
-    const stop = connectRealtime(mock.supabase, sync, USER, vi.fn());
+    const stop = connectRealtime(mock.supabase, sync, USER, [USER], vi.fn());
 
     expect(mock.filters).toEqual([
       { event: "*", schema: "public", table: "projects", filter: "user_id=eq.u1" },
@@ -209,5 +224,15 @@ describe("connectRealtime", () => {
     document.dispatchEvent(new Event("visibilitychange"));
     expect(sync.catchUp).toHaveBeenCalledTimes(4);
     expect(mock.raw.removeChannel).toHaveBeenCalled();
+  });
+
+  it("listens to every owner who shared a project with the user", () => {
+    const mock = mockSupabase();
+    const sync = { receive: vi.fn(), written: vi.fn(), catchUp: vi.fn(async () => {}) };
+    connectRealtime(mock.supabase, sync, USER, ["owner", USER], vi.fn());
+    expect(mock.filters).toEqual([
+      { event: "*", schema: "public", table: "projects", filter: "user_id=in.(owner,u1)" },
+      { event: "*", schema: "public", table: "assets", filter: "user_id=in.(owner,u1)" },
+    ]);
   });
 });
