@@ -5,6 +5,7 @@ import { PRIVACY_FACTS } from "@/lib/privacy-facts";
 import { englishPolicy, norwegianPolicy, type PrivacyPolicy } from "@/lib/privacy-policy";
 import { PrivacySettingsButton } from "@/components/ConsentBanner";
 import { LandingFooter } from "@/components/landing/LandingParts";
+import { PolicyLanguageTabs } from "@/components/PolicyLanguageTabs";
 
 export const metadata: Metadata = {
   title: `Privacy · ${APP.name}`,
@@ -25,20 +26,28 @@ function withLinks(text: string) {
   );
 }
 
+const BUTTON_STYLE = { background: "var(--bg-card)", color: "var(--text-primary)", border: "1px solid var(--border-hover)" };
+
 function PolicyArticle({ policy }: { policy: PrivacyPolicy }) {
   return (
-    <article id={policy.language} lang={policy.language === "no" ? "nb" : "en"} className="scroll-mt-6">
-      <h2 className="text-2xl font-bold mb-1" style={{ color: "var(--text-primary)" }}>
+    <article>
+      <h1 className="text-3xl font-bold mb-1" style={{ color: "var(--text-primary)" }}>
         {policy.title}
-      </h2>
-      <p className="text-sm mb-6" style={{ color: "var(--text-muted)" }}>
+      </h1>
+      <p className="text-sm mb-4" style={{ color: "var(--text-muted)" }}>
         {policy.updated}
       </p>
+      <div className="flex flex-wrap items-center gap-2 mb-8">
+        <PrivacySettingsButton label={policy.privacySettingsLabel} className="px-3 py-1.5 rounded-lg" style={BUTTON_STYLE} />
+        <Link href="/projects" className="px-3 py-1.5 rounded-lg" style={BUTTON_STYLE}>
+          {policy.openAppLabel}
+        </Link>
+      </div>
       {policy.sections.map((section) => (
         <section key={section.heading} className="mb-6">
-          <h3 className="font-semibold mb-2" style={{ color: "var(--text-primary)" }}>
+          <h2 className="font-semibold mb-2" style={{ color: "var(--text-primary)" }}>
             {section.heading}
-          </h3>
+          </h2>
           {section.paragraphs?.map((paragraph) => (
             <p key={paragraph} className="leading-relaxed mb-2">
               {withLinks(paragraph)}
@@ -59,7 +68,6 @@ function PolicyArticle({ policy }: { policy: PrivacyPolicy }) {
 
 export default function PrivacyPage() {
   const policies = [englishPolicy(PRIVACY_FACTS, APP.name), norwegianPolicy(PRIVACY_FACTS, APP.name)];
-  const buttonStyle = { background: "var(--bg-card)", color: "var(--text-primary)", border: "1px solid var(--border-hover)" };
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "var(--bg-primary)" }}>
@@ -72,26 +80,14 @@ export default function PrivacyPage() {
             {APP.name}
           </span>
         </Link>
-        <h1 className="text-3xl font-bold mb-3" style={{ color: "var(--text-primary)" }}>
-          Privacy · Personvern
-        </h1>
-        <nav aria-label="Language" className="flex flex-wrap items-center gap-2 mb-10">
-          <a href="#en" className="px-3 py-1.5 rounded-lg" style={buttonStyle}>
-            English
-          </a>
-          <a href="#no" className="px-3 py-1.5 rounded-lg" style={buttonStyle}>
-            Norsk
-          </a>
-          <PrivacySettingsButton className="px-3 py-1.5 rounded-lg" style={buttonStyle} />
-          <Link href="/projects" className="px-3 py-1.5 rounded-lg" style={buttonStyle}>
-            Open {APP.name}
-          </Link>
-        </nav>
-        <div className="space-y-14">
-          {policies.map((policy) => (
-            <PolicyArticle key={policy.language} policy={policy} />
-          ))}
-        </div>
+        <PolicyLanguageTabs
+          tabs={policies.map((policy) => ({
+            id: policy.language,
+            label: policy.languageName,
+            lang: policy.language === "no" ? "nb" : "en",
+            content: <PolicyArticle policy={policy} />,
+          }))}
+        />
       </main>
       <LandingFooter />
     </div>

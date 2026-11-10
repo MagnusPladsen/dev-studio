@@ -10,7 +10,11 @@ export interface PolicySection {
 
 export interface PrivacyPolicy {
   language: PolicyLanguage;
+  /** The language's own name, for the language switch. */
+  languageName: string;
   title: string;
+  privacySettingsLabel: string;
+  openAppLabel: string;
   updated: string;
   sections: PolicySection[];
 }
@@ -32,7 +36,10 @@ export function englishPolicy(facts: PrivacyFacts, appName: string): PrivacyPoli
   const { contact, region } = placeholders(facts, "en");
   return {
     language: "en",
+    languageName: "English",
     title: "Privacy",
+    privacySettingsLabel: "Privacy settings",
+    openAppLabel: `Open ${appName}`,
     updated: `Last updated ${facts.lastUpdated}.`,
     sections: [
       {
@@ -120,7 +127,10 @@ export function norwegianPolicy(facts: PrivacyFacts, appName: string): PrivacyPo
   const { contact, region } = placeholders(facts, "no");
   return {
     language: "no",
+    languageName: "Norsk",
     title: "Personvern",
+    privacySettingsLabel: "Personverninnstillinger",
+    openAppLabel: `Åpne ${appName}`,
     updated: `Sist oppdatert ${facts.lastUpdated}.`,
     sections: [
       {
@@ -128,7 +138,7 @@ export function norwegianPolicy(facts: PrivacyFacts, appName: string): PrivacyPo
         bullets: [
           `Du kan bruke ${appName} uten konto. Da blir arbeidet ditt i nettleseren eller i en mappe du velger, og kommer aldri til oss.`,
           "Logger du inn, lagres prosjektene dine på kontoen din, så du kan bruke dem på alle enhetene dine.",
-          "Besøksstatistikk lastes bare hvis du trykker Tillat. Ingen reklame, ingen sporingskapsler, og vi selger aldri data.",
+          "Besøksstatistikk lastes bare hvis du trykker «Allow» (tillat). Ingen reklame, ingen sporingskapsler, og vi selger aldri data.",
           "Du kan eksportere alt og slette kontoen din selv, når som helst, fra kontopanelet nederst i sidemenyen.",
         ],
       },
@@ -147,7 +157,7 @@ export function norwegianPolicy(facts: PrivacyFacts, appName: string): PrivacyPo
           `På kontoen din: e-postadressen din (eller, med GitHub-innlogging, GitHub-navn, e-post og bilde), prosjektene dine og tidspunktene for dem. De lagres hos Supabase i ${region}. Supabase kan behandle noen konto- og supportdata utenfor regionen, etter EUs standardkontraktsbestemmelser.`,
           "Drift: Vercel leverer nettsiden. Som alle nettservere ser den IP-adressen din og opplysninger om nettleseren, og lagrer logger en kort tid for å drive og beskytte tjenesten.",
           "Forhåndsvisning av lenker: limer du inn en nettlenke (for eksempel på Canvas), henter serveren vår siden for å vise tittel og bilde. Siden du lenket til, ser en forespørsel fra serveren vår, ikke fra deg.",
-          "Besøksstatistikk: bare etter at du har trykket Tillat, registrerer Vercel Web Analytics sidevisninger, hvilken side du kom fra, land, og type nettleser, system og enhet. Den setter ingen informasjonskapsler. Et besøk kjennes igjen på en hash av forespørselen som slettes etter 24 timer.",
+          "Besøksstatistikk: bare etter at du har trykket «Allow», registrerer Vercel Web Analytics sidevisninger, hvilken side du kom fra, land, og type nettleser, system og enhet. Den setter ingen informasjonskapsler. Et besøk kjennes igjen på en hash av forespørselen som slettes etter 24 timer.",
         ],
       },
       {
@@ -162,8 +172,8 @@ export function norwegianPolicy(facts: PrivacyFacts, appName: string): PrivacyPo
       {
         heading: "Besøksstatistikk og ditt valg",
         paragraphs: [
-          "Første gang du besøker siden, spør et lite banner om vi får telle besøk. Ingenting måles før du har valgt, og Nei takk er like enkelt som Tillat.",
-          "Valget ditt lagres i nettleseren. Bruk «Privacy settings» på denne siden eller nederst på forsiden for å endre det.",
+          "Første gang du besøker siden, spør et lite banner om vi får telle besøk. Ingenting måles før du har valgt, og «No thanks» (nei takk) er like enkelt som «Allow» (tillat).",
+          "Valget ditt lagres i nettleseren. Bruk «Personverninnstillinger» på denne siden, eller «Privacy settings» nederst på forsiden, for å endre det.",
         ],
       },
       {
@@ -178,8 +188,8 @@ export function norwegianPolicy(facts: PrivacyFacts, appName: string): PrivacyPo
       {
         heading: "Hvor lenge vi lagrer",
         bullets: [
-          "Data i nettleseren og mappen: til du sletter dem. Clear data i kontopanelet nederst i sidemenyen fjerner dem fra denne nettleseren.",
-          "Kontodata: så lenge du har en konto. Delete account sletter prosjektene og innloggingen din med en gang; kopier i Supabases sikkerhetskopier forsvinner når kopiene går ut.",
+          "Data i nettleseren og mappen: til du sletter dem. «Clear data» (fjern data) i kontopanelet nederst i sidemenyen fjerner dem fra denne nettleseren.",
+          "Kontodata: så lenge du har en konto. «Delete account» (slett konto) sletter prosjektene og innloggingen din med en gang; kopier i Supabases sikkerhetskopier forsvinner når kopiene går ut.",
           "Driftslogger: en kort tid, slik Vercel lagrer dem.",
           "Besøksstatistikk: bare som tall. Besøks-hashen slettes etter 24 timer.",
         ],
@@ -187,10 +197,10 @@ export function norwegianPolicy(facts: PrivacyFacts, appName: string): PrivacyPo
       {
         heading: "Dine rettigheter",
         bullets: [
-          "Innsyn og dataportabilitet: Export all i kontopanelet nederst i sidemenyen laster ned alle prosjektene som én fil du kan importere igjen. Hvert prosjekt kan også eksporteres for seg.",
+          "Innsyn og dataportabilitet: «Export all» (eksporter alt) i kontopanelet nederst i sidemenyen laster ned alle prosjektene som én fil du kan importere igjen. Hvert prosjekt kan også eksporteres for seg.",
           "Retting: endre hva som helst i appen.",
-          "Sletting: Delete account (innlogget) eller Clear data (ikke innlogget) i kontopanelet nederst i sidemenyen.",
-          "Trekke tilbake samtykke til besøksstatistikk: Privacy settings.",
+          "Sletting: «Delete account» (innlogget) eller «Clear data» (ikke innlogget) i kontopanelet nederst i sidemenyen.",
+          "Trekke tilbake samtykke til besøksstatistikk: «Personverninnstillinger» på denne siden.",
           "Protestere, be om begrenset behandling eller stille spørsmål: skriv til kontaktadressen over.",
           `Klage: du kan klage til Datatilsynet: ${DATATILSYNET_URL}`,
         ],

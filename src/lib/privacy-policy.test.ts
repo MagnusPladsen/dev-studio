@@ -10,6 +10,19 @@ describe("privacy policy", () => {
     expect(norwegianPolicy(PRIVACY_FACTS, "Dev Studio").sections).toHaveLength(englishPolicy(PRIVACY_FACTS, "Dev Studio").sections.length);
   });
 
+  it("gives every English section a Norwegian counterpart of the same shape", () => {
+    const shape = (policy: ReturnType<typeof englishPolicy>) =>
+      policy.sections.map((s) => [s.paragraphs?.length ?? 0, s.bullets?.length ?? 0]);
+    expect(shape(norwegianPolicy(PRIVACY_FACTS, "Dev Studio"))).toEqual(shape(englishPolicy(PRIVACY_FACTS, "Dev Studio")));
+  });
+
+  it("labels each language's own buttons in that language", () => {
+    const english = englishPolicy(PRIVACY_FACTS, "Dev Studio");
+    const norwegian = norwegianPolicy(PRIVACY_FACTS, "Dev Studio");
+    expect([english.languageName, english.privacySettingsLabel, english.openAppLabel]).toEqual(["English", "Privacy settings", "Open Dev Studio"]);
+    expect([norwegian.languageName, norwegian.privacySettingsLabel, norwegian.openAppLabel]).toEqual(["Norsk", "Personverninnstillinger", "Åpne Dev Studio"]);
+  });
+
   it("shows a visible placeholder for facts the owner hasn't confirmed", () => {
     const facts = { ...PRIVACY_FACTS, contactEmail: null, supabaseRegion: null };
     expect(text(englishPolicy(facts, "GameDev Studio"))).toContain("[contact email not confirmed yet]");

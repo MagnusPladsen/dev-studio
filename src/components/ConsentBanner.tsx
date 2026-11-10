@@ -77,10 +77,18 @@ export function ConsentBanner() {
 }
 
 /** A "Privacy settings" link that reopens the consent banner. */
-export function PrivacySettingsButton({ className, style }: { className?: string; style?: React.CSSProperties }) {
+export function PrivacySettingsButton({
+  className,
+  style,
+  label = "Privacy settings",
+}: {
+  className?: string;
+  style?: React.CSSProperties;
+  label?: string;
+}) {
   return (
     <button type="button" onClick={openPrivacySettings} className={className} style={style}>
-      Privacy settings
+      {label}
     </button>
   );
 }
