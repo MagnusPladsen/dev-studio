@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2, FolderOpen, Download, Upload, Loader2, ExternalLink, LogOut, Users } from "lucide-react";
+import { Plus, Trash2, FolderOpen, Download, Upload, Loader2, ExternalLink, LogOut, Users, User, Eye, Pencil } from "lucide-react";
 import { storage } from "@/lib/storage";
 import type { Project } from "@/types";
 import { v4 as uuid } from "uuid";
@@ -12,7 +12,8 @@ import { APP, OTHER_APP, belongsToApp } from "@/lib/app-config";
 import { COPY } from "@/copy";
 import { dialog } from "@/components/Dialog";
 import { useSync } from "@/components/SyncProvider";
-import { getSharedProjects, subscribeShared, type SharedProject } from "@/lib/sharing";
+import { useOwnedShares, useSharedProjects } from "@/hooks/useSharedProject";
+import type { SharedProject } from "@/lib/sharing";
 
 export default function ProjectsPage() {
   const router = useRouter();
@@ -29,7 +30,10 @@ export default function ProjectsPage() {
   const [withTutorials, setWithTutorials] = useState(true);
   const [creating, setCreating] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
-  const shared = useSyncExternalStore(subscribeShared, getSharedProjects, getSharedProjects);
+  const shared = useSharedProjects();
+  const ownedShares = useOwnedShares();
+  const myProjects = projects.filter((p) => !shared.has(p.id));
+  const sharedWithMe = projects.filter((p) => shared.has(p.id));
   const { leaveProject } = useSync();
 
   async function createProject() {
@@ -240,19 +244,40 @@ export default function ProjectsPage() {
           </button>
         </div>
       ) : (
-        <div className="grid gap-3">
-          {projects.map((project) => (
-            <ProjectRow
-              key={project.id}
-              project={project}
-              onOpen={() => router.push(`/project/${project.id}/assets`)}
-              onExport={() => exportProject(project.id)}
-              onDelete={shared.has(project.id) ? undefined : () => deleteProject(project.id)}
-              onLeave={shared.has(project.id) ? () => leave(project.id) : undefined}
-              badge={shared.has(project.id) ? <SharedBadge membership={shared.get(project.id)!} /> : undefined}
-            />
-          ))}
-        </div>
+        <>
+          <ProjectSection
+            title="My projects"
+            icon={User}
+            count={myProjects.length}
+            isLabelled={sharedWithMe.length > 0}
+            empty="You have no projects of your own yet. Create one to get started."
+          >
+            {myProjects.map((project) => (
+              <ProjectRow
+                key={project.id}
+                project={project}
+                meta={ownedShares.get(project.id) ? <SharedByMeTag memberCount={ownedShares.get(project.id)!} /> : undefined}
+                onOpen={() => router.push(`/project/${project.id}/assets`)}
+                onExport={() => exportProject(project.id)}
+                onDelete={() => deleteProject(project.id)}
+              />
+            ))}
+          </ProjectSection>
+          {sharedWithMe.length > 0 && (
+            <ProjectSection title="Shared with me" icon={Users} count={sharedWithMe.length} isLabelled hint="Projects other people invited you to.">
+              {sharedWithMe.map((project) => (
+                <ProjectRow
+                  key={project.id}
+                  project={project}
+                  meta={<SharedWithMeTag membership={shared.get(project.id)!} />}
+                  onOpen={() => router.push(`/project/${project.id}/assets`)}
+                  onExport={() => exportProject(project.id)}
+                  onLeave={() => leave(project.id)}
+                />
+              ))}
+            </ProjectSection>
+          )}
+        </>
       )}
 
       {otherAppProjects.length > 0 && (
@@ -262,9 +287,11 @@ export default function ProjectsPage() {
   );
 }
 
-function ProjectRow({ project, badge, onOpen, onExport, onDelete, onLeave }: {
+function ProjectRow({ project, badge, meta, onOpen, onExport, onDelete, onLeave }: {
   project: Project;
   badge?: React.ReactNode;
+  /** Shown after the created date, e.g. who a project is shared with. */
+  meta?: React.ReactNode;
   onOpen(): void;
   onExport?(): void;
   onDelete?(): void;
@@ -293,9 +320,10 @@ function ProjectRow({ project, badge, onOpen, onExport, onDelete, onLeave }: {
             {project.description}
           </p>
         )}
-        <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
-          Created {new Date(project.createdAt).toLocaleDateString()}
-        </p>
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs mt-1" style={{ color: "var(--text-muted)" }}>
+          <span>Created {new Date(project.createdAt).toLocaleDateString()}</span>
+          {meta}
+        </div>
       </div>
       {badge}
       {(onExport || onDelete || onLeave) && (
@@ -348,18 +376,74 @@ function ProjectRow({ project, badge, onOpen, onExport, onDelete, onLeave }: {
   );
 }
 
-/** Who shared a project with you, and your role in it. */
-function SharedBadge({ membership }: { membership: SharedProject }) {
+/** A titled group on the projects list. Without `isLabelled` it is just the list, as before sharing existed. */
+function ProjectSection({ title, icon: Icon, count, isLabelled, hint, empty, children }: {
+  title: string;
+  icon: React.ComponentType<{ className?: string }>;
+  count: number;
+  isLabelled: boolean;
+  hint?: string;
+  empty?: string;
+  children: React.ReactNode;
+}) {
+  if (!isLabelled) return <div className="grid gap-3">{children}</div>;
   return (
-    <span
-      className="inline-flex items-center gap-1 text-xs shrink min-w-0 ml-auto"
-      style={{ color: "var(--text-secondary)" }}
-      title={`Shared with you by ${membership.ownerEmail || "its owner"}`}
-    >
-      <Users className="w-3.5 h-3.5 shrink-0" />
-      <span className="truncate max-md:hidden">{membership.ownerEmail || "Shared"}</span>
-      <span className="shrink-0 capitalize">· {membership.role}</span>
+    <section className="mb-8" aria-label={title}>
+      <div className="flex items-center gap-2 mb-3">
+        <h2 className="flex items-center gap-1.5 text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
+          <Icon className="w-4 h-4" />
+          {title}
+        </h2>
+        <span className="text-xs px-1.5 rounded-full" style={{ background: "var(--bg-card)", color: "var(--text-secondary)", border: "1px solid var(--border)" }}>
+          {count}
+        </span>
+        {hint && (
+          <span className="text-xs truncate max-md:hidden" style={{ color: "var(--text-muted)" }}>
+            {hint}
+          </span>
+        )}
+      </div>
+      {count === 0 && empty ? (
+        <p className="text-sm px-4 py-5 rounded-xl border border-dashed" style={{ color: "var(--text-secondary)", borderColor: "var(--border)" }}>
+          {empty}
+        </p>
+      ) : (
+        <div className="grid gap-3">{children}</div>
+      )}
+    </section>
+  );
+}
+
+const pillStyle = { background: "color-mix(in srgb, var(--accent) 14%, transparent)", color: "var(--text-primary)" };
+
+/** On one of your own projects: how many people you shared it with. */
+function SharedByMeTag({ memberCount }: { memberCount: number }) {
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-medium" style={pillStyle} title="Open the project and press Share to see who">
+      <Users className="w-3 h-3" />
+      Shared with {memberCount} {memberCount === 1 ? "person" : "people"}
     </span>
+  );
+}
+
+/** On a project someone shared with you: whose it is and what you may do. */
+function SharedWithMeTag({ membership }: { membership: SharedProject }) {
+  const isEditor = membership.role === "editor";
+  const RoleIcon = isEditor ? Pencil : Eye;
+  return (
+    <>
+      <span className="min-w-0 truncate" title={`Owner: ${membership.ownerEmail || "unknown"}`}>
+        Owner: <span style={{ color: "var(--text-secondary)" }}>{membership.ownerEmail || "unknown"}</span>
+      </span>
+      <span
+        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-medium"
+        style={isEditor ? pillStyle : { color: "var(--text-secondary)", border: "1px solid var(--border)" }}
+        title={isEditor ? "You can edit everything and delete assets" : "You can look and export, not change anything"}
+      >
+        <RoleIcon className="w-3 h-3" />
+        {isEditor ? "Editor" : "Viewer"}
+      </span>
+    </>
   );
 }
 

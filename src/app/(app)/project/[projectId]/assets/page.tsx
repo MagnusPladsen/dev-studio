@@ -17,7 +17,7 @@ import { ExamplesBar } from "@/components/ExamplesBar";
 import { NewBadge, isNewTool } from "@/components/NewBadge";
 import { HelpButton } from "@/components/HelpButton";
 import { TutorialsToggle } from "@/components/TutorialsToggle";
-import { ShareButton } from "@/components/ShareProject";
+import { ShareButton, ShareStatus } from "@/components/ShareProject";
 import { ASSET_KINDS, ASSET_TYPES, assetHref, listAssets } from "@/lib/assets";
 import { COPY } from "@/copy";
 import { getRelated, relatedKey, relatedLabel } from "@/lib/links";
@@ -147,6 +147,7 @@ export default function AssetsPage() {
               {project.description}
             </p>
           )}
+          <ShareStatus projectId={projectId} projectName={project.name} />
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <HelpButton topic="assets" />

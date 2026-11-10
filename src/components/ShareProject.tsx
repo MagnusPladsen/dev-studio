@@ -3,10 +3,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { Check, Copy, Link2, Loader2, LogOut, Trash2, Users, X } from "lucide-react";
+import { Check, Copy, Eye, Link2, Loader2, LogOut, Pencil, Trash2, Users, X } from "lucide-react";
 import { useSync } from "@/components/SyncProvider";
 import { dialog } from "@/components/Dialog";
-import { useSharedProject } from "@/hooks/useSharedProject";
+import { useOwnedShares, useSharedProject } from "@/hooks/useSharedProject";
 import { getSupabase } from "@/lib/supabase";
 import {
   createInvite,
@@ -49,9 +49,51 @@ export function ShareButton({ projectId, projectName }: { projectId: string; pro
   );
 }
 
-function ShareDialog({ projectId, projectName, onClose }: { projectId: string; projectName: string; onClose(): void }) {
-  const { user } = useSync();
+/**
+ * Under the project title: who a shared project belongs to and your role, or how many people you shared yours with.
+ * Clicking it opens the Share dialog. Nothing for projects that aren't shared.
+ */
+export function ShareStatus({ projectId, projectName }: { projectId: string; projectName: string }) {
   const shared = useSharedProject(projectId);
+  const memberCount = useOwnedShares().get(projectId) ?? 0;
+  const [isOpen, setIsOpen] = useState(false);
+  if (!shared && !memberCount) return null;
+  const RoleIcon = shared?.role === "viewer" ? Eye : Pencil;
+  return (
+    <>
+      <button
+        onClick={() => setIsOpen(true)}
+        className="mt-2 inline-flex items-center gap-1.5 max-w-full px-2.5 py-1 rounded-full text-xs hover:brightness-125"
+        style={{ background: "color-mix(in srgb, var(--accent) 14%, transparent)", color: "var(--text-primary)" }}
+        title="See who has access"
+      >
+        <Users className="w-3.5 h-3.5 shrink-0" />
+        {shared ? (
+          <>
+            <span className="truncate">Shared by {shared.ownerEmail || "the owner"}</span>
+            <span className="shrink-0" style={{ color: "var(--text-secondary)" }}>·</span>
+            <RoleIcon className="w-3 h-3 shrink-0" />
+            <span className="shrink-0">You&apos;re {shared.role === "editor" ? "an editor" : "a viewer"}</span>
+          </>
+        ) : (
+          <span>
+            You shared this with {memberCount} {memberCount === 1 ? "person" : "people"}
+          </span>
+        )}
+      </button>
+      {isOpen && createPortal(<ShareDialog projectId={projectId} projectName={projectName} onClose={() => setIsOpen(false)} />, document.body)}
+    </>
+  );
+}
+
+function ShareDialog({ projectId, projectName, onClose: close }: { projectId: string; projectName: string; onClose(): void }) {
+  const { user, refreshShared } = useSync();
+  const shared = useSharedProject(projectId);
+  // member changes made in the dialog show on the projects list and the dashboard once it closes
+  const onClose = useCallback(() => {
+    refreshShared().catch(() => {});
+    close();
+  }, [close, refreshShared]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);

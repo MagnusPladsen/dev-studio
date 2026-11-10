@@ -20,6 +20,13 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.4.1-beta",
+    date: "2026-11-10",
+    items: [
+      { text: "Projects are grouped into My projects and Shared with me, and each one shows who owns it, your role, or how many people you shared it with." },
+    ],
+  },
+  {
     version: "0.4.0-beta",
     date: "2026-11-10",
     items: [

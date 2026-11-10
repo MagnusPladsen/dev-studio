@@ -31,7 +31,16 @@ import {
   uploadSnapshot,
   type SyncStatus,
 } from "@/lib/sync/cloud";
-import { fetchSharedProjects, ownerOf, removeMember, roleIn, setSharedProjects, visibleOwners } from "@/lib/sharing";
+import {
+  fetchOwnedShares,
+  fetchSharedProjects,
+  ownerOf,
+  removeMember,
+  roleIn,
+  setOwnedShares,
+  setSharedProjects,
+  visibleOwners,
+} from "@/lib/sharing";
 import { connectRealtime, createRemoteSync, type RemoteSync } from "@/lib/sync/realtime";
 import { listenToOtherTabs } from "@/lib/sync/tabs";
 import {
@@ -133,6 +142,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     userIdRef.current = null;
     setUser(null);
     setSharedProjects([]);
+    setOwnedShares(new Map());
     refreshSharedRef.current = async () => {};
     replaceCache(readLocalSnapshot());
     usePrimary(createLocalPersister(reportError));
@@ -170,6 +180,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         setStatus({ state: "saving", message: "Loading your projects…" });
         // before the sharing migration is live there is nothing shared, and that is fine
         setSharedProjects(await fetchSharedProjects(supabase).catch(() => []));
+        setOwnedShares(await fetchOwnedShares(supabase, u.id).catch(() => new Map()));
         loaded = await loadCloudSnapshot(supabase);
         replaceCache(loaded.snapshot);
       } catch (err) {
@@ -215,6 +226,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       };
       refreshSharedRef.current = async () => {
         const added = setSharedProjects(await fetchSharedProjects(supabase));
+        setOwnedShares(await fetchOwnedShares(supabase, u.id));
         const cached = new Set(cachedIds().projects);
         for (const projectId of added.filter((id) => !cached.has(id))) {
           const rows = await loadProjectRows(supabase, projectId);

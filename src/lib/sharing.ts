@@ -21,7 +21,13 @@ export type InvitePreview = {
 };
 
 let shared = new Map<string, SharedProject>();
+/** The user's own projects that have members: project id → how many people besides the owner. */
+let ownedShares = new Map<string, number>();
 const listeners = new Set<() => void>();
+
+const notify = () => {
+  for (const listener of listeners) listener();
+};
 
 export function getSharedProjects(): Map<string, SharedProject> {
   return shared;
@@ -31,8 +37,17 @@ export function getSharedProjects(): Map<string, SharedProject> {
 export function setSharedProjects(list: SharedProject[]): string[] {
   const added = list.filter((p) => !shared.has(p.projectId)).map((p) => p.projectId);
   shared = new Map(list.map((p) => [p.projectId, p]));
-  for (const listener of listeners) listener();
+  notify();
   return added;
+}
+
+export function getOwnedShares(): Map<string, number> {
+  return ownedShares;
+}
+
+export function setOwnedShares(counts: Map<string, number>): void {
+  ownedShares = counts;
+  notify();
 }
 
 export function subscribeShared(listener: () => void): () => void {
@@ -71,6 +86,15 @@ export async function fetchSharedProjects(supabase: SupabaseClient): Promise<Sha
     "my_shared_projects"
   );
   return rows.map((r) => ({ ownerId: r.owner_id, projectId: r.project_id, role: r.role, ownerEmail: r.owner_email ?? "" }));
+}
+
+/** How many members each of the user's own projects has (projects nobody else is in are left out). */
+export async function fetchOwnedShares(supabase: SupabaseClient, userId: string): Promise<Map<string, number>> {
+  const { data, error } = await supabase.from("project_members").select("project_id").eq("owner_id", userId);
+  if (error) throw new Error(error.message);
+  const counts = new Map<string, number>();
+  for (const row of (data ?? []) as { project_id: string }[]) counts.set(row.project_id, (counts.get(row.project_id) ?? 0) + 1);
+  return counts;
 }
 
 export async function listMembers(supabase: SupabaseClient, ownerId: string, projectId: string): Promise<ProjectMember[]> {
